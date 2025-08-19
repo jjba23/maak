@@ -65,11 +65,24 @@
     (if (not x) default x)))
 
 (define* (syscall cmd
-                  #:key (output-port (current-output-port)))
-  (let* ((process (open-input-pipe cmd))
-         (process-output (get-string-all process)))
-    (close-pipe process)
-    (display process-output output-port)))
+                  #:key (output-port (current-output-port))
+                  (buffer-size 4096))
+  "Executes CMD and streams its output in chunks to OUTPUT-PORT."
+  (let ((process-pipe (open-input-pipe cmd)))
+    (let loop
+      ()
+      (let ((str (read-string process-pipe buffer-size)))
+        (if (and (not (eof-object? str))
+                 (not (equal? "" str)))
+            (begin
+              (display str output-port)
+              (force-output output-port)
+              (loop)))
+        (catch #t
+               (lambda ()
+                 (close-pipe process-pipe))
+               (lambda (key . args)
+                 #t))))))
 
 (define* ($ #:rest args)
   (let* ((cmd (string-join args " ")))
