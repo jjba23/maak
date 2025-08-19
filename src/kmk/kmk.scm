@@ -84,9 +84,10 @@
                (lambda (key . args)
                  #t))))))
 
-(define* ($ #:rest args)
+(define* ($ #:key (verbose #f) #:rest args)
   (let* ((cmd (string-join args " ")))
-    (log-info "Execute command:\n~a" cmd)
+    (when verbose
+      (log-info "Execute command:\n~a\n" cmd))
     (syscall cmd)))
 
 (define-syntax-rule (get-module-var setting)
