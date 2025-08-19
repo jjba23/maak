@@ -6,7 +6,7 @@ KMK - King's Make
 
     See more at: https://codeberg.org/jjba23/kmk
 
-Usage: kmk [OPTIONS] [TASK]...
+Usage: kmk [OPTIONS] -- [TASKS]...
 Options:
     -f, --file FILE
         Specify the Scheme config - absolute path to glyph file (required).
@@ -17,8 +17,8 @@ Options:
 
 Examples:
 
-    kmk test
+    kmk -- test
 
-    kmk -f ./kmk.scm fmt
+    kmk -f ./kmk.scm -- fmt,test,run
 
 +----------------------------------------------------------------------------+
