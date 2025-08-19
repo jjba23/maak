@@ -55,7 +55,6 @@
     (log-info "Start loading tasks from file: ~a" file)
     (use-modules (kmk kmk))
     (load file)
-    (log-info "Raw tasks: ~a" raw-tasks)    
     (log-info "Start executing user tasks: ~a" tasks)
     (for-each (lambda (t)
                 (let* ((proc (get-module-var t)))

@@ -4,7 +4,7 @@
 
 ;; Default target
 (define (default)
-  (log-info "Start work on default task\n")
+  (log-info "This is a test\n")
   ($ "echo 'I am in a shell'")
   ($ "echo \"My pwd is: $(pwd)\"")
   ($ "exit 1"))
