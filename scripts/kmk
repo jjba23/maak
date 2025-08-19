@@ -46,14 +46,10 @@ show_help() {
   cat "$resources_dir/help.txt"
 }
 
-parsed_options=$(getopt -n "kmk" -o d:f:ioch --long destination:,file:,stdin,stdout,convert,help -- "$@")
+parsed_options=$(getopt -n "kmk" -o f:h --long ,file,help -- "$@")
 eval set -- "$parsed_options"
 
-destination_arg=""
 file_arg=""
-stdin_arg=""
-stdout_arg=""
-convert_arg=""
 
 guile_cmd_args=(
   "-L" "${scheme_sources_dir}"
@@ -63,26 +59,6 @@ guile_cmd_args=(
 
 while true; do
   case "${1}" in
-  -d | --destination)
-    destination_arg="${2}"
-    [[ -n "${destination_arg}" ]] && guile_cmd_args+=("--destination" "${destination_arg}")
-    shift 2
-    ;;
-  -i | --stdin)
-    guile_cmd_args+=("--stdin")
-    stdin_arg="true"
-    shift 1
-    ;;
-  -o | --stdout)
-    guile_cmd_args+=("--stdout")
-    stdout_arg="true"
-    shift 1
-    ;;
-  -c | --convert)
-    guile_cmd_args+=("--convert")
-    convert_arg="true"
-    shift 1
-    ;;
   -f | --file)
     file_arg="${2}"
     guile_cmd_args+=("--file" "${file_arg}")
@@ -94,6 +70,7 @@ while true; do
     ;;
   --)
     shift
+    guile_cmd_args+=("--tasks" "${@}")
     break
     ;;
   *)
@@ -104,29 +81,10 @@ while true; do
   esac
 done
 
-if [[ (-z "${file_arg}") && (-z "${stdin_arg}") ]]; then
-  log_error "Error: Either the file or stdin options are required!" >&2
-  log_error "Use -f / --file or alternatively -i / --stdin." >&2
-  show_help
-  exit 1
+if [[ -z "${file_arg}" ]]; then
+  guile_cmd_args+=("--file" "./kmk.scm")
 fi
 
-if [[ (-z "${stdout_arg}") && (-z "${destination_arg}") ]]; then
-  log_error "Error: Either the destination or stdout options are required!" >&2
-  log_error "Use -d / --destination or alternatively -o / --stdout." >&2
-  show_help
-  exit 1
-fi
-
-if [[ (-n "${stdout_arg}") && (-n "${convert_arg}") ]]; then
-  log_error "Error: Cannot combine stdout and convert options!" >&2
-  show_help
-  exit 1
-fi
-
-if [[ -z "${stdout_arg}" ]]; then
-  log_info "Starting Guile Glyph Generator: guile ${guile_cmd_args[*]}"
-fi
-
+echo "${guile_cmd_args[@]}"
 # Run Guile application
 exec guile "${guile_cmd_args[@]}"

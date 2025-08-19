@@ -1,4 +1,4 @@
-# ggg: guile glyph generator
+# kmk
 
 # Copyright © Josep Bigorra <jjbigorra@gmail.com>
 
@@ -15,36 +15,12 @@
 # You should have received a copy of the GNU General Public License
 # along with ggg.  If not, see <https://www.gnu.org/licenses/>.
 
-dev-run:
-	guix shell -m manifest.scm -- \
-		guile -L ./src -c '((@(ggg main) main))' \
-		--file $(realpath ./glyphs/jjba23.scm) --destination ./dist \
-		--resources-dir ./resources
-dev:
-	watchexec -i "dist/**" -r -e scm,css,js -- "make dev-run"
-
 run:
 	guix shell -f guix.scm -- \
-		ggg --file $(realpath ./glyphs/jjba23.scm) --destination ./dist
-
-run-convert:
-	guix shell -f guix.scm -- \
-		ggg --file $(realpath ./glyphs/jjba23.scm) --destination ./dist --convert
-
-run-stdin:
-	cat glyphs/jjba23.scm | guix shell -f guix.scm -- \
-		ggg --destination ./dist
-
-run-stdout:
-	guix shell -f guix.scm -- \
-		ggg --file $(realpath ./glyphs/jjba23.scm) --stdout
-
-run-stdin-stdout:
-	cat ./glyphs/jjba23.scm | guix shell -f guix.scm -- \
-		ggg -i -o
+		kmk -- fmt
 
 help:
-	guix shell -f guix.scm -- ggg --help
+	guix shell -f guix.scm -- kmk --help
 
 # Target to format source code files according to the style guide
 # Find all .scm files and format them using 'guix style'
@@ -57,10 +33,3 @@ repl:
 		guile \
 		-L ./src \
 		-c '((@ (ares server) run-nrepl-server))'
-
-# Deploy generated assets to jointhefreeworld
-deploy:
-	CI=true make run
-	mkdir -p /srv/http/jointhefreeworld.org/ggg
-	rm -rfv /srv/http/jointhefreeworld.org/ggg/dist
-	mv -v dist /srv/http/jointhefreeworld.org/ggg/dist

@@ -1,4 +1,4 @@
-;; ggg: guile glyph generator
+;; kmk
 
 ;; Copyright © Josep Bigorra <jjbigorra@gmail.com>
 

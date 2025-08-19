@@ -1,21 +1,21 @@
-;; ggg: guile glyph generator
+;; kmk
 
 ;; Copyright © Josep Bigorra <jjbigorra@gmail.com>
 
-;; ggg is free software: you can redistribute it and/or modify
+;; kmk is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
-;; ggg is distributed in the hope that it will be useful,
+;; kmk is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with ggg.  If not, see <https://www.gnu.org/licenses/>.
+;; along with kmk.  If not, see <https://www.gnu.org/licenses/>.
 
-(define-module (ggg prelude)
+(define-module (kmk prelude)
   #:declarative? #t
   #:use-module (ice-9 format)
   #:use-module (ice-9 iconv)
@@ -31,7 +31,6 @@
   #:export (log-message log
                         log-info
                         log-error
-                        serialize-style
                         assoc-ref-or
                         get-setting
                         syscall))
@@ -60,12 +59,6 @@
                        (apply format
                               (append (list #f msg) args)))))
 
-(define (serialize-style alist)
-  (string-join (map (lambda (p)
-                      (format #f "~a: ~a"
-                              (car p)
-                              (cdr p))) alist) ";"))
-
 (define (assoc-ref-or alist key default)
   (let ((x (assoc-ref alist key)))
     (if (not x) default x)))
@@ -76,8 +69,8 @@
     (close-pipe process) process-output))
 
 (define-syntax-rule (get-setting setting)
-  "Get a setting for ggg, from glyph file."
-  (let* ((val (module-variable (resolve-module '(ggg config)) setting)))
+  "Get a setting for kmk, from glyph file."
+  (let* ((val (module-variable (resolve-module '(kmk config)) setting)))
     (catch #t
            (lambda ()
              (variable-ref val))
