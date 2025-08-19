@@ -25,8 +25,11 @@ fmt-then-repl:
 	guix shell -f guix.scm -- \
 		kmk -- fmt,repl
 
+# help:
+# 	guix shell -f guix.scm -- kmk --help
 help:
-	guix shell -f guix.scm -- kmk --help
+	guix shell -f guix.scm -- \
+		kmk -- help
 
 # Target to format source code files according to the style guide
 # Find all .scm files and format them using 'guix style'

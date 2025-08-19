@@ -12,3 +12,5 @@
   ($ "guix shell -m manifest.scm --" "guile -L ./src"
      "-c '((@ (ares server) run-nrepl-server))'"))
 
+(define (help)
+  ($ "guix shell -f guix.scm -- kmk --help"))

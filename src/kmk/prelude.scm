@@ -64,10 +64,12 @@
   (let ((x (assoc-ref alist key)))
     (if (not x) default x)))
 
-(define (syscall cmd)
+(define* (syscall cmd #:key (port (current-output-port)))
   (let* ((process (open-input-pipe cmd))
          (process-output (get-string-all process)))
-    (close-pipe process) process-output))
+    (close-pipe process)
+    (display process-output port)
+    process-output))
 
 (define* ($ #:rest args)
   (let* ((cmd (string-join args " ")))
