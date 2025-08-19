@@ -34,8 +34,6 @@
              ((guix licenses)
               #:prefix license:))
 
-(packages->manifest (list (specification->package "make")
-                          guile-3.0
-                          imagemagick
-                          guile-ares-rs))
+(packages->manifest (list (specification->package "make") guile-3.0
+                          imagemagick guile-ares-rs))
 

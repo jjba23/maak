@@ -31,18 +31,26 @@
   #:export (main))
 
 (define* (main #:key (args (command-line)))
-  (log-info (format #f "args: ~a" args))
   (let* ((option-spec '((file (single-char #\f)
                               (value #t)
                               (required? #f))
+                        (resources (single-char #\r)
+                                   (value #t))
                         (tasks (single-char #\t)
                                (value #t))))
          (options (getopt-long args option-spec))
+         (resources (option-ref options
+                                'resources #f))
          (file (option-ref options
                            'file #f))
-         (tasks (option-ref options
-                            'tasks #f)))
-    (log-info "HELLO WORLD FROM KMK")
-    (log-info (format #f "file: ~a" file))
-    (log-info (format #f "tasks: ~a" tasks))))
-
+         (tasks (string-split (option-ref options
+                                          'tasks #f) #\,)))
+    (log-info "resources: ~a" resources)
+    (log-info "Start loading tasks from file: ~a" file)
+    (load file)
+    (log-info "Start executing user tasks: ~a" tasks)
+    (for-each (lambda (t)
+                (let* ((proc (get-setting (string->symbol t))))
+                  (log-info "Start task ~a" t proc)
+                  (apply proc
+                         '()))) tasks)))

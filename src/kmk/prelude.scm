@@ -33,6 +33,7 @@
                         log-error
                         assoc-ref-or
                         get-setting
+                        $
                         syscall))
 
 (define preferred-strftime-format
@@ -68,9 +69,14 @@
          (process-output (get-string-all process)))
     (close-pipe process) process-output))
 
+(define* ($ #:rest args)
+  (let* ((cmd (string-join args " ")))
+    (log-info "Execute command:\n~a" cmd)
+    (syscall cmd)))
+
 (define-syntax-rule (get-setting setting)
-  "Get a setting for kmk, from glyph file."
-  (let* ((val (module-variable (resolve-module '(kmk config)) setting)))
+  "Get a setting for kmk, from kmk file."
+  (let* ((val (module-variable (resolve-module '(kmk)) setting)))
     (catch #t
            (lambda ()
              (variable-ref val))

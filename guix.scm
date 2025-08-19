@@ -18,7 +18,7 @@
 (define-public kmk
   (package
     (name "kmk")
-    (version "0.4.0")
+    (version "0.0.1")
     (source
      (local-file %source-dir
                  #:recursive? #t
@@ -36,9 +36,6 @@
                         (mkdir-p (string-append share "/resources"))
                         (install-file "resources/help.txt"
                                       (string-append share "/resources"))
-                        (copy-recursively "resources/svg-paths"
-                                          (string-append share
-                                           "/resources/svg-paths"))
                         (install-file "scripts/kmk" bin)
                         (install-file "scripts/log.bash"
                                       (string-append share "/scripts/"))
@@ -47,16 +44,8 @@
     (native-inputs (list guile-3.0))
     (inputs (list guile-3.0 bash-minimal))
     (propagated-inputs (list imagemagick))
-    (synopsis "KMK is a SVG image generator for project and web badges")
-    (description
-     "KMK (Guile Glyph Generator) is a command-line utility
-that allows you to generate pretty images/badges which can be used for
-your projects, announcing tech used, sponsoring and appreciating
-other projects, distinguishing versions of things supported, etc.
-
-KMK is highly configurable, reads Scheme files where you define your tasks,
-and supports badges between one and three parts.  It leverages SVG generation
-from Lisp and S-expressions, building pixel perfect badges.")
+    (synopsis "KMK")
+    (description "KMK")
     (home-page "https://codeberg.org/jjba23/kmk")
     (license license:agpl3+)))
 

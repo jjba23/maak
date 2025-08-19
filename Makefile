@@ -18,6 +18,12 @@
 run:
 	guix shell -f guix.scm -- \
 		kmk -- fmt
+# guix shell -f guix.scm -- \
+# 	kmk -f ./kmk.scm -- fmt
+
+fmt-then-repl:
+	guix shell -f guix.scm -- \
+		kmk -- fmt,repl
 
 help:
 	guix shell -f guix.scm -- kmk --help

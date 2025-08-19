@@ -54,7 +54,6 @@ file_arg=""
 guile_cmd_args=(
   "-L" "${scheme_sources_dir}"
   "-c" "((@(kmk main) main))"
-  "--"
   "--resources" "${resources_dir}"
 )
 
@@ -62,7 +61,7 @@ while true; do
   case "${1}" in
   -f | --file)
     file_arg="${2}"
-    guile_cmd_args+=("--file" "${file_arg}")
+    guile_cmd_args+=("--file" "$(realpath "${file_arg}")")
     shift 2
     ;;
   -h | --help)
@@ -83,7 +82,7 @@ while true; do
 done
 
 if [[ -z "${file_arg}" ]]; then
-  guile_cmd_args+=("--file" "./kmk.scm")
+  guile_cmd_args+=("--file" "$(realpath ./kmk.scm)")
 fi
 
 echo "${guile_cmd_args[@]}"
