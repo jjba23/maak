@@ -1,0 +1,24 @@
+
++----------------------------------------------------------------------------+
+
+KMK - King's Make
+    King's Make: Scheme Make-inspired automation tool with the power of Lisp
+
+    See more at: https://codeberg.org/jjba23/kmk
+
+Usage: kmk [OPTIONS] [TASK]...
+Options:
+    -f, --file FILE
+        Specify the Scheme config - absolute path to glyph file (required).
+    -h, --help
+        Display this help message and exit.
+
++----------------------------------------------------------------------------+
+
+Examples:
+
+    kmk test
+
+    kmk -f ./kmk.scm fmt
+
++----------------------------------------------------------------------------+
