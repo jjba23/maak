@@ -54,6 +54,7 @@ file_arg=""
 guile_cmd_args=(
   "-L" "${scheme_sources_dir}"
   "-c" "((@(kmk main) main))"
+  "--"
   "--resources" "${resources_dir}"
 )
 

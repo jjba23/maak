@@ -31,12 +31,12 @@
   #:export (main))
 
 (define* (main #:key (args (command-line)))
+  (log-info (format #f "args: ~a" args))
   (let* ((option-spec '((file (single-char #\f)
                               (value #t)
                               (required? #f))
                         (tasks (single-char #\t)
-                               (value #t)
-                               (required? #t))))
+                               (value #t))))
          (options (getopt-long args option-spec))
          (file (option-ref options
                            'file #f))
