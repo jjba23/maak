@@ -15,7 +15,7 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with kmk.  If not, see <https://www.gnu.org/licenses/>.
 
-(define-module (kmk prelude)
+(define-module (kmk kmk)
   #:declarative? #t
   #:use-module (ice-9 format)
   #:use-module (ice-9 iconv)
@@ -32,7 +32,7 @@
                         log-info
                         log-error
                         assoc-ref-or
-                        get-setting
+                        get-module-var
                         $
                         syscall))
 
@@ -89,7 +89,7 @@
     (log-info "Execute command:\n~a" cmd)
     (syscall cmd)))
 
-(define-syntax-rule (get-setting setting)
+(define-syntax-rule (get-module-var setting)
   "Get a setting for kmk, from kmk file."
   (let* ((val (module-variable (resolve-module '(kmk)) setting)))
     (catch #t

@@ -1,6 +1,13 @@
 (define-module (kmk)
   #:declarative? #t
-  #:use-module (kmk prelude))
+  #:use-module (kmk kmk))
+
+;; Default target
+(define (default)
+  (log-info "Start work on default task")
+  ($ "echo 'I am in a shell'")
+  ($ "echo \"My pwd is: $(pwd)\"")
+  ($ "exit 1"))
 
 ;; Target to format source code files according to the style guide
 ;; Find all .scm files and format them using 'guix style'

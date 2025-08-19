@@ -27,7 +27,7 @@
   #:use-module (srfi srfi-1)
   #:use-module (srfi srfi-13)
   #:use-module (ice-9 getopt-long)
-  #:use-module (kmk prelude)
+  #:use-module (kmk kmk)
   #:export (main))
 
 (define* (main #:key (args (command-line)))
@@ -37,20 +37,28 @@
                         (resources (single-char #\r)
                                    (value #t))
                         (tasks (single-char #\t)
-                               (value #t))))
+                               (value #t)
+                               (required? #f))))
          (options (getopt-long args option-spec))
          (resources (option-ref options
                                 'resources #f))
          (file (option-ref options
                            'file #f))
-         (tasks (string-split (option-ref options
-                                          'tasks #f) #\,)))
+         (raw-tasks (string-split (option-ref options
+                                          'tasks "") #\,))
+         (string-tasks (if (or (not raw-tasks) (equal? 0 (length raw-tasks))
+                               (equal? raw-tasks '("")))
+                    '("default")
+                    raw-tasks))
+         (tasks (map string->symbol string-tasks)))
     (log-info "resources: ~a" resources)
     (log-info "Start loading tasks from file: ~a" file)
+    (use-modules (kmk kmk))
     (load file)
+    (log-info "Raw tasks: ~a" raw-tasks)    
     (log-info "Start executing user tasks: ~a" tasks)
     (for-each (lambda (t)
-                (let* ((proc (get-setting (string->symbol t))))
+                (let* ((proc (get-module-var t)))
                   (log-info "Start task ~a" t proc)
                   (apply proc
                          '()))) tasks)))

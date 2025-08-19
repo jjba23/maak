@@ -70,7 +70,7 @@ while true; do
     ;;
   --)
     shift
-    guile_cmd_args+=("--tasks" "${@}")
+    [ "$#" -gt 0 ] && guile_cmd_args+=("--tasks" "${@}")
     break
     ;;
   *)
