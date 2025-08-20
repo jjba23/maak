@@ -57,7 +57,7 @@ steps:
              "echo '#!/usr/bin/env bash' | sudo tee -a ./task.bash"
              "echo 'sudo guix shell -f guix.scm -- kmk deploy' | sudo tee -a ./task.bash"
              "sudo chmod +x ./task.bash"
-             "./task.bash"
+             "bash task.bash"
              "sudo rm ./task.bash"))))
             
   poll-byggsteg-job:
