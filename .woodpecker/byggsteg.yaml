@@ -53,7 +53,7 @@ steps:
             (project . "%%CI_REPO_NAME%%")
             (branch-name . "%%CI_COMMIT_BRANCH%%")            
             (clone-url . "%%CI_REPO_CLONE_URL%%")
-            (trivial-cmds . ("sudo guix build -f guix.scm"))))
+            (trivial-cmds . ("guix build -f guix.scm"))))
             
   poll-byggsteg-job:
     name: "🔄 Poll job status @ Byggsteg"    
