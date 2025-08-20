@@ -57,8 +57,4 @@
     (use-modules (kmk kmk))
     (load file)
     (log-info "Start executing user tasks: ~a" tasks)
-    (for-each (lambda (t)
-                (let* ((proc (get-module-var t)))
-                  (log-info "Start task: ~a\n" t proc)
-                  (apply proc
-                         '()))) tasks)))
+    (run-tasks tasks)))

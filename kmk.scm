@@ -22,25 +22,25 @@
 (define api-docs-css-url
   "https://jointhefreeworld.org/static-assets/api-docs/css/style.css")
 
+(define deploy-www
+  "/srv/http/jointhefreeworld.org")
+
 (define (default)
   "Default task run when no arguments are passed: do something fun."
   (let* ((entries '(1 3 5 7 9))
          (arithmetics (lambda (x)
                         (* x x 3)))
          (some-data (map arithmetics entries)))
-    (log-info "Running default task")
     (log-info "Performed some fun arithmetics:
 Result: ~a" some-data)))
 
 (define (fmt)
   "Format Scheme source code files according to the Guix style guide."
-  (log-info "Format Scheme files using Guix Style")
   ($ '("find . -maxdepth 8 -name '*.scm'" "-type f -exec guix style -f {} \\;")
      #:verbose #t))
 
 (define (vars)
   "Display some system variables."
-  (log-info "Display some system variables")
   ($ '("echo -n \"\nHome directory: ${HOME}\""))
   ($ '("echo -n \"\nShell: ${SHELL}\""))
   ($ '("echo -n \"\nUser: ${USER}\"")))
@@ -63,3 +63,10 @@ Result: ~a" some-data)))
            "./doc/api/index.texi"))
   ($ '("mv ./index ./doc/api-dist")))
 
+(define (deploy)
+  "Generate documentation for the project and publish to web directory."
+  (docs)
+  ($ (list (format #f "rm -rfv ~a/api-docs/kmk" deploy-www)
+           (format #f "mkdir -p ~a/api-docs/kmk" deploy-www)
+           (format #f "mv doc/api-dist/* ~a/api-docs/kmk" deploy-www)
+           "rm -rfv doc")))

@@ -34,7 +34,9 @@
                         assoc-ref-or
                         get-module-var
                         $
-                        syscall))
+                        syscall
+                        run-tasks
+                        run-task))
 
 (define preferred-strftime-format
   (make-parameter "%Y-%m-%d %H:%M:%S%z"))
@@ -80,7 +82,7 @@ Exit code: ~a
             #:key (verbose #f))
   (let* ((cmd (string-join cmd-parts " ")))
     (when verbose
-      (log-info "Execute command:\n~a\n" cmd))
+      (log-info "  Execute command:\n~a\n" cmd))
     (syscall cmd)))
 
 (define-syntax-rule (get-module-var setting)
@@ -91,3 +93,23 @@ Exit code: ~a
              (variable-ref val))
            (lambda (key . args)
              #f))))
+
+(define (run-tasks tasks)
+  (for-each run-task tasks))
+
+(define (run-task task)
+  (let* ((proc (get-module-var task)))
+    (cond
+      ((and (procedure? proc)
+            (equal? '(0 0 #f)
+                    (procedure-minimum-arity proc)))
+       (log-info "Start task: ~a\n" task proc)
+       (log-info "  Calling procedure: ~a"
+                 (procedure-name proc))
+       (log-info "  ~a"
+                 (procedure-documentation proc))
+       (apply proc
+              '()))
+      (else (error (format #f
+                    "Task ~a was not a valid thunk (no-argument function)"
+                    task)) #f))))
