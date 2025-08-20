@@ -79,8 +79,9 @@ Exit code: ~a
 " cmd exit-code))))))
 
 (define* ($ cmd-parts
-            #:key (verbose #f))
-  (let* ((cmd (string-join cmd-parts " ")))
+            #:key (verbose #f)
+            (join " "))
+  (let* ((cmd (string-join cmd-parts join)))
     (when verbose
       (log-info "  Execute command:\n~a\n" cmd))
     (syscall cmd)))

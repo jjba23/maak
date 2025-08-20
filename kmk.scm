@@ -19,11 +19,15 @@
   #:declarative? #t
   #:use-module (kmk kmk))
 
+;; ====== KMK file constants ======
+
 (define api-docs-css-url
   "https://jointhefreeworld.org/static-assets/api-docs/css/style.css")
 
 (define deploy-www
   "/srv/http/jointhefreeworld.org")
+
+;; ====== KMK file tasks ======
 
 (define (default)
   "Default task run when no arguments are passed: do something fun."
@@ -41,8 +45,8 @@ Result: ~a" some-data)))
 
 (define (vars)
   "Display some system variables."
-  ($ '("echo -n \"\nHome directory: ${HOME}\""))
-  ($ '("echo -n \"\nShell: ${SHELL}\""))
+  ($ '("echo -n \"\nHome directory: ${HOME}\"" "echo -n \"\nShell: ${SHELL}\"")
+     #:join " && ")
   ($ '("echo -n \"\nUser: ${USER}\"")))
 
 (define (repl)
@@ -68,5 +72,8 @@ Result: ~a" some-data)))
   (docs)
   ($ (list (format #f "rm -rfv ~a/api-docs/kmk" deploy-www)
            (format #f "mkdir -p ~a/api-docs/kmk" deploy-www)
-           (format #f "mv doc/api-dist/* ~a/api-docs/kmk" deploy-www)
-           "rm -rfv doc")))
+           (format #f "mv doc/api-dist/* ~a/api-docs/kmk" deploy-www))
+     #:join " && ")
+  ($ '("rm -rfv doc")))
+
+
