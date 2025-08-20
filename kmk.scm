@@ -19,18 +19,18 @@
   #:declarative? #t
   #:use-module (kmk kmk))
 
-;; Default target
-;; (define (default)
-;;   (log-info "This is a test\n")
-;;   ($ "echo 'I am in a shell'")
-;;   ($ "echo \"My pwd is: $(pwd)\""))
+;; Default task run when no arguments are passed: do something fun
+(define (default)
+  (let* ((entries '(1 3 5 7 9))
+         (arithmetics (lambda(x) (* x x 3)))
+         (some-data (map arithmetics entries)))
+    (log-info "Running default task")
+    (log-info "Performed some fun arithmetics:\nResult: ~a" some-data)))
 
-;; Target to format source code files according to the style guide
-;; Find all .scm files and format them using 'guix style'
+;; Format Scheme source code files according to the Guix style guide
 (define (fmt)
   (log-info "Format Scheme files using Guix Style")
-  ($ '("find . -maxdepth 8 -name \"*.scm\""
-       "-type f -exec guix style -f {} \\;")
+  ($ '("find . -maxdepth 8 -name '*.scm'" "-type f -exec guix style -f {} \\;")
      #:verbose #t))
 
 ;; Development REPL
@@ -38,6 +38,7 @@
   ($ '("guix shell -m manifest.scm --" "guile -L ./src"
        "-c '((@ (ares server) run-nrepl-server))'")))
 
+;; Display program help screen
 (define (help)
   ($ '("guix shell -f guix.scm -- kmk --help")
      #:verbose #t))
