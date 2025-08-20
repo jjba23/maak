@@ -9,7 +9,6 @@
              (gnu packages)
              (gnu packages bash)
              (gnu packages guile)
-             (gnu packages imagemagick)
              (gnu packages guile-xyz))
 
 (define %source-dir
@@ -18,7 +17,7 @@
 (define-public maak
   (package
     (name "maak")
-    (version "0.0.1")
+    (version "0.1.3")
     (source
      (local-file %source-dir
                  #:recursive? #t
@@ -43,10 +42,15 @@
     (build-system guile-build-system)
     (native-inputs (list guile-3.0))
     (inputs (list guile-3.0 bash-minimal))
-    (propagated-inputs (list imagemagick))
-    (synopsis "Maak")
-    (description "Maak")
+    (synopsis "Command runner à la Make using Guile Scheme")
+    (description
+     "Maak is a command runner and control plane for your
+projects.  It allows you to use the power of Lisp (Guile Scheme) to define
+your tasks, build steps, repetitive tasks or other automation.
+
+With Maak you can easily call external shell commands and integrate with
+your existing scripts and tools.")
     (home-page "https://codeberg.org/jjba23/maak")
-    (license license:agpl3+)))
+    (license license:gpl3+)))
 
 maak
