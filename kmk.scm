@@ -22,16 +22,25 @@
 ;; Default task run when no arguments are passed: do something fun
 (define (default)
   (let* ((entries '(1 3 5 7 9))
-         (arithmetics (lambda(x) (* x x 3)))
+         (arithmetics (lambda (x)
+                        (* x x 3)))
          (some-data (map arithmetics entries)))
     (log-info "Running default task")
-    (log-info "Performed some fun arithmetics:\nResult: ~a" some-data)))
+    (log-info "Performed some fun arithmetics:
+Result: ~a" some-data)))
 
 ;; Format Scheme source code files according to the Guix style guide
 (define (fmt)
   (log-info "Format Scheme files using Guix Style")
   ($ '("find . -maxdepth 8 -name '*.scm'" "-type f -exec guix style -f {} \\;")
      #:verbose #t))
+
+;; Display some system variables
+(define (vars)
+  (log-info "Display some system variables")
+  ($ '("echo -n \"\nHome directory: ${HOME}\""))
+  ($ '("echo -n \"\nShell: ${SHELL}\""))
+  ($ '("echo -n \"\nUser: ${USER}\"")))
 
 ;; Development REPL
 (define (repl)
