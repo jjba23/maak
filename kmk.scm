@@ -19,8 +19,11 @@
   #:declarative? #t
   #:use-module (kmk kmk))
 
-;; Default task run when no arguments are passed: do something fun
+(define api-docs-css-url
+  "https://jointhefreeworld.org/static-assets/api-docs/css/style.css")
+
 (define (default)
+  "Default task run when no arguments are passed: do something fun."
   (let* ((entries '(1 3 5 7 9))
          (arithmetics (lambda (x)
                         (* x x 3)))
@@ -29,26 +32,34 @@
     (log-info "Performed some fun arithmetics:
 Result: ~a" some-data)))
 
-;; Format Scheme source code files according to the Guix style guide
 (define (fmt)
+  "Format Scheme source code files according to the Guix style guide."
   (log-info "Format Scheme files using Guix Style")
   ($ '("find . -maxdepth 8 -name '*.scm'" "-type f -exec guix style -f {} \\;")
      #:verbose #t))
 
-;; Display some system variables
 (define (vars)
+  "Display some system variables."
   (log-info "Display some system variables")
   ($ '("echo -n \"\nHome directory: ${HOME}\""))
   ($ '("echo -n \"\nShell: ${SHELL}\""))
   ($ '("echo -n \"\nUser: ${USER}\"")))
 
-;; Development REPL
 (define (repl)
+  "Development REPL."
   ($ '("guix shell -m manifest.scm --" "guile -L ./src"
        "-c '((@ (ares server) run-nrepl-server))'")))
 
-;; Display program help screen
 (define (help)
+  "Display program help screen."
   ($ '("guix shell -f guix.scm -- kmk --help")
      #:verbose #t))
+
+(define (docs)
+  "Generate technical API documentation for KMK."
+  ($ '("rm -rfv doc"))
+  ($ (list "guix shell -m manifest.scm --" "documenta api ./src/kmk &&"
+           (format #f "texi2any -v --html --css-ref=~a" api-docs-css-url)
+           "./doc/api/index.texi"))
+  ($ '("mv ./index ./doc/api-dist")))
 

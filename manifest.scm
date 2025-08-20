@@ -24,7 +24,6 @@
              (gnu packages nss)
              (gnu packages gnupg)
              (gnu packages guile-xyz)
-             (gnu packages imagemagick)
              (gnu packages pkg-config)
              (guix build-system guile)
              (gnu packages linux)
@@ -34,6 +33,5 @@
              ((guix licenses)
               #:prefix license:))
 
-(packages->manifest (list (specification->package "make") guile-3.0
-                          imagemagick guile-ares-rs))
+(packages->manifest (list guile-3.0 guile-documenta texinfo guile-ares-rs))
 
