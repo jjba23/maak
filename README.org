@@ -1,11 +1,13 @@
-#+title: KMK: King's Make
+#+title: 👑  KMK: King's Make
 #+author: Josep Bigorra
 #+email: jjbigorra@gmail.com
 
 [[https://jointhefreeworld.org/ggg/dist/scheme-guile.svg]]  [[https://jointhefreeworld.org/ggg/dist/gnu-guix.svg]]   [[https://jointhefreeworld.org/ggg/dist/license-gpl3+.svg]]  [[https://jointhefreeworld.org/ggg/dist/license-fdl13+.svg]]
 [[https://jointhefreeworld.org/ggg/dist/jointhefreeworld-org.svg]] 
 
-🧪 Experimental! King's Make: Lisp/Scheme command runner and control plane à la Make (Guile)
+🧪 Experimental!
+
+/King's Make: Lisp/Scheme command runner and control plane à la Make (Guile)/
 
 If you like my work, please support me by [[https://bmc.link/jjbigorra][buying me a cup of coffee ☕]] so I can continue with a lot of motivation.
 
@@ -13,7 +15,9 @@ kmk has as core mission being your control center or command plane, and act as a
 
 kmk uses Lisp (Guile Scheme) for everything  λ and as such, is not limited by the lack of expressiveness and power that you encounter when using certain tools and DSLs. Here we have a full programming language's power. This also means you don't need to learn yet another syntax or language, but can use Lisp and lambda-calculus skills here.
 
-Have you ever found Makefile to be lacking expressiveness and having a limited syntax and unexpected behavior? Fear not, *King's Make* is here. Easily define functions, data, lists, loop through them, macros, etc. The full power of Scheme (Guile) directly in your command runner/control plane.
+Have you ever found Makefile to be repetitive, lacking expressiveness and having a weird, limited syntax and unexpected behavior?
+
+Fear not, *King's Make* is here 👑. With the full power of Scheme (Guile) directly in your command runner/control plane,  easily define functions, data, lists, loop through them, macros, etc.
 
 --------
 
