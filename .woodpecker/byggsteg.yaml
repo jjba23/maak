@@ -53,12 +53,7 @@ steps:
             (project . "%%CI_REPO_NAME%%")
             (branch-name . "%%CI_COMMIT_BRANCH%%")            
             (clone-url . "%%CI_REPO_CLONE_URL%%")
-            (trivial-cmds . (
-             "echo '#!/usr/bin/env bash' | sudo tee -a ./task.bash"
-             "echo 'sudo guix shell -f ./guix.scm -- kmk deploy' | sudo tee -a ./task.bash"
-             "sudo chmod +x ./task.bash"
-             "sudo bash ./task.bash"
-             "sudo rm ./task.bash"))))
+            (trivial-cmds . ("sudo guix build -f guix.scm"))))
             
   poll-byggsteg-job:
     name: "🔄 Poll job status @ Byggsteg"    
