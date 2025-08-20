@@ -5,8 +5,6 @@
 [[https://jointhefreeworld.org/ggg/dist/scheme-guile.svg]]  [[https://jointhefreeworld.org/ggg/dist/gnu-guix.svg]]   [[https://jointhefreeworld.org/ggg/dist/license-gpl3+.svg]]  [[https://jointhefreeworld.org/ggg/dist/license-fdl13+.svg]]
 [[https://jointhefreeworld.org/ggg/dist/jointhefreeworld-org.svg]] 
 
-🧪 Experimental!
-
 /Lisp/Scheme command runner and control plane à la Make (Guile)/
 
 If you like my work, please support me by [[https://bmc.link/jjbigorra][buying me a cup of coffee ☕]] so I can continue with a lot of motivation.
@@ -74,12 +72,15 @@ https://jointhefreeworld.org/api-docs/maak/API.html
 
 You can see the help by invoking Maak with the ~--help~ argument or running ~guix shell -f guix.scm -- maak help~.
 
+--------
+
 * On Guix
 
 Maak is Guix-first and caters to Guix as first-class citizen in favor of other package managers or build systems. Maak targets exclusively systems that can run Guile Scheme (and optionally Guix).
 
-* Licensing
+--------
 
+* Licensing
 
 Maak and all of its source code are free software, licensed under the GNU General Public License v3 (or newer at your convenience).
 
@@ -101,6 +102,10 @@ https://jointhefreeworld.org/blog/articles/personal/jointhefreeworld-code-of-con
 In summary, we foster an inclusive, respectful, and cooperative environment for all contributors and users of this free software project. Inspired by the ideals of the GNU Project, we strive to uphold freedom, equality, and community as guiding principles. We believe that collaboration in a community of mutual respect is essential to creating excellent free software.
 
 ---------
+
+[[https://jointhefreeworld.org/static-assets/maak/maak-smaller.png]]
+
+--------
 
 * Maak Project
 
