@@ -4,8 +4,6 @@
              ((guix licenses)
               #:prefix license:)
              (guix build-system guile)
-             ((guix build utils)
-              #:select (with-directory-excursion ))
              (gnu packages)
              (gnu packages bash)
              (gnu packages guile)
