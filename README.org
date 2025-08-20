@@ -68,6 +68,10 @@ Any thunk (no-argument function) you define in this file becomes a runnable task
 
 * Help
 
+Find the technical Guile Scheme API documentation of Maak here:
+
+https://jointhefreeworld.org/api-docs/maak/API.html
+
 You can see the help by invoking Maak with the ~--help~ argument or running ~guix shell -f guix.scm -- maak help~.
 
 * On Guix
