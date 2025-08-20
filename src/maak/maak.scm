@@ -30,8 +30,7 @@
   #:use-module (ice-9 getopt-long)
   #:export (log-message log
                         log-info
-                        log-error
-                        assoc-ref-or
+                        log-error                        
                         get-module-var
                         $
                         syscall
@@ -63,11 +62,18 @@
                        (apply format
                               (append (list #f msg) args)))))
 
-(define (assoc-ref-or alist key default)
-  (let ((x (assoc-ref alist key)))
-    (if (not x) default x)))
-
 (define* (syscall cmd)
+  "Executes a shell command and checks its exit code.
+
+Args:
+  cmd: A string representing the shell command to be executed.
+
+Returns:
+  #t if the command completes with an exit code of 0.
+
+Errors:
+  Signals an error if the command returns a non-zero exit code,
+  providing the command and the exit code in the error message."
   (let* ((exit-val (system cmd))
          (exit-code (status:exit-val exit-val)))
     (cond
@@ -82,13 +88,27 @@ Exit code: ~a
 (define* ($ cmd-parts
             #:key (verbose #f)
             (join " "))
+  "Executes a shell command constructed from a list of strings.
+  
+Args:
+  cmd-parts: A list of strings that will be joined to form the command.
+  #:key:
+    verbose: A boolean. If true, the command to be executed will be logged
+             to the info stream before execution.
+    join: A string to use as a separator when joining the command parts.
+          Defaults to a space ("
+  ").
+
+Returns:
+  The result of the `syscall` function, which typically is the exit status
+  of the executed command."
   (let* ((cmd (string-join cmd-parts join)))
     (when verbose
       (log-info "  Execute command:\n~a\n" cmd))
     (syscall cmd)))
 
 (define-syntax-rule (get-module-var setting)
-  "Get a setting for maak, from maak file."
+  "Get a variable from the currently loaded maak file module."
   (let* ((val (module-variable (resolve-module '(maak)) setting)))
     (catch #t
            (lambda ()
@@ -97,6 +117,8 @@ Exit code: ~a
              #f))))
 
 (define (list-tasks)
+  "List documentation for all maak tasks defined in the currently
+loaded module."
   (let* ((mod (resolve-module '(maak)))
          (tt (filter procedure?
                      (module-map (lambda (name var)
@@ -115,14 +137,30 @@ Exit code: ~a
                        '())) tt)))
 
 (define (maak-task? proc)
+  "Predicate that indicates whether a procedure is a valid maak task.
+The conditions for that include it being a valid Guile Scheme procedure,
+as well as being a no-argument proc (thunk)."
   (and (procedure? proc)
        (equal? '(0 0 #f)
                (procedure-minimum-arity proc))))
 
 (define (run-tasks tasks)
+  "Runs a list of tasks sequentially."
   (for-each run-task tasks))
 
 (define (run-task task)
+  "Runs a given task if it is a valid maak task (a no-argument procedure).
+Logs information about the task and its documentation before execution.
+  
+   Args:
+     task: A symbol representing the name of the task to be executed.
+  
+   Returns:
+     The result of calling the task procedure.
+  
+   Errors:
+     Signals an error if the task is not a valid thunk (no-argument function)
+     as determined by `maak-task?`."
   (let* ((proc (get-module-var task)))
     (cond
       ((maak-task? proc)
@@ -136,3 +174,4 @@ Exit code: ~a
       (else (error (format #f
                     "Task ~a was not a valid thunk (no-argument function)"
                     task)) #f))))
+
