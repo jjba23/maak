@@ -9,9 +9,11 @@ KMK - King's Make
 Usage: kmk [OPTIONS] -- [TASKS]...
 Options:
     -f, --file FILE
-        Specify the Scheme config - absolute path to glyph file (required).
+        Specify the Scheme config - path to KMK file (defaults to ./kmk.scm).
     -h, --help
         Display this help message and exit.
+    -l, --list
+        List all available tasks in the currently loaded KMK file.
 
 +----------------------------------------------------------------------------+
 

@@ -35,6 +35,7 @@
                         get-module-var
                         $
                         syscall
+                        list-tasks
                         run-tasks
                         run-task))
 
@@ -95,15 +96,37 @@ Exit code: ~a
            (lambda (key . args)
              #f))))
 
+(define (list-tasks)
+  (let* ((mod (resolve-module '(kmk)))
+         (tt (filter procedure?
+                     (module-map (lambda (name var)
+                                   (cond
+                                     ((variable? var)
+                                      (cond
+                                        ((kmk-task? (variable-ref var))
+                                         (lambda ()
+                                           (log-info "  ~a: ~a" name
+                                                     (procedure-documentation (variable-ref
+                                                                               var)))))
+                                        (else #f)))
+                                     (else #f))) mod))))
+    (for-each (lambda (t)
+                (apply t
+                       '())) tt)))
+
+
+(define (kmk-task? proc)
+  (and (procedure? proc)
+       (equal? '(0 0 #f)
+               (procedure-minimum-arity proc))))
+
 (define (run-tasks tasks)
   (for-each run-task tasks))
 
 (define (run-task task)
   (let* ((proc (get-module-var task)))
     (cond
-      ((and (procedure? proc)
-            (equal? '(0 0 #f)
-                    (procedure-minimum-arity proc)))
+      ((kmk-task? proc)
        (log-info "Start task: ~a\n" task proc)
        (log-info "  Calling procedure: ~a"
                  (procedure-name proc))

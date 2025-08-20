@@ -36,6 +36,9 @@
                               (required? #f))
                         (resources (single-char #\r)
                                    (value #t))
+                        (list (single-char #\l)
+                              (value #f)
+                              (required? #f))
                         (tasks (single-char #\t)
                                (value #t)
                                (required? #f))))
@@ -44,6 +47,8 @@
                                 'resources #f))
          (file (option-ref options
                            'file #f))
+         (should-list (option-ref options
+                                  'list #f))
          (raw-tasks (filter (lambda (t)
                               (not (equal? t "")))
                             (string-split (option-ref options
@@ -56,5 +61,8 @@
     (log-info "Start loading tasks from file: ~a" file)
     (use-modules (kmk kmk))
     (load file)
-    (log-info "Start executing user tasks: ~a" tasks)
-    (run-tasks tasks)))
+    (if should-list
+        (list-tasks)
+        (begin
+          (log-info "Start executing user tasks: ~a" tasks)
+          (run-tasks tasks)))))

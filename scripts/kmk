@@ -46,7 +46,7 @@ show_help() {
   cat "$resources_dir/help.txt"
 }
 
-parsed_options=$(getopt -n "kmk" -o f:h --long ,file,help -- "$@")
+parsed_options=$(getopt -n "kmk" -o lf:h --longoptions ,list,file,help -- "$@")
 eval set -- "$parsed_options"
 
 file_arg=""
@@ -67,6 +67,10 @@ while true; do
   -h | --help)
     show_help
     exit 0
+    ;;
+  -l | --list)
+    guile_cmd_args+=("--list")
+    shift
     ;;
   --)
     shift
