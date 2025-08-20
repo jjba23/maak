@@ -76,4 +76,3 @@ Result: ~a" some-data)))
      #:join " && ")
   ($ '("rm -rfv doc")))
 
-
