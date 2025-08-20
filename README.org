@@ -15,7 +15,7 @@ If you like my work, please support me by [[https://bmc.link/jjbigorra][buying m
 
 Have you ever found Makefile to be repetitive, lacking expressiveness and having a weird, limited syntax and unexpected arcane behavior?
 
-Fear not, *King's Make* is here 👑. With the full power of Scheme (Guile) directly in your command runner/control plane,  easily define functions, data, lists, loop through them, macros, etc.
+No fear, *Maak* is here. With the full power of Scheme (Guile) directly in your command runner/control plane,  easily define functions, data, lists, loop through them, macros, etc.
 
 * Core features
 
