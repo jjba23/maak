@@ -30,7 +30,7 @@
   #:use-module (ice-9 getopt-long)
   #:export (log-message log
                         log-info
-                        log-error                        
+                        log-error
                         get-module-var
                         $
                         syscall
@@ -161,17 +161,19 @@ Logs information about the task and its documentation before execution.
    Errors:
      Signals an error if the task is not a valid thunk (no-argument function)
      as determined by `maak-task?`."
-  (let* ((proc (get-module-var task)))
+  (let* ((proc (get-module-var task))
+         (proc-doc (procedure-documentation proc)))
     (cond
       ((maak-task? proc)
        (log-info "Start task: ~a\n" task proc)
        (log-info "  Calling procedure: ~a"
                  (procedure-name proc))
-       (log-info "  ~a"
-                 (procedure-documentation proc))
+       (when (and (not (equal? #f proc-doc))
+                  (not (equal? "" proc-doc)))
+         (log-info "  ~a" proc-doc))
+       (newline)
        (apply proc
               '()))
       (else (error (format #f
                     "Task ~a was not a valid thunk (no-argument function)"
                     task)) #f))))
-
