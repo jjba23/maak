@@ -44,8 +44,8 @@
     (native-inputs (list guile-3.0))
     (inputs (list guile-3.0 bash-minimal))
     (propagated-inputs (list imagemagick))
-    (synopsis "MAAK")
-    (description "MAAK")
+    (synopsis "Maak")
+    (description "Maak")
     (home-page "https://codeberg.org/jjba23/maak")
     (license license:agpl3+)))
 

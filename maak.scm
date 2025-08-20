@@ -19,7 +19,7 @@
   #:declarative? #t
   #:use-module (maak maak))
 
-;; ====== MAAK file constants ======
+;; ====== Maak file constants ======
 
 (define api-docs-css-url
   "https://jointhefreeworld.org/static-assets/api-docs/css/style.css")
@@ -27,7 +27,7 @@
 (define deploy-www
   "/srv/http/jointhefreeworld.org")
 
-;; ====== MAAK file tasks ======
+;; ====== Maak file tasks ======
 
 (define (default)
   "Default task run when no arguments are passed: do something fun."
@@ -60,7 +60,7 @@ Result: ~a" some-data)))
      #:verbose #t))
 
 (define (docs)
-  "Generate technical API documentation for MAAK."
+  "Generate technical API documentation for Maak."
   ($ '("rm -rfv doc"))
   ($ (list "guix shell -m manifest.scm --" "documenta api ./src/maak &&"
            (format #f "texi2any -v --html --css-ref=~a" api-docs-css-url)

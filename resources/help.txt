@@ -1,19 +1,19 @@
 
 +----------------------------------------------------------------------------+
 
-MAAK
-    MAAK: Scheme Make-inspired automation tool with the power of Lisp
+Maak
+    Maak: Scheme Make-inspired automation tool with the power of Lisp
 
     See more at: https://codeberg.org/jjba23/maak
 
 Usage: maak [OPTIONS] -- [TASKS]...
 Options:
     -f, --file FILE
-        Specify the Scheme config - path to MAAK file (defaults to ./maak.scm).
+        Specify the Scheme config - path to Maak file (defaults to ./maak.scm).
     -h, --help
         Display this help message and exit.
     -l, --list
-        List all available tasks in the currently loaded MAAK file.
+        List all available tasks in the currently loaded Maak file.
 
 +----------------------------------------------------------------------------+
 
