@@ -53,8 +53,9 @@ steps:
             (project . "%%CI_REPO_NAME%%")
             (branch-name . "%%CI_COMMIT_BRANCH%%")            
             (clone-url . "%%CI_REPO_CLONE_URL%%")
-            (trivial-cmds . ("cd /etc/byggsteg/job-clone/kmk/%%CI_REPO_NAME%%/trunk &&
-                              sudo guix build -f guix.scm -- kmk deploy"))))
+            (trivial-cmds . ("cd /etc/byggsteg/job-clone/%%CI_REPO_NAME%%/%%CI_COMMIT_BRANCH%% &&
+                              sudo guix shell -f guix.scm -- kmk deploy"))))
+                                  
             
   poll-byggsteg-job:
     name: "🔄 Poll job status @ Byggsteg"    
