@@ -44,20 +44,21 @@
                                 'resources #f))
          (file (option-ref options
                            'file #f))
-         (raw-tasks (string-split (option-ref options
-                                          'tasks "") #\,))
-         (string-tasks (if (or (not raw-tasks) (equal? 0 (length raw-tasks))
-                               (equal? raw-tasks '("")))
-                    '("default")
-                    raw-tasks))
+         (raw-tasks (filter (lambda (t)
+                              (not (equal? t "")))
+                            (string-split (option-ref options
+                                                      'tasks "") #\,)))
+         (string-tasks (if (or (not raw-tasks)
+                               (equal? 0
+                                       (length raw-tasks)))
+                           '("default") raw-tasks))
          (tasks (map string->symbol string-tasks)))
-    (log-info "resources: ~a" resources)
     (log-info "Start loading tasks from file: ~a" file)
     (use-modules (kmk kmk))
     (load file)
     (log-info "Start executing user tasks: ~a" tasks)
     (for-each (lambda (t)
                 (let* ((proc (get-module-var t)))
-                  (log-info "Start task ~a" t proc)
+                  (log-info "Start task: ~a\n" t proc)
                   (apply proc
                          '()))) tasks)))

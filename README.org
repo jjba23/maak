@@ -5,13 +5,21 @@
 [[https://jointhefreeworld.org/ggg/dist/scheme-guile.svg]]  [[https://jointhefreeworld.org/ggg/dist/gnu-guix.svg]]   [[https://jointhefreeworld.org/ggg/dist/license-gpl3+.svg]]  [[https://jointhefreeworld.org/ggg/dist/license-fdl13+.svg]]
 [[https://jointhefreeworld.org/ggg/dist/jointhefreeworld-org.svg]] 
 
-King's Make: Scheme Make-inspired automation tool with the power of Lisp (Guile Scheme)
+🧪 Experimental! King's Make: Lisp/Scheme command runner and control plane à la Make (Guile)
 
 If you like my work, please support me by [[https://bmc.link/jjbigorra][buying me a cup of coffee ☕]] so I can continue with a lot of motivation.
 
 kmk has as core mission being your control center or command plane, and act as a command runner, not a build system, so it avoids much of Make's complexity. No need for .PHONY recipes here.
 
 kmk uses Lisp (Guile Scheme) for everything, and as such, is not limited by the lack of expressiveness and power that you encounter when using certain tools and DSLs. Here we have a full programming language's power.
+
+All you will need to do to use kmk is to write a file (by default ~./kmk.scm~) where you define your kmk file module and import kmk library:
+
+#+begin_src scheme
+(define-module (kmk)
+  #:declarative? #t
+  #:use-module (kmk kmk))
+#+end_src
 
 --------
 

@@ -64,28 +64,21 @@
   (let ((x (assoc-ref alist key)))
     (if (not x) default x)))
 
-(define* (syscall cmd
-                  #:key (output-port (current-output-port))
-                  (buffer-size 4096))
-  "Executes CMD and streams its output in chunks to OUTPUT-PORT."
-  (let ((process-pipe (open-input-pipe cmd)))
-    (let loop
-      ()
-      (let ((str (read-string process-pipe buffer-size)))
-        (if (and (not (eof-object? str))
-                 (not (equal? "" str)))
-            (begin
-              (display str output-port)
-              (force-output output-port)
-              (loop)))
-        (catch #t
-               (lambda ()
-                 (close-pipe process-pipe))
-               (lambda (key . args)
-                 #t))))))
+(define* (syscall cmd)
+  (let* ((exit-val (system cmd))
+         (exit-code (status:exit-val exit-val)))
+    (cond
+      ((equal? 0 exit-code)
+       #t)
+      (else (error (format #f "
+Non-zero exit code when running!
+Command: ~a
+Exit code: ~a
+" cmd exit-code))))))
 
-(define* ($ #:key (verbose #f) #:rest args)
-  (let* ((cmd (string-join args " ")))
+(define* ($ cmd-parts
+            #:key (verbose #f))
+  (let* ((cmd (string-join cmd-parts " ")))
     (when verbose
       (log-info "Execute command:\n~a\n" cmd))
     (syscall cmd)))
