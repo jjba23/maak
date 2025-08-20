@@ -1,21 +1,21 @@
-;; kmk
+;; maak
 
 ;; Copyright © Josep Bigorra <jjbigorra@gmail.com>
 
-;; kmk is free software: you can redistribute it and/or modify
+;; maak is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
-;; kmk is distributed in the hope that it will be useful,
+;; maak is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with kmk.  If not, see <https://www.gnu.org/licenses/>.
+;; along with maak.  If not, see <https://www.gnu.org/licenses/>.
 
-(define-module (kmk kmk)
+(define-module (maak maak)
   #:declarative? #t
   #:use-module (ice-9 format)
   #:use-module (ice-9 iconv)
@@ -88,8 +88,8 @@ Exit code: ~a
     (syscall cmd)))
 
 (define-syntax-rule (get-module-var setting)
-  "Get a setting for kmk, from kmk file."
-  (let* ((val (module-variable (resolve-module '(kmk)) setting)))
+  "Get a setting for maak, from maak file."
+  (let* ((val (module-variable (resolve-module '(maak)) setting)))
     (catch #t
            (lambda ()
              (variable-ref val))
@@ -97,13 +97,13 @@ Exit code: ~a
              #f))))
 
 (define (list-tasks)
-  (let* ((mod (resolve-module '(kmk)))
+  (let* ((mod (resolve-module '(maak)))
          (tt (filter procedure?
                      (module-map (lambda (name var)
                                    (cond
                                      ((variable? var)
                                       (cond
-                                        ((kmk-task? (variable-ref var))
+                                        ((maak-task? (variable-ref var))
                                          (lambda ()
                                            (log-info "  ~a: ~a" name
                                                      (procedure-documentation (variable-ref
@@ -115,7 +115,7 @@ Exit code: ~a
                        '())) tt)))
 
 
-(define (kmk-task? proc)
+(define (maak-task? proc)
   (and (procedure? proc)
        (equal? '(0 0 #f)
                (procedure-minimum-arity proc))))
@@ -126,7 +126,7 @@ Exit code: ~a
 (define (run-task task)
   (let* ((proc (get-module-var task)))
     (cond
-      ((kmk-task? proc)
+      ((maak-task? proc)
        (log-info "Start task: ~a\n" task proc)
        (log-info "  Calling procedure: ~a"
                  (procedure-name proc))

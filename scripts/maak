@@ -2,27 +2,27 @@
 
 # Copyright © Josep Bigorra <jjbigorra@gmail.com>
 
-# kmk is free software: you can redistribute it and/or modify
+# maak is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 
-# kmk is distributed in the hope that it will be useful,
+# maak is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License
-# along with kmk. If not, see <https://www.gnu.org/licenses/>.
+# along with maak. If not, see <https://www.gnu.org/licenses/>.
 
 # Commentary:
 #
 # This bash script provides a convenient and user-friendly wrapper
-# around the command-line usage of `kmk`, allowing the
+# around the command-line usage of `maak`, allowing the
 # Guile Scheme application to behave and feel like any other
 # executable or binary that users may install to their systems.
 #
-# This also helps installing `kmk` in a convenient fashion
+# This also helps installing `maak` in a convenient fashion
 # to the Guix store and it allows us to decouple the user-facing
 # command-line interface from the internal Guile Scheme arguments
 # to the main program and library.
@@ -46,14 +46,14 @@ show_help() {
   cat "$resources_dir/help.txt"
 }
 
-parsed_options=$(getopt -n "kmk" -o lf:h --longoptions ,list,file,help -- "$@")
+parsed_options=$(getopt -n "maak" -o lf:h --longoptions ,list,file,help -- "$@")
 eval set -- "$parsed_options"
 
 file_arg=""
 
 guile_cmd_args=(
   "-L" "${scheme_sources_dir}"
-  "-c" "((@(kmk main) main))"
+  "-c" "((@(maak main) main))"
   "--resources" "${resources_dir}"
 )
 
@@ -86,7 +86,7 @@ while true; do
 done
 
 if [[ -z "${file_arg}" ]]; then
-  guile_cmd_args+=("--file" "$(realpath ./kmk.scm)")
+  guile_cmd_args+=("--file" "$(realpath ./maak.scm)")
 fi
 
 echo "${guile_cmd_args[@]}"

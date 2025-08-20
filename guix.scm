@@ -15,9 +15,9 @@
 (define %source-dir
   (dirname (current-filename)))
 
-(define-public kmk
+(define-public maak
   (package
-    (name "kmk")
+    (name "maak")
     (version "0.0.1")
     (source
      (local-file %source-dir
@@ -36,17 +36,17 @@
                         (mkdir-p (string-append share "/resources"))
                         (install-file "resources/help.txt"
                                       (string-append share "/resources"))
-                        (install-file "scripts/kmk" bin)
+                        (install-file "scripts/maak" bin)
                         (install-file "scripts/log.bash"
                                       (string-append share "/scripts/"))
-                        (chmod (string-append bin "/kmk") #o755)))))))
+                        (chmod (string-append bin "/maak") #o755)))))))
     (build-system guile-build-system)
     (native-inputs (list guile-3.0))
     (inputs (list guile-3.0 bash-minimal))
     (propagated-inputs (list imagemagick))
-    (synopsis "KMK")
-    (description "KMK")
-    (home-page "https://codeberg.org/jjba23/kmk")
+    (synopsis "MAAK")
+    (description "MAAK")
+    (home-page "https://codeberg.org/jjba23/maak")
     (license license:agpl3+)))
 
-kmk
+maak

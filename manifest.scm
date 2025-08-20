@@ -1,4 +1,4 @@
-;; kmk
+;; maak
 
 ;; Copyright © Josep Bigorra <jjbigorra@gmail.com>
 

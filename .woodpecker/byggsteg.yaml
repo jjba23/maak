@@ -54,7 +54,7 @@ steps:
             (branch-name . "%%CI_COMMIT_BRANCH%%")            
             (clone-url . "%%CI_REPO_CLONE_URL%%")
             (trivial-cmds . ("cd /etc/byggsteg/job-clone/%%CI_REPO_NAME%%/%%CI_COMMIT_BRANCH%% &&
-                              sudo guix shell -f guix.scm -- kmk deploy"))))
+                              sudo guix shell -f guix.scm -- maak deploy"))))
                                   
             
   poll-byggsteg-job:

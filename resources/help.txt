@@ -1,26 +1,26 @@
 
 +----------------------------------------------------------------------------+
 
-KMK - King's Make
-    King's Make: Scheme Make-inspired automation tool with the power of Lisp
+MAAK
+    MAAK: Scheme Make-inspired automation tool with the power of Lisp
 
-    See more at: https://codeberg.org/jjba23/kmk
+    See more at: https://codeberg.org/jjba23/maak
 
-Usage: kmk [OPTIONS] -- [TASKS]...
+Usage: maak [OPTIONS] -- [TASKS]...
 Options:
     -f, --file FILE
-        Specify the Scheme config - path to KMK file (defaults to ./kmk.scm).
+        Specify the Scheme config - path to MAAK file (defaults to ./maak.scm).
     -h, --help
         Display this help message and exit.
     -l, --list
-        List all available tasks in the currently loaded KMK file.
+        List all available tasks in the currently loaded MAAK file.
 
 +----------------------------------------------------------------------------+
 
 Examples:
 
-    kmk -- test
+    maak -- test
 
-    kmk -f ./kmk.scm -- fmt,test,run
+    maak -f ./maak.scm -- fmt,test,run
 
 +----------------------------------------------------------------------------+

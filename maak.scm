@@ -1,25 +1,25 @@
-;; kmk
+;; maak
 
 ;; Copyright © Josep Bigorra <jjbigorra@gmail.com>
 
-;; kmk is free software: you can redistribute it and/or modify
+;; maak is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
-;; kmk is distributed in the hope that it will be useful,
+;; maak is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with kmk.  If not, see <https://www.gnu.org/licenses/>.help
+;; along with maak.  If not, see <https://www.gnu.org/licenses/>.help
 
-(define-module (kmk)
+(define-module (maak)
   #:declarative? #t
-  #:use-module (kmk kmk))
+  #:use-module (maak maak))
 
-;; ====== KMK file constants ======
+;; ====== MAAK file constants ======
 
 (define api-docs-css-url
   "https://jointhefreeworld.org/static-assets/api-docs/css/style.css")
@@ -27,7 +27,7 @@
 (define deploy-www
   "/srv/http/jointhefreeworld.org")
 
-;; ====== KMK file tasks ======
+;; ====== MAAK file tasks ======
 
 (define (default)
   "Default task run when no arguments are passed: do something fun."
@@ -56,13 +56,13 @@ Result: ~a" some-data)))
 
 (define (help)
   "Display program help screen."
-  ($ '("guix shell -f guix.scm -- kmk --help")
+  ($ '("guix shell -f guix.scm -- maak --help")
      #:verbose #t))
 
 (define (docs)
-  "Generate technical API documentation for KMK."
+  "Generate technical API documentation for MAAK."
   ($ '("rm -rfv doc"))
-  ($ (list "guix shell -m manifest.scm --" "documenta api ./src/kmk &&"
+  ($ (list "guix shell -m manifest.scm --" "documenta api ./src/maak &&"
            (format #f "texi2any -v --html --css-ref=~a" api-docs-css-url)
            "./doc/api/index.texi"))
   ($ '("mv ./index ./doc/api-dist")))
@@ -70,9 +70,9 @@ Result: ~a" some-data)))
 (define (deploy)
   "Generate documentation for the project and publish to web directory."
   (docs)
-  ($ (list (format #f "rm -rfv ~a/api-docs/kmk" deploy-www)
-           (format #f "mkdir -p ~a/api-docs/kmk" deploy-www)
-           (format #f "mv doc/api-dist/* ~a/api-docs/kmk" deploy-www))
+  ($ (list (format #f "rm -rfv ~a/api-docs/maak" deploy-www)
+           (format #f "mkdir -p ~a/api-docs/maak" deploy-www)
+           (format #f "mv doc/api-dist/* ~a/api-docs/maak" deploy-www))
      #:join " && ")
   ($ '("rm -rfv doc")))
 
