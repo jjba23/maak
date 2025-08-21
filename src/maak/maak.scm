@@ -32,6 +32,7 @@
                         log-info
                         log-error
                         get-module-var
+                        delete-file-recursively
                         $
                         syscall
                         list-tasks
@@ -86,14 +87,14 @@ Exit code: ~a
 " cmd exit-code))))))
 
 (define* ($ cmd-parts
-            #:key (verbose #f)
+            #:key (verbose? #f)
             (join " "))
   "Executes a shell command constructed from a list of strings.
   
 Args:
   cmd-parts: A list of strings that will be joined to form the command.
   #:key:
-    verbose: A boolean. If true, the command to be executed will be logged
+    verbose?: A boolean. If true, the command to be executed will be logged
              to the info stream before execution.
     join: A string to use as a separator when joining the command parts.
           Defaults to a space ("
@@ -103,7 +104,7 @@ Returns:
   The result of the `syscall` function, which typically is the exit status
   of the executed command."
   (let* ((cmd (string-join cmd-parts join)))
-    (when verbose
+    (when verbose?
       (log-info "  Execute command:\n~a\n" cmd))
     (syscall cmd)))
 
@@ -177,3 +178,8 @@ Logs information about the task and its documentation before execution.
       (else (error (format #f
                     "Task ~a was not a valid thunk (no-argument function)"
                     task)) #f))))
+
+(define* (delete-file-recursively dir #:key (verbose? #f))
+  ($ (list (format #f "rm -rfv ~a" dir))
+     #:verbose? verbose?))
+

@@ -15,7 +15,7 @@
 (define-public maak
   (package
     (name "maak")
-    (version "0.1.3")
+    (version "0.1.4")
     (source
      (local-file %source-dir
                  #:recursive? #t

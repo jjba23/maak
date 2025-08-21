@@ -41,7 +41,7 @@ Result: ~a" some-data)))
 (define (fmt)
   "Format Scheme source code files according to the Guix style guide."
   ($ '("find . -maxdepth 8 -name '*.scm'" "-type f -exec guix style -f {} \\;")
-     #:verbose #t))
+     #:verbose? #t))
 
 (define (vars)
   "Display some system variables."
@@ -57,11 +57,11 @@ Result: ~a" some-data)))
 (define (help)
   "Display program help screen."
   ($ '("guix shell -f guix.scm -- maak --help")
-     #:verbose #t))
+     #:verbose? #t))
 
 (define (docs)
   "Generate technical API documentation for Maak."
-  ($ '("rm -rfv doc"))
+  (delete-file-recursively "doc")
   ($ (list "guix shell -m manifest.scm --" "documenta api ./src/maak &&"
            (format #f "texi2any -v --html --css-ref=~a" api-docs-css-url)
            "./doc/api/index.texi"))
@@ -75,4 +75,5 @@ Result: ~a" some-data)))
            (format #f "mv doc/api-dist/* ~a/api-docs/maak" deploy-www))
      #:join " && ")
   ($ '("rm -rfv doc")))
+
 
