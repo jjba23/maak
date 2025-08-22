@@ -192,7 +192,7 @@ Logs information about the task and its documentation before execution.
                   #:key (verbose? #f))
   ($ (list (~ "mkdir -pv ~a" dir))))
 
-(define (remkdir-p dir
+(define* (remkdir-p dir
                    #:key (verbose? #f))
   (delete-file-recursively dir #:verbose? verbose?)
   (mkdir-p dir #:verbose? verbose?))
