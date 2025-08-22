@@ -41,6 +41,8 @@ All you will need to do to use Maak is to write a file (by default ~./maak.scm~)
 
 Any thunk (no-argument function) you define in this file becomes a runnable task. If no task is passed via command-line, Maak will run the ~default~ task.
 
+Beware not to use names for tasks that conflict with names of built-in Scheme functions as this can cause some problems. For example, avoid calling something ~format~ or ~display~, choose something else instead.
+
 #+begin_src scheme
 ;; Format Scheme source code files according to the Guix style guide
 (define (fmt)

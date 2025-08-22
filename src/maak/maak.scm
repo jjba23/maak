@@ -33,7 +33,11 @@
                         log-error
                         get-module-var
                         delete-file-recursively
+                        mkdir-p
+                        mv
+                        remkdir-p
                         $
+                        ~
                         syscall
                         list-tasks
                         run-tasks
@@ -179,7 +183,25 @@ Logs information about the task and its documentation before execution.
                     "Task ~a was not a valid thunk (no-argument function)"
                     task)) #f))))
 
-(define* (delete-file-recursively dir #:key (verbose? #f))
-  ($ (list (format #f "rm -rfv ~a" dir))
+(define* (delete-file-recursively dir
+                                  #:key (verbose? #f))
+  ($ (list (~ "rm -rfv ~a" dir))
      #:verbose? verbose?))
+
+(define* (mkdir-p dir
+                  #:key (verbose? #f))
+  ($ (list (~ "mkdir -pv ~a" dir))))
+
+(define (remkdir-p dir
+                   #:key (verbose? #f))
+  (delete-file-recursively dir #:verbose? verbose?)
+  (mkdir-p dir #:verbose? verbose?))
+
+(define* (mv x y #:key (verbose? #f))
+  ($ (list (~ "mv -v ~a ~a" x y))
+     #:verbose? verbose?))
+
+(define* (~ #:rest args)
+  (apply format
+         (append '(#f) args)))
 

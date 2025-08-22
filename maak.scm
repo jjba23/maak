@@ -63,17 +63,14 @@ Result: ~a" some-data)))
   "Generate technical API documentation for Maak."
   (delete-file-recursively "doc")
   ($ (list "guix shell -m manifest.scm --" "documenta api ./src/maak &&"
-           (format #f "texi2any -v --html --css-ref=~a" api-docs-css-url)
+           (~ "texi2any -v --html --css-ref=~a" api-docs-css-url)
            "./doc/api/index.texi"))
-  ($ '("mv ./index ./doc/api-dist")))
+  (mv "./index" "./doc/api-dist"))
 
 (define (deploy)
   "Generate documentation for the project and publish to web directory."
   (docs)
-  ($ (list (format #f "rm -rfv ~a/api-docs/maak" deploy-www)
-           (format #f "mkdir -p ~a/api-docs/maak" deploy-www)
-           (format #f "mv doc/api-dist/* ~a/api-docs/maak" deploy-www))
-     #:join " && ")
-  ($ '("rm -rfv doc")))
-
-
+  (remkdir-p (~ "~a/api-docs/maak" deploy-www))
+  (mv "doc/api-dist/*"
+      (~ "~a/api-docs/maak" deploy-www))
+  (delete-file-recursively "doc"))
