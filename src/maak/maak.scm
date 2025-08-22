@@ -33,6 +33,8 @@
                         log-error
                         get-module-var
                         delete-file-recursively
+                        manifest-shell
+                        program-shell
                         mkdir-p
                         mv
                         remkdir-p
@@ -193,15 +195,30 @@ Logs information about the task and its documentation before execution.
   ($ (list (~ "mkdir -pv ~a" dir))))
 
 (define* (remkdir-p dir
-                   #:key (verbose? #f))
-  (delete-file-recursively dir #:verbose? verbose?)
-  (mkdir-p dir #:verbose? verbose?))
+                    #:key (verbose? #f))
+  (delete-file-recursively dir
+                           #:verbose? verbose?)
+  (mkdir-p dir
+           #:verbose? verbose?))
 
-(define* (mv x y #:key (verbose? #f))
+(define* (mv x y
+             #:key (verbose? #f))
   ($ (list (~ "mv -v ~a ~a" x y))
      #:verbose? verbose?))
 
 (define* (~ #:rest args)
   (apply format
          (append '(#f) args)))
+
+(define* (manifest-shell cmd
+                         #:key (verbose? #f)
+                         (manifest "manifest.scm"))
+  ($ (list (~ "guix shell -m ~a -- ~a" manifest cmd))
+     #:verbose? verbose?))
+
+(define* (program-shell cmd
+                        #:key (verbose? #f)
+                        (file "guix.scm"))
+  ($ (list (~ "guix shell -f ~a -- ~a" file cmd))
+     #:verbose? verbose?))
 

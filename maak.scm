@@ -56,15 +56,15 @@ Result: ~a" some-data)))
 
 (define (help)
   "Display program help screen."
-  ($ '("guix shell -f guix.scm -- maak --help")
-     #:verbose? #t))
+  (program-shell "maak --help"))
 
 (define (docs)
   "Generate technical API documentation for Maak."
   (delete-file-recursively "doc")
-  ($ (list "guix shell -m manifest.scm --" "documenta api ./src/maak &&"
-           (~ "texi2any -v --html --css-ref=~a" api-docs-css-url)
-           "./doc/api/index.texi"))
+  (manifest-shell (string-join (list "documenta api ./src/maak && "
+                                     (~ "texi2any -v --html --css-ref=~a"
+                                        api-docs-css-url)
+                                     "./doc/api/index.texi") " "))
   (mv "./index" "./doc/api-dist"))
 
 (define (deploy)
