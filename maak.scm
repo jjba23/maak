@@ -31,13 +31,21 @@
 
 ;; ====== Maak file tasks ======
 
+(define (help)
+  "Display program help screen."
+  (program-shell '("maak --help")))
+
 (define (default)
-  "Default task run when no arguments are passed: do something fun."
+  "Default task to run, call program's help."
+  (help))
+
+(define (arithmetics)
+  "Do some quick math."
   (let* ((entries '(1 3 5 7 9))
          (arithmetics (lambda (x)
                         (* x x 3)))
          (some-data (map arithmetics entries)))
-    (log-info "Performed some fun arithmetics:
+    (log-info "Performed some quick math:
 Result: ~a" some-data)))
 
 (define (fmt)
@@ -55,10 +63,6 @@ Result: ~a" some-data)))
   "Development REPL."
   (manifest-shell '("guile -L ./src"
                     "-c '((@ (ares server) run-nrepl-server))'")))
-
-(define (help)
-  "Display program help screen."
-  (program-shell '("maak --help")))
 
 (define (docs)
   "Generate technical API documentation for Maak."
