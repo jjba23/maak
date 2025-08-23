@@ -89,6 +89,5 @@ if [[ -z "${file_arg}" ]]; then
   guile_cmd_args+=("--file" "$(realpath ./maak.scm)")
 fi
 
-echo "${guile_cmd_args[@]}"
 # Run Guile application
 exec guile "${guile_cmd_args[@]}"
