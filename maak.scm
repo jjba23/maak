@@ -21,10 +21,12 @@
 
 ;; ====== Maak file constants ======
 
+;; The absolute URL for the CSS stylesheet used to style API documentation.
 (define api-docs-css-url
   "https://jointhefreeworld.org/static-assets/api-docs/css/style.css")
 
-(define deploy-www
+;; The absolute path to the directory where the main project files will be deployed.
+(define deploy-dir
   "/srv/http/jointhefreeworld.org")
 
 ;; ====== Maak file tasks ======
@@ -69,7 +71,7 @@ Result: ~a" some-data)))
 (define (deploy)
   "Generate documentation for the project and publish to web directory."
   (docs)
-  (remkdir-p (~ "~a/api-docs/maak" deploy-www))
+  (remkdir-p (~ "~a/api-docs/maak" deploy-dir))
   (mv "doc/api-dist/*"
-      (~ "~a/api-docs/maak" deploy-www))
+      (~ "~a/api-docs/maak" deploy-dir))
   (delete-file-recursively "doc"))
