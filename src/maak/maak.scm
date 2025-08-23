@@ -210,15 +210,17 @@ Logs information about the task and its documentation before execution.
   (apply format
          (append '(#f) args)))
 
-(define* (manifest-shell cmd
+(define* (manifest-shell cmd-parts
                          #:key (verbose? #f)
+                         (join " ")
                          (manifest "manifest.scm"))
-  ($ (list (~ "guix shell -m ~a -- ~a" manifest cmd))
+  ($ (append (list (~ "guix shell -m ~a -- " manifest)) cmd-parts)
      #:verbose? verbose?))
 
-(define* (program-shell cmd
+(define* (program-shell cmd-parts
                         #:key (verbose? #f)
+                        (join " ")
                         (file "guix.scm"))
-  ($ (list (~ "guix shell -f ~a -- ~a" file cmd))
+  ($ (append (list (~ "guix shell -f ~a -- " file)) cmd-parts)
      #:verbose? verbose?))
 

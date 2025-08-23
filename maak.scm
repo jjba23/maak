@@ -51,20 +51,19 @@ Result: ~a" some-data)))
 
 (define (repl)
   "Development REPL."
-  ($ '("guix shell -m manifest.scm --" "guile -L ./src"
-       "-c '((@ (ares server) run-nrepl-server))'")))
+  (manifest-shell '("guile -L ./src"
+                    "-c '((@ (ares server) run-nrepl-server))'")))
 
 (define (help)
   "Display program help screen."
-  (program-shell "maak --help"))
+  (program-shell '("maak --help")))
 
 (define (docs)
   "Generate technical API documentation for Maak."
   (delete-file-recursively "doc")
-  (manifest-shell (string-join (list "documenta api ./src/maak && "
-                                     (~ "texi2any -v --html --css-ref=~a"
-                                        api-docs-css-url)
-                                     "./doc/api/index.texi") " "))
+  (manifest-shell (list "documenta api ./src/maak && "
+                        (~ "texi2any -v --html --css-ref=~a" api-docs-css-url)
+                        "./doc/api/index.texi"))
   (mv "./index" "./doc/api-dist"))
 
 (define (deploy)
