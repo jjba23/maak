@@ -5,7 +5,7 @@
 [[https://jointhefreeworld.org/ggg/dist/scheme-guile.svg]]  [[https://jointhefreeworld.org/ggg/dist/gnu-guix.svg]]   [[https://jointhefreeworld.org/ggg/dist/license-gpl3+.svg]]  [[https://jointhefreeworld.org/ggg/dist/license-fdl13+.svg]]
 [[https://jointhefreeworld.org/ggg/dist/jointhefreeworld-org.svg]] 
 
-/Lisp/Scheme command runner and control plane à la Make (Guile)/
+/The infinitely extensible command runner, control plane and project automator à la Make (Guile Scheme - Lisp)/
 
 If you like my work, please support me by [[https://bmc.link/jjbigorra][buying me a cup of coffee ☕]] so I can continue with a lot of motivation.
 
@@ -13,13 +13,35 @@ If you like my work, please support me by [[https://bmc.link/jjbigorra][buying m
 
 Have you ever found Makefile to be repetitive, lacking expressiveness and having a weird, limited syntax and unexpected arcane behavior?
 
-No fear, *Maak* is here. With the full power of Scheme (Guile) directly in your command runner/control plane,  easily define functions, data, lists, loop through them, macros, etc.
+No fear, *Maak* is here. With the full power of Lisp directly in your command runner/control plane,  easily define functions, data, lists, loop through them, macros, etc. Maak replaces the arcane syntax of Make with the power and elegance of a full-featured functional programming language: GNU Guile Scheme λ.
+
+*** The Problems with Make
+
+Many developers find GNU Make and related tooling to be at times frustrating and not intuitive, despite being so powerful.
+
+Makefile often contains /repetitive/ code, particularly when dealing with similar targets or file types. You might have to write a separate rule for every single output file, even if the process is exactly the same. The limited syntax makes it difficult to abstract this logic into reusable functions or macros, leading to a lot of copy-pasting.
+
+Make's syntax is a Domain-Specific Language (DSL), not a general-purpose programming language. While it's powerful for its intended purpose of managing dependencies, it's /terrible for anything else/.
+
+Defining variables, using conditionals, or looping over a list of items can be surprisingly clunky and often requires arcane, non-standard constructs.
+
+Make has many "gotchas" that can trip up even experienced users.
+
+*** How Maak Solves These Problems
+
+Maak positions itself as a modern infinitely extensible task runner, using the functional programming language  GNU Guile Scheme (a dialect of Lisp). No need for .PHONY recipes here.
+
+Maak gives you the power of Scheme. You're not restricted to a limited, weird syntax. This means you can easily define functions to avoid repetition, create complex data structures (like lists and maps), and use control flow statements (like loops and conditionals) to write much cleaner and more expressive scripts.
+
+Instead of having to learn a new, limited language, you can leverage your existing Lisp knowledge to define tasks, manage data, and automate your workflows. This leads to code that is much easier to read, write, and maintain. For example, you can write a simple loop to process all your source files instead of writing a separate rule for each one.
+
+Maak is designed to be your central control plane. While Make is primarily focused on building software from source, Maak is a general-purpose command runner. This means you can use it for tasks like running tests, deploying applications, or managing your development environment. It's meant to be a more flexible and powerful alternative for all your project's automation needs.
+
+
 
 * Core features
 
-Maak has as core mission being your control center or command plane, and act as a command runner, not necessarily a build system, so it avoids much of Make's complexity. No need for .PHONY recipes here.
 
-Maak replaces the arcane syntax of Make with the power and elegance of a full-featured programming language: GNU Guile Scheme λ.
 
 Instead of learning a limited DSL, you can leverage your existing Lisp skills to define tasks, manage data, and automate your workflows with ease. Define functions, manipulate lists, use conditional, create macros—the entire language is at your disposal.
 
