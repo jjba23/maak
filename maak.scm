@@ -45,8 +45,7 @@
          (arithmetics (lambda (x)
                         (* x x 3)))
          (some-data (map arithmetics entries)))
-    (log-info "Performed some quick math:
-Result: ~a" some-data)))
+    (log-info "Performed some quick math:\nResult: ~a" some-data)))
 
 (define (fmt)
   "Format Scheme source code files according to the Guix style guide."
@@ -79,3 +78,14 @@ Result: ~a" some-data)))
   (mv "doc/api-dist/*"
       (~ "~a/api-docs/maak" deploy-dir))
   (delete-file-recursively "doc"))
+
+(define (package-docker)
+  "Create a Docker image for Maak."
+  ($ '("guix pack --file=./guix.scm" "--format=docker" "--image-tag=maak"
+       "-S /bin=bin" "bash coreutils util-linux-with-udev guile")))
+
+;; To load generated Docker images
+;; docker load < /gnu/store/....tar.gz
+;;
+;; docker container run -v /home/joe:/home/joe \
+;;     localhost/maak:latest maak -f /home/joe/hacking/maak/maak.scm --list
