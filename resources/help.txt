@@ -2,9 +2,11 @@
 +----------------------------------------------------------------------------+
 
 Maak
-    Maak: Scheme Make-inspired automation tool with the power of Lisp
+    The infinitely extensible command runner, control plane
+        and project automator à la Make (Guile Scheme - Lisp)
 
     See more at: https://codeberg.org/jjba23/maak
+    License: GNU GPL v3 or newer
 
 Usage: maak [OPTIONS] -- [TASKS]...
 Options:
@@ -19,7 +21,7 @@ Options:
 
 Examples:
 
-    maak -- test
+    maak test
 
     maak -f ./maak.scm -- fmt,test,run
 
