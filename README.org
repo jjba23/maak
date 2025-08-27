@@ -91,20 +91,23 @@ Any thunk (no-argument function) you define in this file becomes a runnable task
 
 * Help
 
-Find the technical Guile Scheme API documentation of Maak here:
+The project's automation is done using Maak itself, check the ~maak.scm~ file.
+
+Also, find the technical Guile Scheme API documentation of Maak here:
 
 https://jointhefreeworld.org/api-docs/maak/API.html
 
-You can see the help by invoking Maak with the ~--help~ argument or running ~guix shell -f guix.scm -- maak help~.
+You can see the program's help by invoking ggg with the ~--help~ argument or looking at ~resources/help.txt~. 
 
 --------
 
 * Installing
 
-Maak is flexible and versatile, and has very few dependencies. As such, it is trivial to package to many systems. Currently we support:
+maak is officially distributed via:
+- Guix package manager
+- Podman/Docker images
 
-- Guix
-- Podman/Docker  
+/That being said, feel free to use it as you wish, within the terms of the GNU General Public License v3 or newer./    
 
 ** On Guix
 
