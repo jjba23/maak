@@ -36,6 +36,7 @@
                         manifest-shell
                         program-shell
                         mkdir-p
+                        cp
                         mv
                         remkdir-p
                         $
@@ -202,6 +203,19 @@ Logs information about the task and its documentation before execution.
 (define* (mv x y
              #:key (verbose? #f))
   ($ (list (~ "mv -v ~a ~a" x y))
+     #:verbose? verbose?))
+
+(define* (cp x
+             y
+             #:key (recursive? #t)
+             (force? #f)
+             (verbose? #f))
+  ($ (list (~ "cp ~a ~a ~a ~a ~a"
+              (if recursive? "-r" "")
+              (if force? "-f" "")
+              (if verbose? "-v" "")
+              x
+              y))
      #:verbose? verbose?))
 
 (define* (~ #:rest args)
