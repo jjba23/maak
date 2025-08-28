@@ -30,8 +30,10 @@
              (gnu packages compression)
              (gnu packages texinfo)
              (gnu packages autotools)
+             (gnu packages rust-apps)
              ((guix licenses)
               #:prefix license:))
 
-(packages->manifest (list guile-3.0 guile-documenta texinfo guile-ares-rs))
+(packages->manifest (list guile-3.0 guile-documenta texinfo guile-ares-rs
+                          watchexec))
 

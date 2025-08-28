@@ -29,6 +29,8 @@
 (define deploy-dir
   "/srv/http/jointhefreeworld.org")
 
+(define hot-reload-file-types '(scm))
+
 ;; ====== Maak file tasks ======
 
 (define (help)
@@ -83,3 +85,23 @@
   "Create a Docker image for Maak."
   ($ '("guix pack --file=./guix.scm" "--format=docker" "--image-tag=maak"
        "-S /bin=bin" "bash coreutils util-linux-with-udev guile")))
+
+(define (hot-reload)
+  "Hot-reloading developer's setup."
+  (manifest-shell (list "watchexec 'maak --list'"
+                        "--clear"
+                        (~ "--exts ~a"
+                           (string-join (map symbol->string
+                                             hot-reload-file-types) ","))
+                        "--on-busy-update=restart"
+                        "--shell bash"
+                        "--watch .")))
+
+(define (hr)
+  "Alias to hot-reloading."
+  (hot-reload))
+
+(define (dev)
+  "Developer's setup."
+  (hot-reload))
+
