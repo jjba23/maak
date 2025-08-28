@@ -209,11 +209,12 @@ Logs information about the task and its documentation before execution.
              y
              #:key (recursive? #t)
              (force? #f)
-             (verbose? #f))
+             (verbose? #f)
+             (verbose-copy? #t))
   ($ (list (~ "cp ~a ~a ~a ~a ~a"
               (if recursive? "-r" "")
               (if force? "-f" "")
-              (if verbose? "-v" "")
+              (if verbose-copy? "-v" "")
               x
               y))
      #:verbose? verbose?))
