@@ -49,7 +49,7 @@
   (make-parameter "%Y-%m-%d %H:%M:%S%z"))
 
 (define (log-message msg)
-  (display (format #f "\n\x1b[1m~a\x1b[0m" msg)))
+  (display (format #f "\n~a" msg)))
 
 (define (log msg . args)
   (log-message (apply format
@@ -130,14 +130,12 @@ loaded module."
          (tt (filter procedure?
                      (module-map (lambda (name var)
                                    (cond
-                                     ((variable? var)
-                                      (cond
-                                        ((maak-task? (variable-ref var))
-                                         (lambda ()
-                                           (log-info "  ~a: ~a" name
-                                                     (procedure-documentation (variable-ref
-                                                                               var)))))
-                                        (else #f)))
+                                     ((and (variable? var)
+                                           (maak-task? (variable-ref var)))
+                                      (lambda ()
+                                        (log-info "  ~a: ~a" name
+                                                  (procedure-documentation (variable-ref
+                                                                            var)))))
                                      (else #f))) mod))))
     (for-each (lambda (t)
                 (apply t
