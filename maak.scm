@@ -29,7 +29,8 @@
 (define deploy-dir
   "/srv/http/jointhefreeworld.org")
 
-(define hot-reload-file-types '(scm))
+(define hot-reload-file-types
+  '(scm))
 
 ;; ====== Maak file tasks ======
 
@@ -104,4 +105,9 @@
 (define (dev)
   "Developer's setup."
   (hot-reload))
+
+(define (pure-dev)
+  "Pure isolated development shell."
+  ($ '("guix shell --pure -f guix.scm"
+       "bash coreutils util-linux-with-udev guile" "-- maak --list")))
 
