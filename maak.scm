@@ -23,7 +23,7 @@
 
 ;; The URL for the CSS stylesheet used to style API documentation.
 (define api-docs-css-url
-  "https://jointhefreeworld.org/static-assets/api-docs/css/style.css")
+  "https://jointhefreeworld.org/static/css/jointhefreeworld.css")
 
 ;; The path to the directory where the main project files will be deployed.
 (define deploy-dir
