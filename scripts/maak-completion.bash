@@ -10,7 +10,7 @@ maak_completions() {
   local opts
   opts=$(awk '/^\(define \(/ { gsub("[()]", ""); print $2 }' "${maak_file_name}")
 
-  COMPREPLY=($(compgen -W "${opts}" -- "${current_word}"))
+  mapfile -t COMPREPLY < <(compgen -W "${opts}" -- "${current_word}")
   return 0
 }
 
