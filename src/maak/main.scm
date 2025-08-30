@@ -59,7 +59,6 @@
                            '("default") raw-tasks))
          (tasks (map string->symbol string-tasks)))
     (log-info "Start loading tasks from file: ~a" file)
-    (use-modules (maak maak))
     (load file)
     (if should-list
         (list-tasks)

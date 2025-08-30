@@ -42,6 +42,7 @@
                         $
                         ~
                         syscall
+                        cat
                         list-tasks
                         run-tasks
                         run-task))
@@ -128,18 +129,22 @@ Returns:
   "List documentation for all maak tasks defined in the currently
 loaded module."
   (let* ((mod (resolve-module '(maak)))
-         (tt (filter procedure?
+         (tt (filter (lambda(x) (not (equal? #f x)))
                      (module-map (lambda (name var)
                                    (cond
                                      ((and (variable? var)
                                            (maak-task? (variable-ref var)))
-                                      (lambda ()
-                                        (log-info "  ~a: ~a" name
-                                                  (procedure-documentation (variable-ref
-                                                                            var)))))
+                                      (cons name (lambda ()
+                                        (let* ((function-docstring (procedure-documentation
+                                                                    (variable-ref
+                                                                     var))))
+                                          (if (string? function-docstring)
+                                              (log-info "  ~a: ~a" name
+                                                        function-docstring)
+                                              (log-info "  ~a" name))))))
                                      (else #f))) mod))))
     (for-each (lambda (t)
-                (apply t
+                (apply (cdr t)
                        '())) tt)))
 
 (define (maak-task? proc)
@@ -203,6 +208,11 @@ Logs information about the task and its documentation before execution.
 (define* (mv x y
              #:key (verbose? #f))
   ($ (list (~ "mv -v ~a ~a" x y))
+     #:verbose? verbose?))
+
+(define* (cat file
+              #:key (verbose? #f))
+  ($ (list (~ "cat ~a" file))
      #:verbose? verbose?))
 
 (define* (cp x
