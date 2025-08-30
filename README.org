@@ -212,23 +212,17 @@ https://www.gnu.org/licenses/fdl-1.3.html
 
 * REPL: Interactive workflow, developer power
 
-Using Lisp in a Read-Eval-Print Loop (REPL) can be compared to having superpowers when developing software, prototyping and testing and debugging 🦸🏼. In the paragraphs below, we explain why this is so powerful and beneficial, and why it is an important practice for the development process of this project.
+A REPL (Read-Eval-Print Loop) is an interactive environment, which can be used connected to your console, running application, language compiler and more, which gives you superpowers as an engineer 🦸🏼.
 
-A REPL gives you a Live Workbench. Instead of writing an entire program and then running it to see if it works, you can write and execute small pieces of code one at a time directly in the REPL. This allows you to build your application incrementally, testing each function or expression as you go. You can define a function, call it with different arguments, and immediately see the results.
+It fundamentally changes the development workflow by eliminating the slow /edit, save, compile, run/ cycle. Instead of writing a whole program and then running it to see what happens, you get a fast, conversational workflow. What does this mean for in practice?
 
-This eliminates the slow feedback loop of "edit code, save, run, inspect output, repeat" and replaces it with a fast, conversational workflow.
+- *Incremental Development:* Write, test, inspect, evaluate one function or even one line at a time. Get immediate feedback without running the entire app.
+- *Powerful Debugging:* Forget adding ~print~ statements and restarting. You can pause, inspect objects, change values, and even redefine a broken function on the fly to test a fix in any environment (yes even in production, while running).
+- *Fast Prototyping & Learning:* Instantly experiment with a new library or API. Just load it and start calling functions to see how they work, which is much faster than only reading documentation.
 
-This also means you don't have to guess or rely on verbose logging to understand what your code is doing. Instead of running a full task and hoping for the best, you can execute individual pieces of your code interactively. You can examine objects, change their values, and even redefine functions on the fly to test a fix.
+When integrated into your code editor, you can execute any piece of code (a line, a selection, or a file) with a keyboard shortcut and see the result instantly, creating a seamless and powerful development experience.
 
-This is a far more powerful and less painful process than traditional breakpoint or println debugging, which often requires restarting the entire program to test a change. REPL provides a live, interactive console where you can enter expressions and functions and instantly see the results.
-
-A good Read-Eval-Print Loop (REPL), when integrated into a text editor and paired with a powerful dynamic language, brings a paradigm shift, with several key advantages.
-
-For learning a new library or API, the REPL is an unparalleled tool. You can load the library and start calling its functions immediately, seeing what they return and how they behave. This is a much more engaging and effective way to learn than just reading documentation. The REPL is also an ideal environment for rapid prototyping, allowing you to quickly build and test proof-of-concept ideas without the overhead of a full application structure.
-
-A good integration of the REPL into the text editor means you don't have to switch contexts between writing and executing code. This is light-years ahead of most development workflows out there. You can then evaluate the current line, a selection, or the entire buffer with a single keyboard shortcut. Also you can see the output of your code in a dedicated REPL window right next to your source code. 
-
-Guile Scheme has great support for this. I personally of course like to do this with [[https://guix.gnu.org/][Guix]], [[https://www.gnu.org/software/emacs/][Emacs]], [[https://git.sr.ht/~abcdw/emacs-arei][Arei/Ares]] + [[https://github.com/vspinu/sesman][sesman]]) you can get an ultimate extensible powerful editor experience, miles ahead of traditional IDEs 🐂 .
+Lisps, more specifically Guile Scheme, have great support for this. I personally of course like to do this with [[https://guix.gnu.org/][Guix]], [[https://www.gnu.org/software/emacs/][Emacs]], [[https://git.sr.ht/~abcdw/emacs-arei][Arei/Ares]] + [[https://github.com/vspinu/sesman][sesman]]) you can get an ultimate extensible powerful editor experience, miles ahead of traditional IDEs 🐂 .
 
 -----------
 
