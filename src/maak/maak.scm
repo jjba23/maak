@@ -36,11 +36,13 @@
                         manifest-shell
                         program-shell
                         mkdir-p
+                        cp
                         mv
                         remkdir-p
                         $
                         ~
                         syscall
+                        cat
                         list-tasks
                         run-tasks
                         run-task))
@@ -49,7 +51,7 @@
   (make-parameter "%Y-%m-%d %H:%M:%S%z"))
 
 (define (log-message msg)
-  (display (format #f "\n\x1b[1m~a\x1b[0m" msg)))
+  (display (format #f "\n~a" msg)))
 
 (define (log msg . args)
   (log-message (apply format
@@ -127,20 +129,22 @@ Returns:
   "List documentation for all maak tasks defined in the currently
 loaded module."
   (let* ((mod (resolve-module '(maak)))
-         (tt (filter procedure?
+         (tt (filter (lambda(x) (not (equal? #f x)))
                      (module-map (lambda (name var)
                                    (cond
-                                     ((variable? var)
-                                      (cond
-                                        ((maak-task? (variable-ref var))
-                                         (lambda ()
-                                           (log-info "  ~a: ~a" name
-                                                     (procedure-documentation (variable-ref
-                                                                               var)))))
-                                        (else #f)))
+                                     ((and (variable? var)
+                                           (maak-task? (variable-ref var)))
+                                      (cons name (lambda ()
+                                        (let* ((function-docstring (procedure-documentation
+                                                                    (variable-ref
+                                                                     var))))
+                                          (if (string? function-docstring)
+                                              (log-info "  ~a: ~a" name
+                                                        function-docstring)
+                                              (log-info "  ~a" name))))))
                                      (else #f))) mod))))
     (for-each (lambda (t)
-                (apply t
+                (apply (cdr t)
                        '())) tt)))
 
 (define (maak-task? proc)
@@ -204,6 +208,25 @@ Logs information about the task and its documentation before execution.
 (define* (mv x y
              #:key (verbose? #f))
   ($ (list (~ "mv -v ~a ~a" x y))
+     #:verbose? verbose?))
+
+(define* (cat file
+              #:key (verbose? #f))
+  ($ (list (~ "cat ~a" file))
+     #:verbose? verbose?))
+
+(define* (cp x
+             y
+             #:key (recursive? #t)
+             (force? #f)
+             (verbose? #f)
+             (verbose-copy? #t))
+  ($ (list (~ "cp ~a ~a ~a ~a ~a"
+              (if recursive? "-r" "")
+              (if force? "-f" "")
+              (if verbose-copy? "-v" "")
+              x
+              y))
      #:verbose? verbose?))
 
 (define* (~ #:rest args)

@@ -17,6 +17,7 @@
 
 (define-module (maak)
   #:declarative? #t
+  #:use-module (ice-9 string-fun)
   #:use-module (maak maak))
 
 ;; ====== Maak file constants ======
@@ -29,7 +30,8 @@
 (define deploy-dir
   "/srv/http/jointhefreeworld.org")
 
-(define hot-reload-file-types '(scm))
+(define hot-reload-file-types
+  '(scm))
 
 ;; ====== Maak file tasks ======
 
@@ -104,4 +106,23 @@
 (define (dev)
   "Developer's setup."
   (hot-reload))
+
+(define (pure-dev)
+  "Pure isolated development shell."
+  ($ '("guix shell --pure -f guix.scm"
+       "bash coreutils util-linux-with-udev guile" "-- maak --list")))
+
+;; ====== Maak test playground =======
+
+(define (test-all-maak-functions)
+  (define (new-temp-file)
+    (let* ((now (localtime (current-time)))
+           (time-string (string-replace-substring (strftime "%c" now) " " "-"))
+           (temp-file-name (~ "./tmp/~a" time-string)))
+      temp-file-name))
+
+  (let* ((temp-file-name (new-temp-file)))
+    (mkdir-p "./tmp")
+    ($ (list (~ "touch ~a" temp-file-name)))
+    (delete-file-recursively temp-file-name)))
 
