@@ -87,6 +87,14 @@ Any thunk (no-argument function) you define in this file becomes a runnable task
     (log-info "Performed some fun arithmetics:\nResult: ~a" some-data)))
 #+end_src
 
+* Examples of maak files
+
+- [[https://codeberg.org/jjba23/sss][SSS (Supreme Sexp System)]] - SSS is a Lisp machine adventure, where the hacking culture is celebrated. Let me help you achieve GNUrvana. This custom GNU + Linux setup enhances customization to infinity, encourages the hacking spirit, and offers a superior user experience thanks in part too to REPL (Read Eval Print Loop) and Lisps.
+- [[https://codeberg.org/jjba23/veritas][Veritas]] - 
+Unit, Integration and Black Box testing framework powered by Lisp (Guile Scheme)
+- [[https://codeberg.org/jjba23/ggg][GGG (Guile Glyph Generator)]] - Create SVG images, handy useful glyphs, org/markdown badges.
+- [[https://codeberg.org/jjba23/hygguile][Hygguile]] - UI framework for cozy and professional user-interfaces for everyone with the power of Scheme.
+
 --------
 
 * Help
@@ -107,11 +115,24 @@ maak is officially distributed via:
 - Guix package manager
 - Podman/Docker images
 
-/That being said, feel free to use it as you wish, within the terms of the GNU General Public License v3 or newer./    
+/That being said, feel free to use it as you wish, within the terms of the GNU General Public License v3 or newer./
 
 ** On Guix
 
-Maak is Guix-first and caters to Guix as first-class citizen in favor of other package managers or build systems. Maak targets exclusively systems that can run Guile Scheme (and optionally Guix).  
+Maak is Guix-first and caters to Guix as first-class citizen in favor of other package managers or build systems. Maak targets exclusively systems that can run Guile Scheme (and optionally Guix). Check the ~maak.scm~, the ~guix.scm~ and ~manifest.scm~ for more details.
+
+For example, to enter an environment shell with maak temporarily you can use:
+
+#+begin_src shell
+guix shell -f guix.scm
+#+end_src
+
+You can also chain commands to it:
+
+#+begin_src shell
+guix shell -f guix.scm -- maak --help
+#+end_src
+
 
 I am working to get Maak upstreamed to Guix soon as ~maak~, stay tuned. You can alternatively use this package definition which should work nicely:
 
