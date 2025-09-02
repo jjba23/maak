@@ -272,6 +272,4 @@ We welcome everyone to feel invited to the Maak Project, and encourage active co
 
 Find here the Backlog and Kanban boards for Maak: https://lucidplan.jointhefreeworld.org/tickets/maak
 
-
 -------
-
