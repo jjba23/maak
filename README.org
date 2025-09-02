@@ -89,6 +89,8 @@ Any thunk (no-argument function) you define in this file becomes a runnable task
 
 * Examples of maak files
 
+Find below a list of some projects using maak for their automation. Reminder: ~maak.scm~ is the default name of a maak file, but you can choose to use a different one.
+
 - [[https://codeberg.org/jjba23/sss][SSS (Supreme Sexp System)]] - SSS is a Lisp machine adventure, where the hacking culture is celebrated. Let me help you achieve GNUrvana. This custom GNU + Linux setup enhances customization to infinity, encourages the hacking spirit, and offers a superior user experience thanks in part too to REPL (Read Eval Print Loop) and Lisps.
 - [[https://codeberg.org/jjba23/veritas][Veritas]] - Unit, Integration and Black Box testing framework powered by Lisp (Guile Scheme)
 - [[https://codeberg.org/jjba23/ggg][GGG (Guile Glyph Generator)]] - Create SVG images, handy useful glyphs, org/markdown badges.
