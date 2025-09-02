@@ -15,7 +15,7 @@
 (define-public maak
   (package
     (name "maak")
-    (version "0.1.4")
+    (version "dev")
     (source
      (local-file %source-dir
                  #:recursive? #t
@@ -29,12 +29,12 @@
                                                 "/bin"))
                             (share (string-append (assoc-ref outputs "out")
                                                   "/share")))
-                        (mkdir-p (string-append share "/scripts"))
-                        (mkdir-p (string-append share "/resources"))
                         (install-file "resources/help.txt"
                                       (string-append share "/resources"))
                         (install-file "scripts/maak" bin)
                         (install-file "scripts/log.bash"
+                                      (string-append share "/scripts/"))
+                        (install-file "scripts/maak-completion.bash"
                                       (string-append share "/scripts/"))
                         (chmod (string-append bin "/maak") #o755)))))))
     (build-system guile-build-system)
