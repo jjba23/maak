@@ -21,22 +21,22 @@
                  #:recursive? #t
                  #:select? (git-predicate %source-dir)))
     (arguments
-     `(#:source-directory "src"
-       #:phases (modify-phases %standard-phases
-                  (add-before 'build 'install-program-files
-                    (lambda* (#:key outputs #:allow-other-keys)
-                      (let ((bin (string-append (assoc-ref outputs "out")
-                                                "/bin"))
-                            (share (string-append (assoc-ref outputs "out")
-                                                  "/share")))
-                        (install-file "resources/help.txt"
-                                      (string-append share "/resources"))
-                        (install-file "scripts/maak" bin)
-                        (install-file "scripts/log.bash"
-                                      (string-append share "/scripts/"))
-                        (install-file "scripts/maak-completion.bash"
-                                      (string-append share "/scripts/"))
-                        (chmod (string-append bin "/maak") #o755)))))))
+     (list
+      #:source-directory "src"
+      #:phases
+      #~(modify-phases %standard-phases
+          (add-before 'build 'install-program-files
+            (lambda _
+              (let ((bin (string-append #$output "/bin"))
+                    (share (string-append #$output "/share")))
+                (install-file "resources/help.txt"
+                              (string-append share "/resources"))
+                (install-file "scripts/maak" bin)
+                (install-file "scripts/log.bash"
+                              (string-append share "/scripts/"))
+                (install-file "scripts/maak-completion.bash"
+                              (string-append share "/scripts/"))
+                (chmod (string-append bin "/maak") #o755)))))))
     (build-system guile-build-system)
     (native-inputs (list guile-3.0))
     (inputs (list guile-3.0 bash-minimal))
