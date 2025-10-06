@@ -60,7 +60,32 @@ All you will need to do to use Maak is to write a file (by default ~./maak.scm~)
 
 Any thunk (no-argument function) you define in this file becomes a runnable task. If no task is passed via command-line, Maak will run the ~default~ task.
 
+Tasks can:
+- Run shell commands with the ~$~ helper.
+- Print logs with ~log-info~.
+- Call other Maak tasks.
+- Use any Guile Scheme function you define (or import from a library).
+- Some syntactic sugar for working with Guix dev shells ~manifest-shell~ and ~program-shell~  
+  
 ⚠️ Beware not to use names for tasks that conflict with names of built-in Scheme functions as this can cause some problems. For example, avoid calling something ~format~ or ~display~, choose something else instead.
+
+You can extend Maak by defining new tasks — just like writing functions in Scheme.
+
+Here’s an example:
+
+#+begin_src scheme
+(define (hello)
+  "Say hello from Maak!"
+  (display "Hello from Maak!~%"))
+#+end_src
+
+You can now run it:
+
+#+begin_src shell
+maak hello
+#+end_src
+
+More advanced examples here:
 
 #+begin_src scheme
 ;; Format Scheme source code files according to the Guix style guide.
@@ -160,10 +185,28 @@ Maak offers a simple but powerful shell completion. When you are in a directory 
 
 See the script at ~scripts/maak-completion.bash~ . You should "source" this script if you want these completions to always be available for you.
 
+Load maak Bash shell auto-completions with :
+
+#+begin_src sh
+#!/usr/bin/env bash
+# Integrate Guix-managed Bash & Maak
+maak_bin_install_dir=$(which maak)
+maak_install_dir=$(realpath "${maak_bin_install_dir}")
+maak_bin=$(dirname "${maak_install_dir}")
+maak_store=$(dirname "${maak_bin}")
+maak_completions="${maak_store}/share/scripts/maak-completion.bash"
+
+# Load Maak auto-completions
+if [[ -f "${maak_completions}" ]]; then
+  # echo "Found completions: ${maak_completions}"
+  # echo "Loading Maak completions..."
+  source "${maak_completions}" || true
+fi
+#+end_src
+
 -------
 
 * Licensing
-
 Maak and all of its source code are free software, licensed under the GNU General Public License v3 (or newer at your convenience).
 
 https://www.gnu.org/licenses/gpl-3.0.html
@@ -175,7 +218,6 @@ https://www.gnu.org/licenses/fdl-1.3.html
 ---------
 
 * REPL: Interactive workflow, developer power
-
 A REPL (Read-Eval-Print Loop) is an interactive environment, which can be used connected to your console, running application, language compiler and more, which gives you superpowers as an engineer 🦸🏼.
 
 Lisp dialects, more specifically Guile Scheme, have great support for this. I personally of course like to do this with [[https://guix.gnu.org/][Guix]], [[https://www.gnu.org/software/emacs/][Emacs]], ([[https://git.sr.ht/~abcdw/emacs-arei][Arei/Ares]] + [[https://github.com/vspinu/sesman][sesman]]) you can get an ultimate extensible powerful editor experience, miles ahead of traditional IDEs 🐂 .
@@ -191,7 +233,6 @@ When integrated into your code editor, you can execute any piece of code (a line
 -----------
 
 * Code of conduct
-
 This project adheres to the jointhefreeworld code of conduct. Find it here:
 
 https://jointhefreeworld.org/blog/articles/personal/jointhefreeworld-code-of-conduct/index.html
@@ -207,11 +248,42 @@ The project logo of maak is courtesy of Google Gemini.
 --------
 
 * Maak Project
-
 Contributing to free software is a uniquely beautiful act because it embodies principles of generosity, collaboration, and empowerment.
 
 We welcome everyone to feel invited to the Maak Project, and encourage active contribution in all forms, to improve it and/or suggest improvements, brainstorm with me, make it more modular/flexible, etc, feel free to contact me <jjbigorra@gmail.com> to chat, discuss or report feedback.
 
 Find here the Backlog and Kanban boards for Maak: https://lucidplan.jointhefreeworld.org/tickets/maak
 
+Maak embodies the spirit of GNU: simplicity, freedom, and curiosity.  
+It’s both a tool and a playground for learning Lisp-based automation.
+
+As you grow comfortable, extend Maak — define your own DSLs, orchestrate builds, or automate your projects in elegant Scheme.
+
+Happy hacking! ✨
+
 -------
+
+* The Philosophy of Maak
+
+Maak was designed with a few simple but powerful ideas in mind — ideas rooted in the GNU tradition and Lisp philosophy.
+
+** Lisp as the Language of Tasks
+Most build tools invent their own domain-specific language.  Maak doesn’t. It simply *embraces Lisp*.
+
+This also means your code is solid and reliable with a robust for >50 years mindset.
+
+Every build rule, every script, is a first-class Scheme function.  
+This means your automation scripts are *composable*, *readable*, and *hackable*.
+
+** Purity and Reproducibility
+Maak believes in pure, deterministic environments, that’s why it integrates tightly with GNU Guix 🐂.  
+
+** Small Is Beautiful
+No YAML, HOCON, INI or configs, no hidden logic, no magic — just clean Scheme code.
+
+Every part of Maak can be read, understood, and extended within a good afternoon of hacking ☕.
+
+** Free as in Freedom
+It’s free software under the GNU GPL, built to encourage curiosity, learning, and contribution.
+
+You own your build logic, you can read it, change it, and share it freely.
