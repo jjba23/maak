@@ -276,7 +276,7 @@ Every build rule, every script, is a first-class Scheme function.
 This means your automation scripts are *composable*, *readable*, and *hackable*.
 
 ** Purity and Reproducibility
-Maak believes in pure, deterministic environments, that’s why it integrates tightly with GNU Guix 🐂.  
+Maak believes in pure, deterministic environments, that’s why it integrates so well with GNU Guix 🐂.  
 
 ** Small Is Beautiful
 No YAML, HOCON, INI or configs, no hidden logic, no magic — just clean Scheme code.
