@@ -9,6 +9,12 @@
 
 If you like my work, please support me by [[https://bmc.link/jjbigorra][buying me a cup of coffee ☕]] so I can continue with a lot of motivation.
 
+Most build tools invent their own limited domain-specific language.  Maak embraces the powerful *λ Lisp*.
+
+This also means your code is solid, reliable and robust for the next 50 years at least.
+
+-------------
+
 * Core features
 
 Instead of learning a limited DSL, you can leverage your existing Lisp skills to define tasks, manage data, and automate your workflows with ease. Define functions, manipulate lists, use conditional, create macros—the entire language is at your disposal.
@@ -45,7 +51,8 @@ Here’s an example:
 #+begin_src scheme
 (define (hello)
   "Say hello from Maak!"
-  (display "Hello from Maak!~%"))
+  (display "Hello from Maak!")
+  (display (format #f "~a + ~a = ~a" 3 4 (+ 3 4))))
 #+end_src
 
 You can now run it:
@@ -70,10 +77,11 @@ More advanced examples here:
 
 ;; By default (no task given) run help.
 (define (default)
-  (help))
+  ($ '("maak --list"))
 
 ;; Do some quick math
 (define (arithmetics)
+  (fmt) ;; call another task first
   (let* ((entries '(1 3 5 7 9))
          (arithmetics (lambda(x) (* x x 3)))
          (some-data (map arithmetics entries)))
@@ -271,10 +279,6 @@ Happy hacking! ✨
 Maak was designed with a few simple but powerful ideas in mind — ideas rooted in the GNU tradition and Lisp philosophy.
 
 ** Lisp as the Language of Tasks
-Most build tools invent their own domain-specific language.  Maak doesn’t. It simply *embraces Lisp*.
-
-This also means your code is solid and reliable with a robust for >50 years mindset.
-
 Every build rule, every script, is a first-class Scheme function.  
 This means your automation scripts are *composable*, *readable*, and *hackable*.
 
