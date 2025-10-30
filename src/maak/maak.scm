@@ -165,7 +165,8 @@ as well as being a no-argument proc (thunk)."
               (unless (get-module-var task)
                 (raise-exception (make-exception-with-message (format #f
                                                                "Could not find task: ~a"
-                                                               task))))) tasks))
+                                                               task))))
+              (run-task task)) tasks))
 
 (define (run-task task)
   "Runs a given task if it is a valid maak task (a no-argument procedure).
