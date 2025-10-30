@@ -20,6 +20,7 @@
   #:use-module (ice-9 format)
   #:use-module (ice-9 iconv)
   #:use-module (ice-9 match)
+  #:use-module (ice-9 exceptions)
   #:use-module (ice-9 popen)
   #:use-module (ice-9 rdelim)
   #:use-module (ice-9 regex)
@@ -129,19 +130,22 @@ Returns:
   "List documentation for all maak tasks defined in the currently
 loaded module."
   (let* ((mod (resolve-module '(maak)))
-         (tt (filter (lambda(x) (not (equal? #f x)))
+         (tt (filter (lambda (x)
+                       (not (equal? #f x)))
                      (module-map (lambda (name var)
                                    (cond
                                      ((and (variable? var)
                                            (maak-task? (variable-ref var)))
-                                      (cons name (lambda ()
-                                        (let* ((function-docstring (procedure-documentation
-                                                                    (variable-ref
-                                                                     var))))
-                                          (if (string? function-docstring)
-                                              (log-info "  ~a: ~a" name
-                                                        function-docstring)
-                                              (log-info "  ~a" name))))))
+                                      (cons name
+                                            (lambda ()
+                                              (let* ((function-docstring (procedure-documentation
+                                                                          (variable-ref
+                                                                           var))))
+                                                (if (string?
+                                                     function-docstring)
+                                                    (log-info "  ~a: ~a" name
+                                                     function-docstring)
+                                                    (log-info "  ~a" name))))))
                                      (else #f))) mod))))
     (for-each (lambda (t)
                 (apply (cdr t)
@@ -157,7 +161,11 @@ as well as being a no-argument proc (thunk)."
 
 (define (run-tasks tasks)
   "Runs a list of tasks sequentially."
-  (for-each run-task tasks))
+  (for-each (lambda (task)
+              (unless (get-module-var task)
+                (raise-exception (make-exception-with-message (format #f
+                                                               "Could not find task: ~a"
+                                                               task))))) tasks))
 
 (define (run-task task)
   "Runs a given task if it is a valid maak task (a no-argument procedure).

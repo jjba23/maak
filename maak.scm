@@ -41,7 +41,7 @@
 
 (define (default)
   "Default task to run, call program's help."
-  (help))
+  (list-tasks))
 
 (define (arithmetics)
   "Do some quick math."
@@ -110,7 +110,8 @@
 (define (pure-dev)
   "Pure isolated development shell."
   ($ '("guix shell --pure -f guix.scm"
-       "bash coreutils util-linux-with-udev guile" "-- maak --list")))
+       "bash coreutils util-linux-with-udev guile" "-- maak --list")
+     #:verbose? #t))
 
 ;; ====== Maak test playground =======
 
