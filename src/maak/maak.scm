@@ -126,38 +126,42 @@ Returns:
            (lambda (key . args)
              #f))))
 
+(define* (resolve-maak-tasks #:key (module-name '(maak)))
+  (let* ((mod (resolve-module module-name))
+         (tasks (filter (lambda (x)
+                          (not (equal? #f x)))
+                        (module-map (lambda (name var)
+                                      (cond
+                                        ((maak-task? var)
+                                         (cons name var))
+                                        (else #f))) mod))))
+    tasks))
+
 (define (list-tasks)
   "List documentation for all maak tasks defined in the currently
 loaded module."
-  (let* ((mod (resolve-module '(maak)))
-         (tt (filter (lambda (x)
-                       (not (equal? #f x)))
-                     (module-map (lambda (name var)
-                                   (cond
-                                     ((and (variable? var)
-                                           (maak-task? (variable-ref var)))
-                                      (cons name
-                                            (lambda ()
-                                              (let* ((function-docstring (procedure-documentation
-                                                                          (variable-ref
-                                                                           var))))
-                                                (if (string?
-                                                     function-docstring)
-                                                    (log-info "  ~a: ~a" name
-                                                     function-docstring)
-                                                    (log-info "  ~a" name))))))
-                                     (else #f))) mod))))
-    (for-each (lambda (t)
-                (apply (cdr t)
-                       '())) tt)))
+  (let* ((tasks (resolve-maak-tasks)))
+    (for-each (lambda (task)
+                (let* ((function-docstring (procedure-documentation (variable-ref
+                                                                     (cdr task)))))
+                  (if (string? function-docstring)
+                      (log-info "  ~a: ~a"
+                                (car task) function-docstring)
+                      (log-info "  ~a"
+                                (car task))))) tasks)
+    (newline)))
 
-(define (maak-task? proc)
-  "Predicate that indicates whether a procedure is a valid maak task.
-The conditions for that include it being a valid Guile Scheme procedure,
-as well as being a no-argument proc (thunk)."
-  (and (procedure? proc)
+(define (maak-task? x)
+  "Predicate that indicates whether it is a valid maak task."
+  (let* ((proc (variable-ref x)))
+    (and proc
+         (maak-proc? proc))))
+
+(define (maak-proc? x)
+  "Predicate that indicates whether a procedure is a valid maak proc."
+  (and (procedure? x)
        (equal? '(0 0 #f)
-               (procedure-minimum-arity proc))))
+               (procedure-minimum-arity x))))
 
 (define (run-tasks tasks)
   "Runs a list of tasks sequentially."
@@ -184,7 +188,7 @@ Logs information about the task and its documentation before execution.
   (let* ((proc (get-module-var task))
          (proc-doc (procedure-documentation proc)))
     (cond
-      ((maak-task? proc)
+      ((maak-proc? proc)
        (log-info "Start task: ~a\n" task proc)
        (log-info "  Calling procedure: ~a"
                  (procedure-name proc))
