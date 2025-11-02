@@ -29,8 +29,7 @@
   #:use-module (srfi srfi-1)
   #:use-module (srfi srfi-13)
   #:use-module (ice-9 getopt-long)
-  #:export (log-message log
-                        log-info
+  #:export (log-message log-info
                         log-error
                         get-module-var
                         delete-file-recursively
@@ -40,6 +39,8 @@
                         cp
                         mv
                         remkdir-p
+                        maak-proc?
+                        maak-task?
                         $
                         ~
                         syscall
@@ -48,12 +49,10 @@
 (define preferred-strftime-format
   (make-parameter "%Y-%m-%d %H:%M:%S%z"))
 
-(define (log-message msg)
-  (display (format #f "\n~a" msg)))
-
-(define (log msg . args)
-  (log-message (apply format
-                      (append (list #f msg) args))))
+(define (log-message msg . args)
+  (display (format #f "\n~a"
+                   (apply format
+                          (append (list #f msg) args)))))
 
 (define (log-info msg . args)
   (log-message (format #f "[INFO][~a] ~a"

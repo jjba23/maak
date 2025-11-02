@@ -28,6 +28,7 @@
   #:use-module (srfi srfi-13)
   #:use-module (ice-9 getopt-long)
   #:use-module (maak maak)
+  #:use-module (maak dsl)  
   #:export (main))
 
 (define* (main #:key (args (command-line)))

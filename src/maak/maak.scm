@@ -30,6 +30,22 @@
   #:use-module (srfi srfi-13)
   #:use-module (ice-9 getopt-long)
   #:use-module (maak dsl)
+  #:re-export (log-message log-info
+                           log-error
+                           get-module-var
+                           delete-file-recursively
+                           manifest-shell
+                           program-shell
+                           mkdir-p
+                           cp
+                           mv
+                           remkdir-p
+                           maak-proc?
+                           maak-task?
+                           $
+                           ~
+                           syscall
+                           cat)
   #:export (resolve-maak-tasks list-tasks run-tasks run-task))
 
 (define* (resolve-maak-tasks #:key (module-name '(maak)))
