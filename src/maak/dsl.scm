@@ -36,6 +36,7 @@
                         manifest-shell
                         program-shell
                         mkdir-p
+                        bold-output
                         cp
                         mv
                         remkdir-p
@@ -192,3 +193,5 @@ Returns:
   ($ (append (list (~ "guix shell -f ~a -- " file)) cmd-parts)
      #:verbose? verbose?))
 
+(define (bold-output x)
+  (format #f "\x1b[1m~a\x1b[0m" x))

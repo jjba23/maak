@@ -32,6 +32,7 @@
   #:use-module (maak dsl)
   #:re-export (log-message log-info
                            log-error
+                           bold-output
                            get-module-var
                            delete-file-recursively
                            manifest-shell
@@ -66,20 +67,31 @@ loaded module."
     (for-each (lambda (task)
                 (let* ((function-docstring (procedure-documentation (variable-ref
                                                                      (cdr task)))))
+                  (newline)
                   (if (string? function-docstring)
-                      (log-info "  ~a: ~a"
-                                (car task) function-docstring)
-                      (log-info "  ~a"
-                                (car task))))) tasks)
+                      (log-message "~a: ~a"
+                                   (bold-output (car task)) function-docstring)
+                      (log-message "~a"
+                                   (bold-output (car task)))))) tasks)
+    (newline)
     (newline)))
 
 (define (run-tasks tasks)
   "Runs a list of tasks sequentially."
   (for-each (lambda (task)
               (unless (get-module-var task)
-                (raise-exception (make-exception-with-message (format #f
-                                                               "Could not find task: ~a"
-                                                               task))))
+                (cond
+                  ((equal? 'default task)
+                   (raise-exception (make-exception-with-message (format #f
+                                                                         (string-join '
+                                                                          ("Could not find default task."
+                                                                           "Have you defined a thunk named `default' in your Maak file?"
+                                                                           "(a thunk is a procedure without arguments)"))
+                                                                         task))))
+                  (else (raise-exception (make-exception-with-message (format
+                                                                              #f
+                                                                              "Could not find task: ~a"
+                                                                              task))))))
               (run-task task)) tasks))
 
 (define (run-task task)
@@ -100,8 +112,6 @@ Logs information about the task and its documentation before execution.
     (cond
       ((maak-proc? proc)
        (log-info "Start task: ~a\n" task proc)
-       (log-info "  Calling procedure: ~a"
-                 (procedure-name proc))
        (when (and (not (equal? #f proc-doc))
                   (not (equal? "" proc-doc)))
          (log-info "  ~a" proc-doc))
