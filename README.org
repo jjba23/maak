@@ -294,3 +294,15 @@ Every part of Maak can be read, understood, and extended within a good afternoon
 It’s free software under the GNU GPL, built to encourage curiosity, learning, and contribution.
 
 You own your build logic, you can read it, change it, and share it freely.
+
+-----
+
+* Hacking on Maak
+
+In systems where ~maak~ is already installed, a good way to compile from source and test all program functionalities is a pure shell:
+
+#+begin_src shell
+guix shell --pure -f guix.scm bash coreutils util-linux-with-udev guile -- maak test-all-maak-functions
+
+guix shell --pure -f guix.scm bash coreutils util-linux-with-udev guile -- maak --list
+#+end_src
