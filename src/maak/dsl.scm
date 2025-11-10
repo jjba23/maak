@@ -50,10 +50,9 @@
 (define preferred-strftime-format
   (make-parameter "%Y-%m-%d %H:%M:%S%z"))
 
-(define (log-message msg . args)
+(define (log-message msg)
   (display (format #f "\n~a"
-                   (apply format
-                          (append (list #f msg) args)))))
+                   msg)))
 
 (define (log-info msg . args)
   (log-message (format #f "[INFO][~a] ~a"
@@ -195,3 +194,4 @@ Returns:
 
 (define (bold-output x)
   (format #f "\x1b[1m~a\x1b[0m" x))
+

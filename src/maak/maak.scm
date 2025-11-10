@@ -69,10 +69,11 @@ loaded module."
                                                                      (cdr task)))))
                   (newline)
                   (if (string? function-docstring)
-                      (log-message "~a: ~a"
-                                   (bold-output (car task)) function-docstring)
-                      (log-message "~a"
-                                   (bold-output (car task)))))) tasks)
+                      (log-message (format #f "~a: ~a"
+                                           (bold-output (car task))
+                                           function-docstring))
+                      (log-message (format #f "~a"
+                                           (bold-output (car task))))))) tasks)
     (newline)
     (newline)))
 
