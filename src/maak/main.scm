@@ -59,11 +59,14 @@
                                        (length raw-tasks)))
                            '("default") raw-tasks))
          (tasks (map string->symbol string-tasks)))
-    (log-info "Start loading tasks from file: ~a" file)
+    (log-separator)
+    (log-info "Maak: the infinitely extensible command runner")
+    (log-info "Loading tasks from Maak file: ~a" file)
     (load file)
     (if should-list
         (list-tasks)
         (begin
-          (log-info "Start executing user tasks: ~a" tasks)
+          (log-info "Executing Maak tasks: ~a"
+                    (string-join (map symbol->string tasks) " =>"))
           (run-tasks tasks)))))
 
