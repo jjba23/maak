@@ -45,6 +45,7 @@
                         maak-task?
                         $
                         ~
+                        time-machine
                         time-machine-manifest-shell
                         time-machine-program-shell
                         syscall
