@@ -60,8 +60,8 @@
                            '("default") raw-tasks))
          (tasks (map string->symbol string-tasks)))
     (log-separator)
-    (log-info "Maak: the infinitely extensible command runner")
-    (log-info "Loading tasks from Maak file: ~a" file)
+    (log-info "Maak: the infinitely extensible command runner\n")
+    (log-info "Loading tasks from Maak file: ~a\n" file)
     (load file)
     (if should-list
         (list-tasks)
