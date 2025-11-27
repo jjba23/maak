@@ -31,6 +31,7 @@
   #:use-module (ice-9 getopt-long)
   #:export (log-message log-info
                         log-error
+                        log-separator
                         get-module-var
                         delete-file-recursively
                         manifest-shell
@@ -44,27 +45,27 @@
                         maak-task?
                         $
                         ~
+                        time-machine
+                        time-machine-manifest-shell
+                        time-machine-program-shell
                         syscall
                         cat))
 
-(define preferred-strftime-format
-  (make-parameter "%Y-%m-%d %H:%M:%S%z"))
-
 (define (log-message msg)
-  (display (format #f "\n~a"
-                   msg)))
+  (display (format #f "\n~a" msg)))
+
+(define (log-separator)
+  (log-message "
+_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_
+"))
 
 (define (log-info msg . args)
-  (log-message (format #f "[INFO][~a] ~a"
-                       (strftime (preferred-strftime-format)
-                                 (localtime (current-time)))
+  (log-message (format #f "~a"
                        (apply format
                               (append (list #f msg) args)))))
 
 (define (log-error msg . args)
-  (log-message (format #f "[ERROR][~a] ~a"
-                       (strftime (preferred-strftime-format)
-                                 (localtime (current-time)))
+  (log-message (format #f "~a"
                        (apply format
                               (append (list #f msg) args)))))
 
@@ -178,18 +179,44 @@ Returns:
   (apply format
          (append '(#f) args)))
 
+(define* (time-machine cmd-parts
+                       #:key (verbose? #f)
+                       (join " ")
+                       (channels "channels.scm"))
+  ($ (append (list (~ "guix time-machine --channels=~a" channels) "--")
+             cmd-parts)
+     #:verbose? verbose?))
+
 (define* (manifest-shell cmd-parts
                          #:key (verbose? #f)
                          (join " ")
                          (manifest "manifest.scm"))
-  ($ (append (list (~ "guix shell -m ~a -- " manifest)) cmd-parts)
+  ($ (append (list (~ "guix shell -m ~a" manifest) "--") cmd-parts)
+     #:verbose? verbose?))
+
+(define* (time-machine-manifest-shell cmd-parts
+                                      #:key (verbose? #f)
+                                      (join " ")
+                                      (channels "channels.scm")
+                                      (manifest "manifest.scm"))
+  ($ (append (list (~ "guix time-machine --channels=~a" channels) "--"
+                   (~ "shell -m ~a" manifest) "--") cmd-parts)
      #:verbose? verbose?))
 
 (define* (program-shell cmd-parts
                         #:key (verbose? #f)
                         (join " ")
                         (file "guix.scm"))
-  ($ (append (list (~ "guix shell -f ~a -- " file)) cmd-parts)
+  ($ (append (list (~ "guix shell -f ~a" file) "--") cmd-parts)
+     #:verbose? verbose?))
+
+(define* (time-machine-program-shell cmd-parts
+                                     #:key (verbose? #f)
+                                     (join " ")
+                                     (channels "channels.scm")
+                                     (file "guix.scm"))
+  ($ (append (list (~ "guix time-machine --channels=~a" channels) "--"
+                   (~ "shell -f ~a" file) "--") cmd-parts)
      #:verbose? verbose?))
 
 (define (bold-output x)

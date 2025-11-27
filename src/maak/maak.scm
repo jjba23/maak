@@ -32,11 +32,15 @@
   #:use-module (maak dsl)
   #:re-export (log-message log-info
                            log-error
+                           log-separator
                            bold-output
                            get-module-var
                            delete-file-recursively
                            manifest-shell
+                           time-machine
+                           time-machine-manifest-shell
                            program-shell
+                           time-machine-program-shell
                            mkdir-p
                            cp
                            mv
@@ -64,6 +68,7 @@
   "List documentation for all maak tasks defined in the currently
 loaded module."
   (let* ((tasks (resolve-maak-tasks)))
+    (log-separator)
     (for-each (lambda (task)
                 (let* ((function-docstring (procedure-documentation (variable-ref
                                                                      (cdr task)))))
@@ -112,7 +117,8 @@ Logs information about the task and its documentation before execution.
          (proc-doc (procedure-documentation proc)))
     (cond
       ((maak-proc? proc)
-       (log-info "Start task: ~a\n" task proc)
+       (log-separator)
+       (log-info "=> Running Maak task: ~a\n" task proc)
        (when (and (not (equal? #f proc-doc))
                   (not (equal? "" proc-doc)))
          (log-info "  ~a" proc-doc))
