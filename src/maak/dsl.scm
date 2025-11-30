@@ -101,7 +101,11 @@ Exit code: ~a
             #:key (verbose? #f)
             (join " "))
   "Executes a shell command constructed from a list of strings.
-  
+
+@example
+($ '(\"echo -n\" \"hello-world\"))
+@end example
+
 @sc{arguments}:
 @itemize @bullet
 
@@ -117,7 +121,7 @@ A string to use as a separator when joining the command parts.
 @end itemize
   
 @sc{returns}:
-The result of the `syscall` function, which is @code{#t} if the command completes with an exit code of 0."
+The result of the @code{syscall} function, which is @code{#t} if the command completes with an exit code of 0."
   (let* ((cmd (string-join cmd-parts join)))
     (when verbose?
       (log-info "  Execute command:\n~a\n" cmd))
@@ -148,9 +152,7 @@ The result of the `syscall` function, which is @code{#t} if the command complete
                                   #:key (verbose? #f))
   "Delete a directory and all its contents recursively.
 Runs `rm -rfv DIR` using the `$` command wrapper. This means:
-    - The deletion is recursive.
-    - It forces removal without prompting (`-f`).
-    - It prints removed files (`-v`).
+The deletion is recursive.It forces removal without prompting (`-f`).It prints removed files (`-v`).
 
 @sc{arguments}:
 @itemize @bullet
@@ -174,12 +176,13 @@ If #t, logs the generated command before executing it.
 (define* (mkdir-p dir
                   #:key (verbose? #f))
   "Create a directory and all necessary parent directories.
-  Executes `mkdir -pv DIR` using the `$` wrapper. This means:
-    - Parent directories are created as needed (`-p`).
-    - The operation prints each created directory (`-v`).
+Executes `mkdir -pv DIR` using the `$` wrapper. This means:
+Parent directories are created as needed (`-p`).
+The operation prints each created directory (`-v`).
 
 @sc{arguments}:
 @itemize @bullet
+
 @item @strong{dir}:
 The path of the directory to create.
 
@@ -211,8 +214,7 @@ The path of the directory to recreate.
 If #t, logs the generated command before executing it.
 @end itemize
 
-@sc{returns}:
-  #t if the operations succeed.
+@sc{returns}: #t if the operations succeed.
 
 @sc{errors}:
   Signals an error if any underlying shell command fails."
@@ -241,8 +243,7 @@ If #t, logs the generated command before executing it.
 
 @end itemize
 
-@sc{returns}:
-  #t if the command succeeds.
+@sc{returns}: #t if the command succeeds.
 
 @sc{errors}:
   Signals an error if the underlying shell command returns a non-zero exit code."
@@ -277,8 +278,7 @@ If #t, logs the generated command before executing it.
 
   using the `$` wrapper, ensuring errors are caught and logged.
 
-@sc{returns}:
-  #t if the copy succeeds.
+@sc{returns}: #t if the copy succeeds.
 
 @sc{errors}:
   Signals an error if the underlying `cp` command exits with a non-zero status."
@@ -291,6 +291,25 @@ If #t, logs the generated command before executing it.
      #:verbose? verbose?))
 
 (define* (~ #:rest args)
+  "A utility function to format a string (interpolation). Alias for (apply format #f ARGS).
+
+@example
+(~ \"Hello world, my name is ~a and I am ~a years old\"
+    \"Joe\"
+    30)
+@end example
+
+@sc{arguments}:
+@itemize @bullet
+
+@item @strong{args} (list):
+A list of arguments where the first element is the format string
+and the subsequent elements are the values to be substituted.
+
+@end itemize
+
+@sc{returns}:
+  A newly allocated string resulting from the formatting operation."
   (apply format
          (append '(#f) args)))
 
@@ -312,13 +331,13 @@ If #t, logs the generated command before executing it.
             Defaults to \"channels.scm\".
 
   Constructs and executes a command of the form:
-
+@example
     guix time-machine --channels=CHANNELS -- <cmd ...>
+@end example
 
   using the `$` wrapper to run the resulting shell command safely.
 
-@sc{returns}:
-  #t if the command succeeds.
+@sc{returns}:  #t if the command succeeds.
 
 @sc{errors}:
   Signals an error if the underlying command exits with a non-zero status."
@@ -333,6 +352,7 @@ If #t, logs the generated command before executing it.
   "Execute a command inside a Guix shell defined by a manifest file.
 
 @sc{arguments}:
+
   cmd-parts: A list of strings representing the command to run
              inside the Guix shell environment.
 
@@ -345,13 +365,13 @@ If #t, logs the generated command before executing it.
             package environment. Defaults to \"manifest.scm\".
 
   Constructs and executes a command of the form:
-
+@example
     guix shell -m MANIFEST -- <cmd ...>
+@end example
 
   using the `$` wrapper to enforce proper execution and error handling.
 
-@sc{returns}:
-  #t if the command succeeds.
+@sc{returns}: #t if the command succeeds.
 
 @sc{errors}:
   Signals an error if the underlying shell command exits with a non-zero status."
@@ -378,16 +398,15 @@ using a pinned Guix revision via `guix time-machine`.
   manifest: Path to the manifest file describing the package environment.
             Defaults to \"manifest.scm\".
 
-
   Constructs and executes a command of the form:
-
+@example
     guix time-machine --channels=CHANNELS -- shell -m MANIFEST -- <cmd ...>
+@end example
 
   This provides a reproducible shell environment defined by the manifest file
   and pinned to the Guix revision specified in the channels file.
 
-@sc{returns}:
-  #t if the command succeeds.
+@sc{returns}: #t if the command succeeds.
 
 @sc{errors}:
   Signals an error if any underlying shell command exits with a non-zero status."
@@ -413,13 +432,13 @@ using a pinned Guix revision via `guix time-machine`.
 
 
   Constructs and executes a command of the form:
-
+@example
     guix shell -f FILE -- <cmd ...>
+@end example
 
   using the `$` wrapper to safely run the command and check for errors.
 
-@sc{returns}:
-  #t if the command succeeds.
+@sc{returns}: #t if the command succeeds.
 
 @sc{errors}:
   Signals an error if the underlying shell command exits with a non-zero status."
@@ -448,14 +467,14 @@ using a pinned Guix revision via `guix time-machine`.
 
 
   Constructs and executes a command of the form:
+@example
+    guix time-machine --channels=CHANNELS -- shell -f FILE -- <cmd ...>
+@end example
 
-    guix time-machine --channels=CHANNELS --       shell -f FILE -- <cmd ...>
+This provides a reproducible development environment defined by the program
+file and pinned to the Guix revision specified in the channels file.
 
-  This provides a reproducible development environment defined by the program
-  file and pinned to the Guix revision specified in the channels file.
-
-@sc{returns}:
-  #t if the command succeeds.
+@sc{returns}: #t if the command succeeds.
 
 @sc{errors}:
   Signals an error if any underlying shell command exits with a non-zero status."
