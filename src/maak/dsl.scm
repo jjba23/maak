@@ -72,13 +72,18 @@
 (define* (syscall cmd)
   "Executes a shell command and checks its exit code.
 
-Args:
-  cmd: A string representing the shell command to be executed.
+@sc{arguments}:
+@itemize @bullet
 
-Returns:
-  #t if the command completes with an exit code of 0.
+@item @strong{cmd} (string):
+The shell command to be executed.
 
-Errors:
+@end itemize
+
+@sc{returns}:
+@code{#t} if the command completes with an exit code of 0.
+
+@sc{errors}:
   Signals an error if the command returns a non-zero exit code,
   providing the command and the exit code in the error message."
   (let* ((exit-val (system cmd))
@@ -97,18 +102,22 @@ Exit code: ~a
             (join " "))
   "Executes a shell command constructed from a list of strings.
   
-Args:
-  cmd-parts: A list of strings that will be joined to form the command.
-  #:key:
-    verbose?: A boolean. If true, the command to be executed will be logged
-             to the info stream before execution.
-    join: A string to use as a separator when joining the command parts.
-          Defaults to a space ("
-  ").
+@sc{arguments}:
+@itemize @bullet
 
-Returns:
-  The result of the `syscall` function, which typically is the exit status
-  of the executed command."
+@item @strong{cmd-parts} (list):
+A list of strings that will be joined to form the command.
+
+@item @strong{#:verbose?} (boolean, default #f):
+If #t, logs the generated command before executing it.
+
+@item @strong{#:join} (boolean, default \" \"):
+A string to use as a separator when joining the command parts.
+
+@end itemize
+  
+@sc{returns}:
+The result of the `syscall` function, which is @code{#t} if the command completes with an exit code of 0."
   (let* ((cmd (string-join cmd-parts join)))
     (when verbose?
       (log-info "  Execute command:\n~a\n" cmd))
@@ -138,24 +147,26 @@ Returns:
 (define* (delete-file-recursively dir
                                   #:key (verbose? #f))
   "Delete a directory and all its contents recursively.
-
-Args:
-  dir: The path of the directory (or file) to delete.
-
-Keyword arguments:
-  verbose?: If #t, logs the generated command before executing it.
-            Defaults to #f.
-
-Behavior:
-  Runs `rm -rfv DIR` using the `$` command wrapper. This means:
+Runs `rm -rfv DIR` using the `$` command wrapper. This means:
     - The deletion is recursive.
     - It forces removal without prompting (`-f`).
     - It prints removed files (`-v`).
 
-Returns:
+@sc{arguments}:
+@itemize @bullet
+
+@item
+@strong{dir} (string):
+The path of the directory (or file) to delete.
+
+@item @strong{#:verbose?} (boolean, default #f):
+If #t, logs the generated command before executing it.
+@end itemize
+
+@sc{returns}:
   #t if the command succeeded.
 
-Errors:
+@sc{errors}:
   Signals an error if the underlying shell command exits with a non-zero status."
   ($ (list (~ "rm -rfv ~a" dir))
      #:verbose? verbose?))
@@ -163,48 +174,47 @@ Errors:
 (define* (mkdir-p dir
                   #:key (verbose? #f))
   "Create a directory and all necessary parent directories.
-
-Args:
-  dir: The path of the directory to create.
-
-Keyword arguments:
-  verbose?: If #t, logs the generated command before executing it.
-            Defaults to #f.
-
-Behavior:
   Executes `mkdir -pv DIR` using the `$` wrapper. This means:
     - Parent directories are created as needed (`-p`).
     - The operation prints each created directory (`-v`).
 
-Returns:
+@sc{arguments}:
+@itemize @bullet
+@item @strong{dir}:
+The path of the directory to create.
+
+@item @strong{#:verbose?} (boolean, default #f):
+If #t, logs the generated command before executing it.
+
+@end itemize
+
+@sc{returns}:
   #t if the command completed successfully.
 
-Errors:
+@sc{errors}:
   Signals an error if the underlying shell command exits with a non-zero code."
   ($ (list (~ "mkdir -pv ~a" dir))))
 
 (define* (remkdir-p dir
                     #:key (verbose? #f))
   "Remove a directory if it exists, then recreate it.
-
-Args:
-  dir: The path of the directory to recreate.
-
-Keyword arguments:
-  verbose?: If #t, logs each underlying command before executing it.
-            Defaults to #f.
-
-Behavior:
-  Performs two steps:
-    1. Calls `delete-file-recursively` on DIR.
-    2. Calls `mkdir-p` to recreate DIR.
-
 This results in an empty directory, regardless of its previous state.
+Calls `delete-file-recursively` then `mkdir-p` on DIR.
 
-Returns:
-  #t if both operations succeed.
+@sc{arguments}:
+@itemize @bullet
 
-Errors:
+@item @strong{dir}:
+The path of the directory to recreate.
+
+@item @strong{#:verbose?} (boolean, default #f):
+If #t, logs the generated command before executing it.
+@end itemize
+
+@sc{returns}:
+  #t if the operations succeed.
+
+@sc{errors}:
   Signals an error if any underlying shell command fails."
   (delete-file-recursively dir
                            #:verbose? verbose?)
@@ -214,23 +224,27 @@ Errors:
 (define* (mv x y
              #:key (verbose? #f))
   "Move or rename a file or directory.
-
-Args:
-  x: The source file or directory.
-  y: The destination path.
-
-Keyword arguments:
-  verbose?: If #t, logs the generated command before executing it.
-            Defaults to #f.
-
-Behavior:
   Executes `mv -v X Y` using the `$` wrapper. The `-v` flag prints
   each move operation performed.
 
-Returns:
+@sc{arguments}:
+
+@itemize @bullet
+@item @strong{x} (string):
+The source file or directory.
+
+@item  @strong{y} (string):
+The destination path.
+
+@item @strong{#:verbose?} (boolean, default #f):
+If #t, logs the generated command before executing it.
+
+@end itemize
+
+@sc{returns}:
   #t if the command succeeds.
 
-Errors:
+@sc{errors}:
   Signals an error if the underlying shell command returns a non-zero exit code."
   ($ (list (~ "mv -v ~a ~a" x y))
      #:verbose? verbose?))
@@ -248,27 +262,25 @@ Errors:
              (verbose-copy? #t))
   "Copy a file or directory from X to Y.
 
-Args:
+@sc{arguments}:
   x: Source file or directory.
   y: Destination path.
 
-Keyword arguments:
   recursive?: If #t, copy directories recursively (`-r`). Defaults to #t.
   force?: If #t, overwrite existing files without prompting (`-f`). Defaults to #f.
   verbose?: If #t, logs the final shell command before execution. Defaults to #f.
   verbose-copy?: If #t, enables verbose output from `cp` (`-v`). Defaults to #t.
 
-Behavior:
   Constructs and executes a command of the form:
 
     cp [OPTIONS] X Y
 
   using the `$` wrapper, ensuring errors are caught and logged.
 
-Returns:
+@sc{returns}:
   #t if the copy succeeds.
 
-Errors:
+@sc{errors}:
   Signals an error if the underlying `cp` command exits with a non-zero status."
   ($ (list (~ "cp ~a ~a ~a ~a ~a"
               (if recursive? "-r" "")
@@ -288,29 +300,27 @@ Errors:
                        (channels "channels.scm"))
   "Execute a command using a pinned Guix revision via `guix time-machine`.
 
-Args:
+@sc{arguments}:
   cmd-parts: A list of strings representing the command to run
              after the `guix time-machine` invocation.
 
-Keyword arguments:
-  verbose?: If #t, logs the final constructed command before running it.
+  #:verbose?: If #t, logs the final constructed command before running it.
             Defaults to #f.
-  join: The string used to join command segments when constructing
+  #:join: The string used to join command segments when constructing
         the final command. Defaults to a single space.
-  channels: Path to the channels file used to pin the Guix revision.
+  #:channels: Path to the channels file used to pin the Guix revision.
             Defaults to \"channels.scm\".
 
-Behavior:
   Constructs and executes a command of the form:
 
     guix time-machine --channels=CHANNELS -- <cmd ...>
 
   using the `$` wrapper to run the resulting shell command safely.
 
-Returns:
+@sc{returns}:
   #t if the command succeeds.
 
-Errors:
+@sc{errors}:
   Signals an error if the underlying command exits with a non-zero status."
   ($ (append (list (~ "guix time-machine --channels=~a" channels) "--")
              cmd-parts)
@@ -322,29 +332,28 @@ Errors:
                          (manifest "manifest.scm"))
   "Execute a command inside a Guix shell defined by a manifest file.
 
-Args:
+@sc{arguments}:
   cmd-parts: A list of strings representing the command to run
              inside the Guix shell environment.
 
-Keyword arguments:
-  verbose?: If #t, logs the fully constructed command before execution.
+
+  #:verbose?: If #t, logs the fully constructed command before execution.
             Defaults to #f.
-  join: The string separator used when joining command segments.
+  #:join: The string separator used when joining command segments.
         Defaults to a single space.
-  manifest: Path to the manifest file (in Scheme) describing the
+  #:manifest: Path to the manifest file (in Scheme) describing the
             package environment. Defaults to \"manifest.scm\".
 
-Behavior:
   Constructs and executes a command of the form:
 
     guix shell -m MANIFEST -- <cmd ...>
 
   using the `$` wrapper to enforce proper execution and error handling.
 
-Returns:
+@sc{returns}:
   #t if the command succeeds.
 
-Errors:
+@sc{errors}:
   Signals an error if the underlying shell command exits with a non-zero status."
   ($ (append (list (~ "guix shell -m ~a" manifest) "--") cmd-parts)
      #:verbose? verbose?))
@@ -357,11 +366,10 @@ Errors:
   "Execute a command inside a Guix shell defined by a manifest file,
 using a pinned Guix revision via `guix time-machine`.
 
-Args:
+@sc{arguments}:
   cmd-parts: A list of strings representing the command to run inside
              the pinned Guix shell environment.
 
-Keyword arguments:
   verbose?: If #t, logs the composed command before execution.
             Defaults to #f.
   join: String used to join command segments. Defaults to a single space.
@@ -370,18 +378,18 @@ Keyword arguments:
   manifest: Path to the manifest file describing the package environment.
             Defaults to \"manifest.scm\".
 
-Behavior:
+
   Constructs and executes a command of the form:
 
-    guix time-machine --channels=CHANNELS --       shell -m MANIFEST -- <cmd ...>
+    guix time-machine --channels=CHANNELS -- shell -m MANIFEST -- <cmd ...>
 
   This provides a reproducible shell environment defined by the manifest file
   and pinned to the Guix revision specified in the channels file.
 
-Returns:
+@sc{returns}:
   #t if the command succeeds.
 
-Errors:
+@sc{errors}:
   Signals an error if any underlying shell command exits with a non-zero status."
   ($ (append (list (~ "guix time-machine --channels=~a" channels) "--"
                    (~ "shell -m ~a" manifest) "--") cmd-parts)
@@ -393,28 +401,27 @@ Errors:
                         (file "guix.scm"))
   "Execute a command inside a Guix shell defined by a program file.
 
-Args:
+@sc{arguments}:
   cmd-parts: A list of strings representing the command to run
              inside the Guix shell environment.
 
-Keyword arguments:
-  verbose?: If #t, logs the full constructed command before execution.
+  #:verbose?: If #t, logs the full constructed command before execution.
             Defaults to #f.
-  join: String used to join command segments. Defaults to a single space.
-  file: Path to the Guix program or manifest file defining the shell
+  #:join: String used to join command segments. Defaults to a single space.
+  #:file: Path to the Guix program or manifest file defining the shell
         environment. Defaults to \"guix.scm\".
 
-Behavior:
+
   Constructs and executes a command of the form:
 
     guix shell -f FILE -- <cmd ...>
 
   using the `$` wrapper to safely run the command and check for errors.
 
-Returns:
+@sc{returns}:
   #t if the command succeeds.
 
-Errors:
+@sc{errors}:
   Signals an error if the underlying shell command exits with a non-zero status."
   ($ (append (list (~ "guix shell -f ~a" file) "--") cmd-parts)
      #:verbose? verbose?))
@@ -427,20 +434,19 @@ Errors:
   "Execute a command inside a Guix shell defined by a program file,
 using a pinned Guix revision via `guix time-machine`.
 
-Args:
+@sc{arguments}:
   cmd-parts: A list of strings representing the command to run inside
              the pinned Guix shell environment.
 
-Keyword arguments:
-  verbose?: If #t, logs the composed command before execution.
+  #:verbose?: If #t, logs the composed command before execution.
             Defaults to #f.
-  join: String used to join command segments. Defaults to a single space.
-  channels: Path to the channels file used to pin the Guix revision.
+  #:join: String used to join command segments. Defaults to a single space.
+  #:channels: Path to the channels file used to pin the Guix revision.
             Defaults to \"channels.scm\".
-  file: Path to the Guix program file (e.g. guix.scm) defining the environment.
+  #:file: Path to the Guix program file (e.g. guix.scm) defining the environment.
         Defaults to \"guix.scm\".
 
-Behavior:
+
   Constructs and executes a command of the form:
 
     guix time-machine --channels=CHANNELS --       shell -f FILE -- <cmd ...>
@@ -448,10 +454,10 @@ Behavior:
   This provides a reproducible development environment defined by the program
   file and pinned to the Guix revision specified in the channels file.
 
-Returns:
+@sc{returns}:
   #t if the command succeeds.
 
-Errors:
+@sc{errors}:
   Signals an error if any underlying shell command exits with a non-zero status."
   ($ (append (list (~ "guix time-machine --channels=~a" channels) "--"
                    (~ "shell -f ~a" file) "--") cmd-parts)
