@@ -127,10 +127,13 @@ Maak is designed to be your central control plane. While Make is primarily focus
 
 Find below a list of some projects using maak for their automation. Reminder: ~maak.scm~ is the default name of a maak file, but you can choose to use a different one.
 
-- [[https://codeberg.org/jjba23/sss][SSS (Supreme Sexp System)]] - SSS is a Lisp machine adventure, where the hacking culture is celebrated. Let me help you achieve GNUrvana. This custom GNU + Linux setup enhances customization to infinity, encourages the hacking spirit, and offers a superior user experience thanks in part too to REPL (Read Eval Print Loop) and Lisps.
+- [[https://codeberg.org/jjba23/heks-linux][Heks GNU/Linux]] - The witches' GNU/Linux: modular, flexible, reproducible, powered by Lisp and Fedora / Debian + GNOME / Niri
+- [[https://codeberg.org/jjba23/lucidplan][LucidPlan]] - Project management (CMS) for everyone - free and open
 - [[https://codeberg.org/jjba23/veritas][Veritas]] - Unit, Integration and Black Box testing framework powered by Lisp (Guile Scheme)
+- [[https://codeberg.org/jjba23/mutastructura][Mutastructura]] -  Relational Schema and Database Migrations powered by Lisp (Guile Scheme)
 - [[https://codeberg.org/jjba23/ggg][GGG (Guile Glyph Generator)]] - Create SVG images, handy useful glyphs, org/markdown badges.
 - [[https://codeberg.org/jjba23/hygguile][Hygguile]] - UI framework for cozy and professional user-interfaces for everyone with the power of Scheme.
+- [[https://codeberg.org/jjba23/sss][SSS (Supreme Sexp System)]] - SSS is a Lisp machine adventure, where the hacking culture is celebrated. This custom GNU + Linux setup enhances customization to infinity, encourages the hacking spirit.
 
 --------
 
@@ -158,19 +161,35 @@ maak is officially distributed via:
 
 Maak is Guix-first and caters to Guix as first-class citizen in favor of other package managers or build systems. Maak targets exclusively systems that can run Guile Scheme (and optionally Guix). Check the ~maak.scm~, the ~guix.scm~ and ~manifest.scm~ for more details.
 
-For example, to enter an environment shell with maak temporarily you can use:
+Requirements:
+- *Guix*: The Guix package manager will ensure a reproducible working software, and will manage all needed dependencies for you.
+-  *Guile Scheme:*  This entire program is written using the official GNU extension language, Guile Scheme.
+
+If you just want to quickly install it to your profile:
 
 #+begin_src shell
-guix shell -f guix.scm
+guix package --install-from-file=./guix.scm
+#+end_src
+
+For example, to enter an environment shell with mutastructura temporarily you can use:
+#+begin_src shell
+guix time-machine --channels=channels.scm -- shell -f guix.scm
 #+end_src
 
 You can also chain commands to it:
 
 #+begin_src shell
-guix shell -f guix.scm -- maak --help
+guix time-machine --channels=channels.scm -- shell -f guix.scm -- maak --help
 #+end_src
 
-I am working to get Maak upstreamed to Guix soon as ~maak~, stay tuned.
+You can also run a dev shell (with manifest)
+#+begin_src shell
+guix time-machine --channels=channels.scm -- \
+     shell -m manifest.scm -- guile -L ./src -c '((@(maak main) main))' \
+     --list
+#+end_src
+
+Maak is available in upstream Guix as ~maak~ in the module ~(gnu packages build-tools)~
 
 ** On Podman/Docker
 
