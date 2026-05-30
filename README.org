@@ -3,7 +3,7 @@
 #+email: jjbigorra@gmail.com
 
 [[https://jointhefreeworld.org/ggg/dist/scheme-guile.svg]]  [[https://jointhefreeworld.org/ggg/dist/gnu-guix.svg]]   [[https://jointhefreeworld.org/ggg/dist/maak.svg]]  [[https://jointhefreeworld.org/ggg/dist/license-gpl3+.svg]]  [[https://jointhefreeworld.org/ggg/dist/license-fdl13+.svg]]
-[[https://jointhefreeworld.org/ggg/dist/jointhefreeworld-org.svg]] 
+[[https://jointhefreeworld.org/ggg/dist/jointhefreeworld-org.svg]]
 
 /The infinitely extensible command runner, control plane and project automator à la Make (Guile Scheme - Lisp)/
 
@@ -40,8 +40,8 @@ Tasks can:
 - Print logs with ~log-info~.
 - Call other Maak tasks.
 - Use any Guile Scheme function you define (or import from a library).
-- Some syntactic sugar for working with Guix dev shells ~manifest-shell~ and ~program-shell~  
-  
+- Some syntactic sugar for working with Guix dev shells ~manifest-shell~ and ~program-shell~
+
 ⚠️ Beware not to use names for tasks that conflict with names of built-in Scheme functions as this can cause some problems. For example, avoid calling something ~format~ or ~display~, choose something else instead.
 
 You can extend Maak by defining new tasks — just like writing functions in Scheme.
@@ -145,7 +145,7 @@ Also, find the technical Guile Scheme API documentation of Maak here:
 
 https://jointhefreeworld.org/api-docs/maak/API.html
 
-You can see the program's help by invoking ggg with the ~--help~ argument or looking at ~resources/help.txt~. 
+You can see the program's help by invoking ggg with the ~--help~ argument or looking at ~resources/help.txt~.
 
 --------
 
@@ -262,6 +262,20 @@ When integrated into your code editor, you can execute any piece of code (a line
 
 -----------
 
+* AI Policy
+
+This project adheres to the [[https://jointhefreeworld.org/blog/articles/personal/jointhefreeworld-ai-policy/index.html][jointhefreeworld AI (Artificial Intelligence) policy]].
+
+Our core principle is simple: *AI should assist human creativity and problem-solving, never replace human reasoning.*
+
+While tools like Large Language Models (LLMs) and interactive chatbots can be beneficial for reviewing, refactoring small functions, or acting as a sounding board, they should be used with moderation.
+
+We require a human in the loop for all contributions. The use of autonomous AI agents to automatically generate and submit pull requests to this project is strictly prohibited.
+
+
+
+---------------------
+
 * Code of conduct
 This project adheres to the jointhefreeworld code of conduct. Find it here:
 
@@ -284,7 +298,7 @@ We welcome everyone to feel invited to the Maak Project, and encourage active co
 
 Find here the Backlog and Kanban boards for Maak: https://lucidplan.jointhefreeworld.org/tickets/maak
 
-Maak embodies the spirit of GNU: simplicity, freedom, and curiosity.  
+Maak embodies the spirit of GNU: simplicity, freedom, and curiosity.
 It’s both a tool and a playground for learning Lisp-based automation.
 
 As you grow comfortable, extend Maak — define your own DSLs, orchestrate builds, or automate your projects in elegant Scheme.
@@ -298,11 +312,11 @@ Happy hacking! ✨
 Maak was designed with a few simple but powerful ideas in mind — ideas rooted in the GNU tradition and Lisp philosophy.
 
 ** Lisp as the Language of Tasks
-Every build rule, every script, is a first-class Scheme function.  
+Every build rule, every script, is a first-class Scheme function.
 This means your automation scripts are *composable*, *readable*, and *hackable*.
 
 ** Purity and Reproducibility
-Maak believes in pure, deterministic environments, that’s why it integrates so well with GNU Guix 🐂.  
+Maak believes in pure, deterministic environments, that’s why it integrates so well with GNU Guix 🐂.
 
 ** Small Is Beautiful
 No YAML, HOCON, INI or configs, no hidden logic, no magic — just clean Scheme code.
