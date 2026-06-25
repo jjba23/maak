@@ -40,6 +40,8 @@
                         bold-output
                         cp
                         mv
+                        quiet?
+                        dry-run?
                         remkdir-p
                         maak-proc?
                         maak-task?
@@ -69,6 +71,12 @@
                        (apply format
                               (append (list #f msg) args)))))
 
+(define dry-run?
+  (make-parameter #f))
+
+(define quiet?
+  (make-parameter #f))
+
 (define* (syscall cmd)
   "Executes a shell command and checks its exit code.
 
@@ -86,16 +94,15 @@ The shell command to be executed.
 @sc{errors}:
   Signals an error if the command returns a non-zero exit code,
   providing the command and the exit code in the error message."
-  (let* ((exit-val (system cmd))
-         (exit-code (status:exit-val exit-val)))
-    (cond
-      ((equal? 0 exit-code)
-       #t)
-      (else (error (format #f "
-Non-zero exit code when running!
-Command: ~a
-Exit code: ~a
-" cmd exit-code))))))
+  (cond
+    ((dry-run?)
+     (display (bold-output (format #f " [DRY-RUN]: ~a\n" cmd))) #t)
+    (else (unless (quiet?)
+            (log-info "Executing: ~a" cmd))
+          (let* ((exit-val (system cmd))
+                 (exit-code (status:exit-val exit-val)))
+            (if (zero? exit-code) #t
+                (error "Command failed" cmd exit-code))))))
 
 (define* ($ cmd-parts
             #:key (verbose? #f)
@@ -122,10 +129,14 @@ A string to use as a separator when joining the command parts.
 
 @sc{returns}:
 The result of the @code{syscall} function, which is @code{#t} if the command completes with an exit code of 0."
-  (let* ((cmd (string-join cmd-parts join)))
-    (when verbose?
-      (log-info "  Execute command:\n~a\n" cmd))
-    (syscall cmd)))
+  (let ((cmd (string-join cmd-parts join)))
+    (cond
+      ((dry-run?)
+       (display (bold-output (format #f " [DRY-RUN]: ~a\n" cmd))) #t)
+      (else (begin
+              (when verbose?
+                (log-info "  Execute command:\n~a\n" cmd))
+              (syscall cmd))))))
 
 (define-syntax-rule (get-module-var setting)
   "Get a variable from the currently loaded maak file module."

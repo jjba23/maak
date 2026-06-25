@@ -44,6 +44,8 @@
                            mkdir-p
                            cp
                            mv
+                           quiet?
+                           dry-run?
                            remkdir-p
                            maak-proc?
                            maak-task?
@@ -103,13 +105,13 @@ loaded module."
 (define (run-task task)
   "Runs a given task if it is a valid maak task (a no-argument procedure).
 Logs information about the task and its documentation before execution.
-  
+
    Args:
      task: A symbol representing the name of the task to be executed.
-  
+
    Returns:
      The result of calling the task procedure.
-  
+
    Errors:
      Signals an error if the task is not a valid thunk (no-argument function)
      as determined by `maak-task?`."
@@ -128,4 +130,3 @@ Logs information about the task and its documentation before execution.
       (else (error (format #f
                     "Task ~a was not a valid thunk (no-argument function)"
                     task)) #f))))
-
