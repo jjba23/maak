@@ -119,7 +119,7 @@ If #t, logs the generated command before executing it.
 A string to use as a separator when joining the command parts.
 
 @end itemize
-  
+
 @sc{returns}:
 The result of the @code{syscall} function, which is @code{#t} if the command completes with an exit code of 0."
   (let* ((cmd (string-join cmd-parts join)))
@@ -347,6 +347,7 @@ and the subsequent elements are the values to be substituted.
 
 (define* (manifest-shell cmd-parts
                          #:key (verbose? #f)
+                         (pure? #f)
                          (join " ")
                          (manifest "manifest.scm"))
   "Execute a command inside a Guix shell defined by a manifest file.
@@ -358,6 +359,8 @@ and the subsequent elements are the values to be substituted.
 
 
   #:verbose?: If #t, logs the fully constructed command before execution.
+            Defaults to #f.
+  #:pure?: If #t, it will run in a pure isolated shell (clean).
             Defaults to #f.
   #:join: The string separator used when joining command segments.
         Defaults to a single space.
@@ -375,11 +378,13 @@ and the subsequent elements are the values to be substituted.
 
 @sc{errors}:
   Signals an error if the underlying shell command exits with a non-zero status."
-  ($ (append (list (~ "guix shell -m ~a" manifest) "--") cmd-parts)
+  ($ (append (list (~ "guix shell -m ~a" manifest)
+                   (if pure? "--pure" "") "--") cmd-parts)
      #:verbose? verbose?))
 
 (define* (time-machine-manifest-shell cmd-parts
                                       #:key (verbose? #f)
+                                      (pure? #f)
                                       (join " ")
                                       (channels "channels.scm")
                                       (manifest "manifest.scm"))
@@ -390,12 +395,14 @@ using a pinned Guix revision via `guix time-machine`.
   cmd-parts: A list of strings representing the command to run inside
              the pinned Guix shell environment.
 
-  verbose?: If #t, logs the composed command before execution.
+  #:verbose?: If #t, logs the composed command before execution.
+            Defaults to #f.
+  #:pure?: If #t, it will run in a pure isolated shell (clean).
             Defaults to #f.
   join: String used to join command segments. Defaults to a single space.
-  channels: Path to the channels file used to pin the Guix revision.
+  #:channels: Path to the channels file used to pin the Guix revision.
             Defaults to \"channels.scm\".
-  manifest: Path to the manifest file describing the package environment.
+  #:manifest: Path to the manifest file describing the package environment.
             Defaults to \"manifest.scm\".
 
   Constructs and executes a command of the form:
@@ -411,11 +418,13 @@ using a pinned Guix revision via `guix time-machine`.
 @sc{errors}:
   Signals an error if any underlying shell command exits with a non-zero status."
   ($ (append (list (~ "guix time-machine --channels=~a" channels) "--"
-                   (~ "shell -m ~a" manifest) "--") cmd-parts)
+                   (~ "shell -m ~a" manifest)
+                   (if pure? "--pure" "") "--") cmd-parts)
      #:verbose? verbose?))
 
 (define* (program-shell cmd-parts
                         #:key (verbose? #f)
+                        (pure? #f)
                         (join " ")
                         (file "guix.scm"))
   "Execute a command inside a Guix shell defined by a program file.
@@ -426,6 +435,7 @@ using a pinned Guix revision via `guix time-machine`.
 
   #:verbose?: If #t, logs the full constructed command before execution.
             Defaults to #f.
+
   #:join: String used to join command segments. Defaults to a single space.
   #:file: Path to the Guix program or manifest file defining the shell
         environment. Defaults to \"guix.scm\".
@@ -442,11 +452,13 @@ using a pinned Guix revision via `guix time-machine`.
 
 @sc{errors}:
   Signals an error if the underlying shell command exits with a non-zero status."
-  ($ (append (list (~ "guix shell -f ~a" file) "--") cmd-parts)
+  ($ (append (list (~ "guix shell -f ~a" file)
+                   (if pure? "--pure" "") "--") cmd-parts)
      #:verbose? verbose?))
 
 (define* (time-machine-program-shell cmd-parts
                                      #:key (verbose? #f)
+                                     (pure? #f)
                                      (join " ")
                                      (channels "channels.scm")
                                      (file "guix.scm"))
@@ -458,6 +470,8 @@ using a pinned Guix revision via `guix time-machine`.
              the pinned Guix shell environment.
 
   #:verbose?: If #t, logs the composed command before execution.
+            Defaults to #f.
+  #:pure?: If #t, it will run in a pure isolated shell (clean).
             Defaults to #f.
   #:join: String used to join command segments. Defaults to a single space.
   #:channels: Path to the channels file used to pin the Guix revision.
@@ -479,9 +493,9 @@ file and pinned to the Guix revision specified in the channels file.
 @sc{errors}:
   Signals an error if any underlying shell command exits with a non-zero status."
   ($ (append (list (~ "guix time-machine --channels=~a" channels) "--"
-                   (~ "shell -f ~a" file) "--") cmd-parts)
+                   (~ "shell -f ~a" file)
+                   (if pure? "--pure" "") "--") cmd-parts)
      #:verbose? verbose?))
 
 (define (bold-output x)
   (format #f "\x1b[1m~a\x1b[0m" x))
-

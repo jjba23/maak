@@ -34,6 +34,9 @@
              ((guix licenses)
               #:prefix license:))
 
-(packages->manifest (list guile-3.0 guile-documenta texinfo guile-ares-rs
+(packages->manifest (list guile-3.0-latest
+                          guile-documenta
+                          texinfo
+                          guile-ares-rs
+                          coreutils
                           watchexec))
-

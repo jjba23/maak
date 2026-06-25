@@ -124,6 +124,6 @@
 
   (let* ((temp-file-name (new-temp-file)))
     (mkdir-p "./tmp")
+    (time-machine-manifest-shell (list "mkdir -p ./tmp") #:pure? #t)
     ($ (list (~ "touch ~a" temp-file-name)))
     (delete-file-recursively temp-file-name)))
-
