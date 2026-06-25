@@ -121,7 +121,7 @@
 
 ;; ====== Maak test playground =======
 
-(define (test-all-maak-functions)
+(define (test)
   (define (new-temp-file)
     (let* ((now (localtime (current-time)))
            (time-string (string-replace-substring (strftime "%c" now) " " "-"))
@@ -130,7 +130,9 @@
 
   (let* ((temp-file-name (new-temp-file)))
     (mkdir-p "./tmp")
-    (time-machine-manifest-shell (list "mkdir -p ./tmp")
-                                 #:pure? #t)
     ($ (list (~ "touch ~a" temp-file-name)))
+    ($ (list (~ "touch ~a" temp-file-name)))
+    (parameterize ((dry-run? #t))
+      ($ (list (~ "touch ~a" temp-file-name)))
+      (delete-file-recursively temp-file-name))
     (delete-file-recursively temp-file-name)))

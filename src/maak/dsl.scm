@@ -98,7 +98,7 @@ The shell command to be executed.
   (cond
     ((dry-run?)
      (unless (quiet?)
-       (display (bold-output (format #f " [DRY-RUN]: ~a\n" cmd)))) #t)
+       (display (bold-output (format #f "\n[DRY-RUN]: ~a\n" cmd)))) #t)
     (else (unless (quiet?)
             (log-info "Executing: ~a" cmd))
           (let* ((exit-val (system cmd))
@@ -135,7 +135,7 @@ The result of the @code{syscall} function, which is @code{#t} if the command com
     (cond
       ((dry-run?)
        (unless (quiet?)
-         (display (bold-output (format #f " [DRY-RUN]: ~a\n" cmd)))) #t)
+         (display (bold-output (format #f "\n[DRY-RUN]: ~a\n" cmd)))) #t)
       (else (begin
               (when (and verbose?
                          (not (quiet?)))

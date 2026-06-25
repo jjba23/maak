@@ -69,7 +69,15 @@ maak hello
 maak quick-math 23 42
 #+end_src
 
-More advanced examples here:
+You can also run multiple tasks easily (sequentially) via a comma-separated list :
+
+#+begin_src shell
+maak fmt,compile,test
+#+end_src
+
+Often it's just cleaner to do it directly in Lisp (Scheme code ) in your Maakfile (where it's also trivial to add concurrent computations)
+
+More advanced examples here and below:
 
 #+begin_src scheme
 ;; Format Scheme source code files according to the Guix style guide.
@@ -97,38 +105,6 @@ More advanced examples here:
     (log-info "Performed some fun arithmetics:\nResult: ~a" some-data)))
 #+end_src
 
---------------
-
-* Why write Maak ?
-
-Have you ever found Makefile to be repetitive, lacking expressiveness and having a weird, limited syntax and unexpected arcane behavior?
-
-No fear, *Maak* is here. With the full power of Lisp directly in your command runner/control plane,  easily define functions, data, lists, loop through them, macros, etc. Maak replaces the arcane syntax of Make with the power and elegance of a full-featured functional programming language: GNU Guile Scheme λ.
-
-Maak replaces Make’s runes and mystery with the power and clarity of GNU Guile Scheme λ.
-
-** The Problems with Make
-
-Many developers find GNU Make and related tooling to be at times frustrating and not intuitive, despite being so powerful.
-
-Makefile often contains /repetitive/ code, particularly when dealing with similar targets or file types. You might have to write a separate rule for every single output file, even if the process is exactly the same. The limited syntax makes it difficult to abstract this logic into reusable functions or macros, leading to a lot of copy-pasting.
-
-Make's syntax is a Domain-Specific Language (DSL), not a general-purpose programming language. While it's powerful for its intended purpose of managing dependencies, it's /terrible for anything else/.
-
-Defining variables, using conditionals, or looping over a list of items can be surprisingly clunky and often requires arcane, non-standard constructs.
-
-Make has many "gotchas" that can trip up even experienced users.
-
-** How Maak Solves These Problems
-
-Maak positions itself as a modern infinitely extensible task runner, using the functional programming language  GNU Guile Scheme (a dialect of Lisp). No need for .PHONY recipes here.
-
-Maak gives you the power of Scheme. You're not restricted to a limited, weird syntax. This means you can easily define functions to avoid repetition, create complex data structures (like lists and maps), and use control flow statements (like loops and conditionals) to write much cleaner and more expressive scripts.
-
-Instead of having to learn a new, limited language, you can leverage your existing Lisp knowledge to define tasks, manage data, and automate your workflows. This leads to code that is much easier to read, write, and maintain. For example, you can write a simple loop to process all your source files instead of writing a separate rule for each one.
-
-Maak is designed to be your central control plane. While Make is primarily focused on building software from source, Maak is a general-purpose command runner. This means you can use it for tasks like running tests, deploying applications, or managing your development environment. It's meant to be a more flexible and powerful alternative for all your project's automation needs.
-
 ------------------------
 
 * Examples of maak files
@@ -143,11 +119,47 @@ Find below a list of some projects using maak for their automation. Reminder: ~m
 - [[https://codeberg.org/jjba23/hygguile][Hygguile]] - UI framework for cozy and professional user-interfaces for everyone with the power of Scheme.
 - [[https://codeberg.org/jjba23/sss][SSS (Supreme Sexp System)]] - SSS is a Lisp machine adventure, where the hacking culture is celebrated. This custom GNU + Linux setup enhances customization to infinity, encourages the hacking spirit.
 
+--------------
+
+* Why write Maak ?
+
+Have you ever found Makefile to be repetitive, lacking expressiveness and having a weird, limited syntax and unexpected arcane behavior?
+
+No fear, *Maak* is here. With the full power of Lisp directly in your command runner/control plane,  easily define functions, data, lists, loop through them, macros, etc. Maak replaces the arcane syntax of Make with the power and elegance of a full-featured functional programming language: GNU Guile Scheme λ.
+
+Maak replaces Make’s runes and mystery with the power and clarity of GNU Guile Scheme λ.
+
+* The Problems with Make
+
+Many developers find GNU Make and related tooling to be at times frustrating and not intuitive, despite being so powerful.
+
+Makefile often contains /repetitive/ code, particularly when dealing with similar targets or file types. You might have to write a separate rule for every single output file, even if the process is exactly the same. The limited syntax makes it difficult to abstract this logic into reusable functions or macros, leading to a lot of copy-pasting.
+
+Make's syntax is a Domain-Specific Language (DSL), not a general-purpose programming language. While it's powerful for its intended purpose of managing dependencies, it's /terrible for anything else/.
+
+Defining variables, using conditionals, or looping over a list of items can be surprisingly clunky and often requires arcane, non-standard constructs.
+
+Make has many "gotchas" that can trip up even experienced users.
+
+* How Maak Innovates
+
+Maak positions itself as a modern infinitely extensible task runner, using the functional programming language  GNU Guile Scheme (a dialect of Lisp). No need for .PHONY recipes here.
+
+Maak gives you the power of Scheme. You're not restricted to a limited, weird syntax. This means you can easily define functions to avoid repetition, create complex data structures (like lists and maps), and use control flow statements (like loops and conditionals) to write much cleaner and more expressive scripts.
+
+Instead of having to learn a new, limited language, you can leverage your existing Lisp knowledge to define tasks, manage data, and automate your workflows. This leads to code that is much easier to read, write, and maintain. For example, you can write a simple loop to process all your source files instead of writing a separate rule for each one.
+
+Maak is designed to be your central control plane. While Make is primarily focused on building software from source, Maak is a general-purpose command runner. This means you can use it for tasks like running tests, deploying applications, or managing your development environment. It's meant to be a more flexible and powerful alternative for all your project's automation needs.
+
 --------
 
-* And more
+* Parameterize: customize the running of tasks and commands
 
-Dry-run and quietness are easily controlled in lexical scope via parameters. There parameters work for pretty much any functionality of Maak. Dry-runs will be good for testing.
+Dry-run and quietness are easily controlled in lexical scope via Lisp (Scheme) parameters.
+
+There are  parameters  many functionality of Maak.
+
+Dry-runs for example are  good for testing.
 
 #+begin_src scheme
 (define (fmt)
@@ -209,14 +221,16 @@ guix time-machine --channels=channels.scm -- shell -f guix.scm
 You can also chain commands to it:
 
 #+begin_src shell
-guix time-machine --channels=channels.scm -- shell -f guix.scm -- maak --help
+guix time-machine --channels=channels.scm -- \
+     shell -f guix.scm -- \
+     maak --help
 #+end_src
 
 You can also run a dev shell (with manifest)
 #+begin_src shell
 guix time-machine --channels=channels.scm -- \
-     shell -m manifest.scm -- guile -L ./src -c '((@(maak main) main))' \
-     --list
+     shell -m manifest.scm -- guile -L ./src -c \
+     '((@(maak main) main))' --list
 #+end_src
 
 Maak is available in upstream Guix as ~maak~ in the module ~(gnu packages build-tools)~
@@ -234,7 +248,8 @@ Then you can run Maak from the container, and bind your local filesystem to give
 
 #+begin_src shell
  docker container run -v /home/joe:/home/joe \
-     docker.io/jjba23/maak:latest maak -f /home/joe/hacking/maak/maak.scm --list
+     docker.io/jjba23/maak:latest \
+     maak -f /home/joe/hacking/maak/maak.scm --list
 #+end_src
 
 ---------
@@ -365,7 +380,12 @@ You own your build logic, you can read it, change it, and share it freely.
 In systems where ~maak~ is already installed, a good way to compile from source and test all program functionalities is a pure shell:
 
 #+begin_src shell
-guix shell --pure -f guix.scm bash coreutils util-linux-with-udev guile -- maak test-all-maak-functions
+guix shell --pure -f guix.scm \
+     bash coreutils util-linux-with-udev guile -- \
+     maak --list
 
-guix shell --pure -f guix.scm bash coreutils util-linux-with-udev guile -- maak --list
+# run project tests
+guix time-machine --channels=channels.scm -- \
+     shell -f guix.scm --pure -- \
+     maak test
 #+end_src
