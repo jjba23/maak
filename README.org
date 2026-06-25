@@ -139,7 +139,7 @@ Find below a list of some projects using maak for their automation. Reminder: ~m
 
 * And more
 
-Dry-run and quietness are easily controlled in lexical scope via parameters. There parameters work for ~syscall~ and for ~$~.
+Dry-run and quietness are easily controlled in lexical scope via parameters. There parameters work for pretty much any functionality of Maak. Dry-runs will be good for testing.
 
 #+begin_src scheme
 (define (fmt)
@@ -148,10 +148,12 @@ Dry-run and quietness are easily controlled in lexical scope via parameters. The
   ;; this will not
   (parameterize ((dry-run? #t)
                  (quiet? #f))
+    (delete-file-recursively "tmp")
     ($ '("find . -maxdepth 8 -name '*.scm'"
          "-type f -exec guix style -f {} \\;")
        #:verbose? #t)))
 ;; it will print instead or unning
+;; [DRY-RUN]: rm -rfv tmp
 ;; [DRY-RUN]: find . -maxdepth 8 -name '*.scm' -type f -exec guix style -f {} \;
 #+end_src
 

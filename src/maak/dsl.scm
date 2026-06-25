@@ -54,7 +54,8 @@
                         cat))
 
 (define (log-message msg)
-  (display (format #f "\n~a" msg)))
+  (unless (quiet?)
+    (display (format #f "\n~a" msg))))
 
 (define (log-separator)
   (log-message "
@@ -96,7 +97,8 @@ The shell command to be executed.
   providing the command and the exit code in the error message."
   (cond
     ((dry-run?)
-     (display (bold-output (format #f " [DRY-RUN]: ~a\n" cmd))) #t)
+     (unless (quiet?)
+       (display (bold-output (format #f " [DRY-RUN]: ~a\n" cmd)))) #t)
     (else (unless (quiet?)
             (log-info "Executing: ~a" cmd))
           (let* ((exit-val (system cmd))
@@ -132,9 +134,11 @@ The result of the @code{syscall} function, which is @code{#t} if the command com
   (let ((cmd (string-join cmd-parts join)))
     (cond
       ((dry-run?)
-       (display (bold-output (format #f " [DRY-RUN]: ~a\n" cmd))) #t)
+       (unless (quiet?)
+         (display (bold-output (format #f " [DRY-RUN]: ~a\n" cmd)))) #t)
       (else (begin
-              (when verbose?
+              (when (and verbose?
+                         (not (quiet?)))
                 (log-info "  Execute command:\n~a\n" cmd))
               (syscall cmd))))))
 
