@@ -137,6 +137,26 @@ Find below a list of some projects using maak for their automation. Reminder: ~m
 
 --------
 
+* And more
+
+Dry-run and quietness are easily controlled in lexical scope via parameters. There parameters work for ~syscall~ and for ~$~.
+
+#+begin_src scheme
+(define (fmt)
+  "Format Scheme source code files according to the Guix style guide."
+  (syscall "ls") ;; this will run
+  ;; this will not
+  (parameterize ((dry-run? #t)
+                 (quiet? #f))
+    ($ '("find . -maxdepth 8 -name '*.scm'"
+         "-type f -exec guix style -f {} \\;")
+       #:verbose? #t)))
+;; it will print instead or unning
+;; [DRY-RUN]: find . -maxdepth 8 -name '*.scm' -type f -exec guix style -f {} \;
+#+end_src
+
+------
+
 * Help
 
 The project's automation is done using Maak itself, check the ~maak.scm~ file.
