@@ -260,24 +260,29 @@ Maak offers a simple but powerful shell completion. When you are in a directory 
 
 See the script at ~scripts/maak-completion.bash~ . You should "source" this script if you want these completions to always be available for you.
 
-Load maak Bash shell auto-completions with :
+You might find these variables useful (for your bash, zsh or fish config) specially if you run Guix, but feel free to download and load the scripts from ~./scripts~ at your will in your shell.
 
-#+begin_src sh
-#!/usr/bin/env bash
-# Integrate Guix-managed Bash & Maak
+#+begin_src shell
 maak_bin_install_dir=$(which maak)
 maak_install_dir=$(realpath "${maak_bin_install_dir}")
 maak_bin=$(dirname "${maak_install_dir}")
 maak_store=$(dirname "${maak_bin}")
+#+end_src
+
+Load maak Bash shell auto-completions with :
+
+#+begin_src sh
+#!/usr/bin/env bash
 maak_completions="${maak_store}/share/scripts/maak-completion.bash"
 
 # Load Maak auto-completions
 if [[ -f "${maak_completions}" ]]; then
-  # echo "Found completions: ${maak_completions}"
-  # echo "Loading Maak completions..."
   source "${maak_completions}" || true
 fi
 #+end_src
+
+
+For Zsh and fish shell, scripts are also provided, and should be loaded in similar fashion. See ~./scripts~
 
 -------
 
