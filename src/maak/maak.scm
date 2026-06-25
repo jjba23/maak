@@ -66,10 +66,15 @@
                                         (else #f))) mod))))
     tasks))
 
-(define (list-tasks)
+(define* (list-tasks #:key (as-is? #f))
   "List documentation for all maak tasks defined in the currently
-loaded module."
-  (let* ((tasks (resolve-maak-tasks)))
+loaded module. Sorts alphabetically by default unless AS-IS? is #t."
+  (let* ((raw-tasks (resolve-maak-tasks))
+         (tasks (if as-is? raw-tasks
+                    (sort raw-tasks
+                          (lambda (a b)
+                            (string<? (symbol->string (car a))
+                                      (symbol->string (car b))))))))
     (log-separator)
     (for-each (lambda (task)
                 (let* ((function-docstring (procedure-documentation (variable-ref
@@ -129,6 +134,4 @@ Logs information about the task and its documentation before execution.
          (log-info "  ~a" proc-doc))
        (newline)
        (apply proc task-args))
-      (else (error (format #f
-                    "Task ~a was not a valid function"
-                    task)) #f))))
+      (else (error (format #f "Task ~a was not a valid function" task)) #f))))

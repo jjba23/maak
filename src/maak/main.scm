@@ -44,7 +44,9 @@
                                (value #t)
                                (required? #f))))
          (options (getopt-long args option-spec))
-         (task-args (option-ref options '() '()))
+         (task-args (option-ref options
+                                '()
+                                '()))
          (resources (option-ref options
                                 'resources #f))
          (file (option-ref options
@@ -66,8 +68,9 @@
     (log-info "Loading tasks from Maak file: ~a\n" file)
     (load file)
     (if should-list
-        (list-tasks)
+        (list-tasks #:as-is? #f)
         (begin
           (log-info "Executing Maak tasks: ~a"
                     (string-join (map symbol->string tasks) " =>"))
-          (run-tasks tasks #:task-args task-args)))))
+          (run-tasks tasks
+                     #:task-args task-args)))))
