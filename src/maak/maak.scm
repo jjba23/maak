@@ -84,7 +84,8 @@ loaded module."
     (newline)
     (newline)))
 
-(define (run-tasks tasks)
+(define* (run-tasks tasks
+                    #:key (task-args '()))
   "Runs a list of tasks sequentially."
   (for-each (lambda (task)
               (unless (get-module-var task)
@@ -93,27 +94,29 @@ loaded module."
                    (raise-exception (make-exception-with-message (format #f
                                                                          (string-join '
                                                                           ("Could not find default task."
-                                                                           "Have you defined a thunk named `default' in your Maak file?"
-                                                                           "(a thunk is a procedure without arguments)"))
+                                                                           "Have you defined a function named `default' in your Maak file?"))
                                                                          task))))
                   (else (raise-exception (make-exception-with-message (format
                                                                               #f
                                                                               "Could not find task: ~a"
                                                                               task))))))
-              (run-task task)) tasks))
+              (run-task task
+                        #:task-args task-args)) tasks))
 
-(define (run-task task)
-  "Runs a given task if it is a valid maak task (a no-argument procedure).
+(define* (run-task task
+                   #:key (task-args '()))
+  "Runs a given task if it is a valid maak task.
 Logs information about the task and its documentation before execution.
 
    Args:
      task: A symbol representing the name of the task to be executed.
+     task-args: Additional arguments to be passed to the task.
 
    Returns:
      The result of calling the task procedure.
 
    Errors:
-     Signals an error if the task is not a valid thunk (no-argument function)
+     Signals an error if the task is not a valid function
      as determined by `maak-task?`."
   (let* ((proc (get-module-var task))
          (proc-doc (procedure-documentation proc)))
@@ -125,8 +128,7 @@ Logs information about the task and its documentation before execution.
                   (not (equal? "" proc-doc)))
          (log-info "  ~a" proc-doc))
        (newline)
-       (apply proc
-              '()))
+       (apply proc task-args))
       (else (error (format #f
-                    "Task ~a was not a valid thunk (no-argument function)"
+                    "Task ~a was not a valid function"
                     task)) #f))))

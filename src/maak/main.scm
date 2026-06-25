@@ -44,6 +44,7 @@
                                (value #t)
                                (required? #f))))
          (options (getopt-long args option-spec))
+         (task-args (option-ref options '() '()))
          (resources (option-ref options
                                 'resources #f))
          (file (option-ref options
@@ -69,5 +70,4 @@
         (begin
           (log-info "Executing Maak tasks: ~a"
                     (string-join (map symbol->string tasks) " =>"))
-          (run-tasks tasks)))))
-
+          (run-tasks tasks #:task-args task-args)))))

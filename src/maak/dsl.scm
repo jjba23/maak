@@ -159,9 +159,7 @@ The result of the @code{syscall} function, which is @code{#t} if the command com
 
 (define (maak-proc? x)
   "Predicate that indicates whether a procedure is a valid maak proc."
-  (and (procedure? x)
-       (equal? '(0 0 #f)
-               (procedure-minimum-arity x))))
+  (procedure? x))
 
 (define* (delete-file-recursively dir
                                   #:key (verbose? #f))

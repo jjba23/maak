@@ -33,7 +33,7 @@ All you will need to do to use Maak is to write a file (by default ~./maak.scm~)
 
 * Defining tasks
 
-Any thunk (no-argument function) you define in this file becomes a runnable task. If no task is passed via command-line, Maak will run the ~default~ task.
+Any function (with or without arguments) you define in this file becomes a runnable task. If no task is passed via command-line, Maak will run the ~default~ task.
 
 Tasks can:
 - Run shell commands with the ~$~ helper.
@@ -53,12 +53,20 @@ Here’s an example:
   "Say hello from Maak!"
   (display "Hello from Maak!")
   (display (format #f "~a + ~a = ~a" 3 4 (+ 3 4))))
+
+(define (quick-math x-arg y-arg)
+  ;; beware task args come always as strings due to CLI parse
+  (let* ((x (string->number x-arg))
+         (y (string->number y-arg)))
+    (format #t "~a + ~a = ~a" x y
+            (+ x y))))
 #+end_src
 
 You can now run it:
 
 #+begin_src shell
 maak hello
+maak quick-math 23 42
 #+end_src
 
 More advanced examples here:

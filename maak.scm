@@ -62,6 +62,12 @@
      #:join " && ")
   ($ '("echo -n \"\nUser: ${USER}\"")))
 
+(define (quick-math x-arg y-arg)
+  (let* ((x (string->number x-arg))
+         (y (string->number y-arg)))
+    (format #t "~a + ~a = ~a" x y
+            (+ x y))))
+
 (define (repl)
   "Development REPL."
   (manifest-shell '("guile -L ./src"
@@ -124,6 +130,7 @@
 
   (let* ((temp-file-name (new-temp-file)))
     (mkdir-p "./tmp")
-    (time-machine-manifest-shell (list "mkdir -p ./tmp") #:pure? #t)
+    (time-machine-manifest-shell (list "mkdir -p ./tmp")
+                                 #:pure? #t)
     ($ (list (~ "touch ~a" temp-file-name)))
     (delete-file-recursively temp-file-name)))
