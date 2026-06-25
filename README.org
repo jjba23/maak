@@ -254,13 +254,17 @@ Then you can run Maak from the container, and bind your local filesystem to give
 
 ---------
 
-* Shell completions
+* Shell completions: Bash, ZSH, Fish
 
 Maak offers a simple but powerful shell completion. When you are in a directory with ~maak.scm~ files, you can type ~maak~ followed by space, then hit TAB and you will see the names of maak tasks appear. This is done by reading the current file and extracting task names from it with some awk magic.
 
-See the script at ~scripts/maak-completion.bash~ . You should "source" this script if you want these completions to always be available for you.
+See the scripts at ~./scripts~ . You should "source" these script if you want these completions to be available for you.
 
-You might find these variables useful (for your bash, zsh or fish config) specially if you run Guix, but feel free to download and load the scripts from ~./scripts~ at your will in your shell.
+You might find these variables useful (for your ~.bashrc~, ~.zshrc~  or ~fish~ config) specially if you run Guix, but feel free to download and load the scripts from ~./scripts~ at your will in your shell.
+
+For Zsh and fish shell, scripts are also provided, and should be loaded in similar fashion. See ~./scripts~
+
+Bash example:
 
 #+begin_src shell
 maak_bin_install_dir=$(which maak)
@@ -269,7 +273,6 @@ maak_bin=$(dirname "${maak_install_dir}")
 maak_store=$(dirname "${maak_bin}")
 #+end_src
 
-Load maak Bash shell auto-completions with :
 
 #+begin_src sh
 #!/usr/bin/env bash
@@ -282,7 +285,7 @@ fi
 #+end_src
 
 
-For Zsh and fish shell, scripts are also provided, and should be loaded in similar fashion. See ~./scripts~
+
 
 -------
 
