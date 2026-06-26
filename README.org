@@ -262,7 +262,9 @@ See the scripts at ~./scripts~ . You should "source" these script if you want th
 
 You might find these variables useful (for your ~.bashrc~, ~.zshrc~  or ~fish~ config) specially if you run Guix, but feel free to download and load the scripts from ~./scripts~ at your will in your shell.
 
-For Zsh and fish shell, scripts are also provided, and should be loaded in similar fashion. See ~./scripts~
+For ZSH and fish shell, scripts are also provided, and should be loaded in similar fashion. See ~./scripts~
+
+ZSH users will want to add the Maak completion script to ~$FPATH~. Fish users will want to look at ~$fish_complete_path~.
 
 Bash example:
 
@@ -283,7 +285,6 @@ if [[ -f "${maak_completions}" ]]; then
   source "${maak_completions}" || true
 fi
 #+end_src
-
 
 
 
