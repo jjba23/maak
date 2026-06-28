@@ -77,7 +77,7 @@
   "Generate technical API documentation for Maak."
   (delete-file-recursively "doc")
   (manifest-shell (list "documenta api ./src/maak && "
-                        (~ "texi2any -v --html --css-ref=~a" api-docs-css-url)
+                        (~ "texi2any -v --html --css-ref=~a -o index_html" api-docs-css-url)
                         "./doc/api/index.texi"))
   (mv "./index_html" "./doc/api-dist"))
 
