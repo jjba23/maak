@@ -79,7 +79,7 @@
   (manifest-shell (list "documenta api ./src/maak && "
                         (~ "texi2any -v --html --css-ref=~a" api-docs-css-url)
                         "./doc/api/index.texi"))
-  (mv "./index" "./doc/api-dist"))
+  (mv "./index_html" "./doc/api-dist"))
 
 (define (deploy)
   "Generate documentation for the project and publish to web directory."
