@@ -287,6 +287,13 @@ fi
 #+end_src
 
 
+--------
+
+* Maak runner in Emacs
+
+Creating a connection to Maak from your favourite programmable environment should be simple. You can see how Heks Emacs does it for example here in [[https://codeberg.org/jjba23/heks-emacs/src/branch/trunk/src/modules/heks-emacs.el][heks-emacs.el]]
+
+[[https://jointhefreeworld.org/static-assets/maak/maak-in-emacs.png]]
 
 -------
 
@@ -398,9 +405,3 @@ guix time-machine --channels=channels.scm -- \
      shell -f guix.scm --pure -- \
      maak test
 #+end_src
-
---------
-
-* Maak runner in Emacs
-
-Creating a connection to Maak from your favourite programmable environment should be simple. You can see how Heks Emacs does it for example here: https://codeberg.org/jjba23/heks-emacs/src/branch/trunk/src/modules/heks-emacs.el
