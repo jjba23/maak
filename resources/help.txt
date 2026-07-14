@@ -1,9 +1,14 @@
 
 +----------------------------------------------------------------------------+
 
-Maak
-    The infinitely extensible command runner, control plane
-        and project automator à la Make (Guile Scheme - Lisp)
+,---.        ,---.
+      (     \      /     )
+       )  (  \____/  )  (
+      (    \ @  @ /    )     [ Maak ]
+       )    ( oo )    (      The infinitely extensible
+      (      \__/      )     command runner, control plane,
+       \  (  λ Lisp ) /      and project automator.
+        `------------'
 
     See more at: https://codeberg.org/jjba23/maak
     License: GNU GPL v3 or newer
@@ -22,6 +27,8 @@ Options:
 Examples:
 
     maak test
+
+    maak test,quick-math 42 42 100
 
     maak -f ./maak.scm -- fmt,test,run
 
