@@ -23,6 +23,8 @@
              (guix build-system guile)
              (gnu packages)
              (gnu packages bash)
+             (gnu packages base)
+             (gnu packages linux)
              (gnu packages guile)
              (gnu packages guile-xyz))
 
@@ -53,10 +55,13 @@
                               (string-append share "/scripts/"))
                 (install-file "scripts/maak-completion.bash"
                               (string-append share "/scripts/"))
+                (install-file "scripts/maak-completion.zsh"
+                              (string-append share "/scripts/"))
+                (install-file "scripts/maak-completion.fish"
+                              (string-append share "/scripts/"))
                 (chmod (string-append bin "/maak") #o755)))))))
     (build-system guile-build-system)
-    (native-inputs (list guile-3.0))
-    (inputs (list guile-3.0 bash-minimal))
+    (propagated-inputs (list guile-3.0 bash-minimal coreutils util-linux))
     (synopsis "Command runner à la Make using Guile Scheme")
     (description
      "Maak is a command runner and control plane for your
