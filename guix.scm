@@ -59,9 +59,24 @@
                               (string-append share "/scripts/"))
                 (install-file "scripts/maak-completion.fish"
                               (string-append share "/scripts/"))
-                (chmod (string-append bin "/maak") #o755)))))))
+                (chmod (string-append bin "/maak") #o755))))
+          (add-after 'unpack 'fix-paths
+            (lambda* (#:key inputs #:allow-other-keys)
+              (substitute* "scripts/maak"
+                (("readlink -f ")
+                 (string-append (search-input-file inputs "bin/readlink")
+                                " -f "))
+                (("realpath ")
+                 (string-append (search-input-file inputs "bin/realpath") " "))
+                (("dirname ")
+                 (string-append (search-input-file inputs "bin/dirname") " "))
+                (("getopt ")
+                 (string-append (search-input-file inputs "bin/getopt") " "))
+                (("exec guile ")
+                 (string-append "exec "
+                                (search-input-file inputs "bin/guile") " "))))))))
     (build-system guile-build-system)
-    (propagated-inputs (list guile-3.0 bash-minimal coreutils util-linux))
+    (inputs (list guile-3.0 bash-minimal coreutils util-linux))
     (synopsis "Command runner à la Make using Guile Scheme")
     (description
      "Maak is a command runner and control plane for your
