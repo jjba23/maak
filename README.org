@@ -37,7 +37,7 @@ Any function (with or without arguments) you define in this file becomes a runna
 
 ** Task Export & Visibility Rule
 - *Open Fallback (No Exports)*: If you do not write an ~#:export~ directive in your module (or leave it empty), Maak is completely "open season": all procedures in the file are treated as runnable tasks.
-- *Strict Lock (With Exports)*: If you define *even a single procedure* in your ~#:export~ directive (e.g., ~#:export (quick-math)~), Maak locks down the module. *Only* the explicitly exported procedures will be treated as tasks. Any other functions become private helper procedures and are completely hidden from the CLI and ~--list~ command.
+- *Strict Lock (With Exports)*: If you define anything in your ~#:export~ directive (e.g., ~#:export (quick-math)~), then only the explicitly exported procedures will be treated as tasks. Any other functions become private helper procedures and are completely hidden from the CLI and ~--list~ command.
 
 If no task is passed via command-line, Maak will run the ~default~ task.
 

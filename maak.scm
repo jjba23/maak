@@ -30,8 +30,18 @@
 (define deploy-dir
   "/srv/http/jointhefreeworld.org")
 
+(define project-name
+  'maak)
+
 (define hot-reload-file-types
   '(scm))
+
+;; ====== Maak abstractions ======
+
+(define (syscall-with-output cmd)
+  (let* ((process (open-input-pipe cmd))
+         (process-output (get-string-all process)))
+    (close-pipe process) process-output))
 
 ;; ====== Maak file tasks ======
 
@@ -93,6 +103,20 @@
   "Create a Docker image for Maak."
   ($ '("guix pack --file=./guix.scm" "--format=docker" "--image-tag=maak"
        "-S /bin=bin" "bash coreutils util-linux-with-udev guile")))
+
+(define (push-docker-latest)
+  "Push the latest locally generated Docker image to Dockerhub."
+  ($ (list (~ "podman push localhost/~a:latest" project-name)
+           (~ "docker.io/jjba23/~a:latest" project-name))
+     #:verbose? #t))
+
+(define (push-docker-tag)
+  "Push the locally generated Docker image to Dockerhub."
+  ($ '("git fetch --all"))
+  (let* ((latest-tag (syscall-with-output "git describe --tags --abbrev=0")))
+    ($ (list (~ "podman push localhost/~a:latest" project-name)
+             (~ "docker.io/jjba23/~a:~a" project-name latest-tag))
+       #:verbose? #t)))
 
 (define (hot-reload)
   "Hot-reloading developer's setup."

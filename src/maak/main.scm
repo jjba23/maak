@@ -40,7 +40,6 @@
                         (list (single-char #\l)
                               (value #f)
                               (required? #f))
-                        ;; Added dry-run (-n) and quiet (-q) specs
                         (dry-run (single-char #\n)
                                  (value #f)
                                  (required? #f))
