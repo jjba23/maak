@@ -1,35 +1,49 @@
-
 +----------------------------------------------------------------------------+
 
-,---.        ,---.
-      (     \      /     )
-       )  (  \____/  )  (
-      (    \ @  @ /    )     [ Maak ]
-       )    ( oo )    (      The infinitely extensible
-      (      \__/      )     command runner, control plane,
-       \  (  λ Lisp ) /      and project automator.
-        `------------'
+ ,---.       ,---.
+(     \     /     )
+ )  (  \____/  )  (
+(    \ @  @ /    )      [ Maak ]
+ )    ( oo )    (       The infinitely extensible
+(      \__/      )      command runner, control plane,
+ \  (  λ Lisp ) /       and project automator.
+  `------------'
 
     See more at: https://codeberg.org/jjba23/maak
     License: GNU GPL v3 or newer
 
-Usage: maak [OPTIONS] -- [TASKS]...
+Usage: maak [OPTIONS] [-- [TASKS]... [TASK_ARGS]...]
+
 Options:
     -f, --file FILE
-        Specify the Scheme config - path to Maak file (defaults to ./maak.scm).
+        Specify the path to the Maak file (defaults to ./maak.scm).
+
     -h, --help
         Display this help message and exit.
+
     -l, --list
         List all available tasks in the currently loaded Maak file.
+
+    -n, --dry-run
+        Run in dry-run mode. Print shell commands instead of executing them.
+
+    -q, --quiet
+        Quiet mode. Suppress standard logging, banners, and header outputs.
 
 +----------------------------------------------------------------------------+
 
 Examples:
 
+    # Run the 'test' task
     maak test
 
-    maak test,quick-math 42 42 100
+    # Run 'test', then 'quick-math', passing arguments to the tasks
+    maak quick-math -- 42 42
 
-    maak -f ./maak.scm -- fmt,test,run
+    # Run tasks from a specific file
+    maak -f ./build/tasks.scm -- fmt,test
+
+    # Quietly test run a pipeline without modifying files
+    maak -n -q -- clean,build,deploy
 
 +----------------------------------------------------------------------------+

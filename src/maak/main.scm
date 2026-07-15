@@ -40,6 +40,13 @@
                         (list (single-char #\l)
                               (value #f)
                               (required? #f))
+                        ;; Added dry-run (-n) and quiet (-q) specs
+                        (dry-run (single-char #\n)
+                                 (value #f)
+                                 (required? #f))
+                        (quiet (single-char #\q)
+                               (value #f)
+                               (required? #f))
                         (tasks (single-char #\t)
                                (value #t)
                                (required? #f))))
@@ -53,6 +60,10 @@
                            'file #f))
          (should-list (option-ref options
                                   'list #f))
+         (should-dry-run (option-ref options
+                                     'dry-run #f))
+         (should-quiet (option-ref options
+                                   'quiet #f))
          (raw-tasks (filter (lambda (t)
                               (not (equal? t "")))
                             (string-split (option-ref options
@@ -62,15 +73,21 @@
                                        (length raw-tasks)))
                            '("default") raw-tasks))
          (tasks (map string->symbol string-tasks)))
-    (log-separator)
-    (log-info "Maak: the infinitely extensible command runner
+    (parameterize ((dry-run? should-dry-run)
+                   (quiet? should-quiet))
+      (unless (quiet?)
+        (log-separator)
+        (log-info "Maak: the infinitely extensible command runner
 ")
-    (log-info "Loading tasks from Maak file: ~a\n" file)
-    (load file)
-    (if should-list
-        (list-tasks #:as-is? #f)
-        (begin
-          (log-info "Executing Maak tasks: ~a"
-                    (string-join (map symbol->string tasks) " =>"))
-          (run-tasks tasks
-                     #:task-args task-args)))))
+        (log-info "Loading tasks from Maak file: ~a\n" file))
+
+      (load file)
+
+      (if should-list
+          (list-tasks #:as-is? #f)
+          (begin
+            (unless (quiet?)
+              (log-info "Executing Maak tasks: ~a"
+                        (string-join (map symbol->string tasks) " =>")))
+            (run-tasks tasks
+                       #:task-args task-args))))))
