@@ -26,6 +26,7 @@
              (gnu packages guile-xyz)
              (gnu packages pkg-config)
              (guix build-system guile)
+             (gnu packages base)
              (gnu packages linux)
              (gnu packages compression)
              (gnu packages texinfo)
@@ -39,4 +40,5 @@
                           texinfo
                           guile-ares-rs
                           coreutils
+                          util-linux
                           watchexec))
