@@ -18,6 +18,8 @@
 (define-module (maak)
   #:declarative? #t
   #:use-module (ice-9 string-fun)
+  #:use-module (ice-9 textual-ports)
+  #:use-module (ice-9 popen)
   #:use-module (maak maak))
 
 ;; ====== Maak file constants ======
