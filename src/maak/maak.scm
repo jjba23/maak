@@ -57,13 +57,20 @@
 
 (define* (resolve-maak-tasks #:key (module-name '(maak)))
   (let* ((mod (resolve-module module-name))
+         (public-mod (module-public-interface mod))
+         ;; Check if a public interface exists AND contains at least one export.
+         (has-exports? (and public-mod
+                            (not (null? (module-map (lambda (name var)
+                                                      name) public-mod)))))
+         ;; If it has exports, search only those. Otherwise, fall back to the whole module.
+         (target-mod (if has-exports? public-mod mod))
          (tasks (filter (lambda (x)
                           (not (equal? #f x)))
                         (module-map (lambda (name var)
                                       (cond
                                         ((maak-task? var)
                                          (cons name var))
-                                        (else #f))) mod))))
+                                        (else #f))) target-mod))))
     tasks))
 
 (define* (list-tasks #:key (as-is? #f))
@@ -124,9 +131,12 @@ Logs information about the task and its documentation before execution.
      Signals an error if the task is not a valid function
      as determined by `maak-task?`."
   (let* ((proc (get-module-var task))
-         (proc-doc (procedure-documentation proc)))
+         (proc-doc (procedure-documentation proc))
+         (valid-tasks (resolve-maak-tasks)))
     (cond
-      ((maak-proc? proc)
+      ;; Ensure the procedure is valid AND exists in the exported tasks list
+      ((and (maak-proc? proc)
+            (assoc task valid-tasks))
        (log-separator)
        (log-info "=> Running Maak task: ~a\n" task proc)
        (when (and (not (equal? #f proc-doc))
@@ -134,4 +144,6 @@ Logs information about the task and its documentation before execution.
          (log-info "  ~a" proc-doc))
        (newline)
        (apply proc task-args))
-      (else (error (format #f "Task ~a was not a valid function" task)) #f))))
+      (else (error (format #f
+                    "Task ~a was not a valid maak task. Please double-check for typos and on the function visibility!"
+                    task)) #f))))

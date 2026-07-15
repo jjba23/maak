@@ -29,6 +29,9 @@ All you will need to do to use Maak is to write a file (by default ~./maak.scm~)
   #:use-module (maak maak))
 #+end_src
 
+By default, if you don't use the ~#:export~ directive at module level, all procedures will be read and treated as maak tasks.
+If you only want some procedures to be interpreted as maak tasks, ensure you have a valid directive in the module, e.g. ~#:export (quick-math)~.
+
 --------
 
 * Defining tasks
