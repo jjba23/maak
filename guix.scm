@@ -62,19 +62,21 @@
                 (chmod (string-append bin "/maak") #o755))))
           (add-after 'unpack 'fix-paths
             (lambda* (#:key inputs #:allow-other-keys)
-              (substitute* "scripts/maak"
-                (("readlink -f ")
-                 (string-append (search-input-file inputs "bin/readlink")
-                                " -f "))
-                (("realpath ")
-                 (string-append (search-input-file inputs "bin/realpath") " "))
-                (("dirname ")
-                 (string-append (search-input-file inputs "bin/dirname") " "))
-                (("getopt ")
-                 (string-append (search-input-file inputs "bin/getopt") " "))
-                (("exec guile ")
-                 (string-append "exec "
-                                (search-input-file inputs "bin/guile") " "))))))))
+              (for-each (lambda (spec)
+                          (let ((pattern (car spec))
+                                (program (cadr spec))
+                                (format-string (caddr spec)))
+                            (substitute* "scripts/maak"
+                              ((pattern)
+                               (format #f format-string
+                                       (search-input-file inputs
+                                                          (string-append
+                                                           "bin/" program)))))))
+                        '(("readlink -f " "readlink" "~s -f ")
+                          ("realpath " "realpath" "~s ")
+                          ("dirname " "dirname" "~s ")
+                          ("getopt " "getopt" "~s ")
+                          ("exec guile " "guile" "exec ~s "))))))))
     (build-system guile-build-system)
     (inputs (list guile-3.0 bash-minimal coreutils util-linux))
     (synopsis "Command runner à la Make using Guile Scheme")
