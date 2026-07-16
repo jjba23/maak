@@ -100,7 +100,7 @@ The shell command to be executed.
      (unless (quiet?)
        (display (bold-output (format #f "\n[DRY-RUN]: ~a\n" cmd)))) #t)
     (else (unless (quiet?)
-            (log-info "Executing: ~a" cmd))
+            (log-info "Executing: ~a\n" cmd))
           (let* ((exit-val (system cmd))
                  (exit-code (status:exit-val exit-val)))
             (if (zero? exit-code) #t
