@@ -55,8 +55,6 @@
                 (install-file "resources/help.txt"
                               (string-append share "/resources"))
                 (install-file "scripts/maak" bin)
-                (install-file "scripts/log.bash"
-                              (string-append share "/scripts/"))
                 (chmod (string-append bin "/maak") #o755))))
           (add-after 'unpack 'fix-paths
             (lambda* (#:key inputs #:allow-other-keys)
@@ -75,21 +73,19 @@
                           ("exec guile " "guile" "exec ~s ")))))
           (add-after 'build 'install-completions
             (lambda _
-              (let ((bash-dir (string-append #$output
-                               "/share/bash-completion/completions"))
-                    (fish-dir (string-append #$output
-                               "/share/fish/vendor_completions.d"))
-                    (zsh-dir (string-append #$output
-                                            "/share/zsh/site-functions")))
-                (mkdir-p bash-dir)
-                (mkdir-p fish-dir)
-                (mkdir-p zsh-dir)
-                (copy-file "scripts/maak-completion.bash"
-                           (string-append bash-dir "/maak"))
-                (copy-file "scripts/maak-completion.fish"
-                           (string-append fish-dir "/maak.fish"))
-                (copy-file "scripts/maak-completion.zsh"
-                           (string-append zsh-dir "/_maak"))))))))
+              (for-each (match-lambda
+                          ((src-file dest-dir dest-name)
+                           (let ((target-dir (string-append #$output dest-dir)))
+                             (mkdir-p target-dir)
+                             (copy-file src-file
+                                        (string-append target-dir "/"
+                                                       dest-name)))))
+                        '(("scripts/maak-completion.bash"
+                           "/share/bash-completion/completions" "maak")
+                          ("scripts/maak-completion.fish"
+                           "/share/fish/vendor_completions.d" "maak.fish")
+                          ("scripts/maak-completion.zsh"
+                           "/share/zsh/site-functions" "_maak"))))))))
     (build-system guile-build-system)
     (inputs (list guile-3.0 bash-minimal coreutils util-linux))
     (synopsis "Command runner à la Make using Guile Scheme")
