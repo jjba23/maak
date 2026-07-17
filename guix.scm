@@ -40,6 +40,7 @@
      (local-file %source-dir
                  #:recursive? #t
                  #:select? (git-predicate %source-dir)))
+    (build-system guile-build-system)
     (arguments
      (list
       #:source-directory "src"
@@ -86,8 +87,8 @@
                            "/share/fish/vendor_completions.d" "maak.fish")
                           ("scripts/maak-completion.zsh"
                            "/share/zsh/site-functions" "_maak"))))))))
-    (build-system guile-build-system)
     (inputs (list guile-3.0 bash-minimal coreutils util-linux))
+    (home-page "https://codeberg.org/jjba23/maak")
     (synopsis "Command runner à la Make using Guile Scheme")
     (description
      "Maak is a command runner and control plane for your
@@ -95,8 +96,8 @@ projects.  It allows you to use the power of Lisp (Guile Scheme) to define
 your tasks, build steps, repetitive tasks or other automation.
 
 With Maak you can easily call external shell commands and integrate with
-your existing scripts and tools.")
-    (home-page "https://codeberg.org/jjba23/maak")
+your existing scripts and tools.  It is inspired by the GNU Make utility
+but it does away with a lot of the complexity that comes with its history.")
     (license license:gpl3+)))
 
 maak
