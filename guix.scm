@@ -26,7 +26,8 @@
              (gnu packages base)
              (gnu packages linux)
              (gnu packages guile)
-             (gnu packages guile-xyz))
+             (gnu packages guile-xyz)
+             (ice-9 match))
 
 (define %source-dir
   (dirname (current-filename)))
@@ -42,6 +43,9 @@
     (arguments
      (list
       #:source-directory "src"
+      #:modules '((guix build guile-build-system)
+                  (guix build utils)
+                  (ice-9 match))
       #:phases
       #~(modify-phases %standard-phases
           (add-before 'build 'install-program-files
@@ -53,15 +57,41 @@
                 (install-file "scripts/maak" bin)
                 (install-file "scripts/log.bash"
                               (string-append share "/scripts/"))
-                (install-file "scripts/maak-completion.bash"
-                              (string-append share "/scripts/"))
-                (install-file "scripts/maak-completion.zsh"
-                              (string-append share "/scripts/"))
-                (install-file "scripts/maak-completion.fish"
-                              (string-append share "/scripts/"))
-                (chmod (string-append bin "/maak") #o755)))))))
+                (chmod (string-append bin "/maak") #o755))))
+          (add-after 'unpack 'fix-paths
+            (lambda* (#:key inputs #:allow-other-keys)
+              (for-each (match-lambda
+                          ((pattern program format-string)
+                           (substitute* "scripts/maak"
+                             ((pattern)
+                              (format #f format-string
+                                      (search-input-file inputs
+                                                         (string-append "bin/"
+                                                          program)))))))
+                        '(("readlink -f " "readlink" "~s -f ")
+                          ("realpath " "realpath" "~s ")
+                          ("dirname " "dirname" "~s ")
+                          ("getopt " "getopt" "~s ")
+                          ("exec guile " "guile" "exec ~s ")))))
+          (add-after 'build 'install-completions
+            (lambda _
+              (let ((bash-dir (string-append #$output
+                               "/share/bash-completion/completions"))
+                    (fish-dir (string-append #$output
+                               "/share/fish/vendor_completions.d"))
+                    (zsh-dir (string-append #$output
+                                            "/share/zsh/site-functions")))
+                (mkdir-p bash-dir)
+                (mkdir-p fish-dir)
+                (mkdir-p zsh-dir)
+                (copy-file "scripts/maak-completion.bash"
+                           (string-append bash-dir "/maak"))
+                (copy-file "scripts/maak-completion.fish"
+                           (string-append fish-dir "/maak.fish"))
+                (copy-file "scripts/maak-completion.zsh"
+                           (string-append zsh-dir "/_maak"))))))))
     (build-system guile-build-system)
-    (propagated-inputs (list guile-3.0 bash-minimal coreutils util-linux))
+    (inputs (list guile-3.0 bash-minimal coreutils util-linux))
     (synopsis "Command runner à la Make using Guile Scheme")
     (description
      "Maak is a command runner and control plane for your
