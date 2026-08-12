@@ -9,7 +9,7 @@
 #+begin_quote
 Most build tools invent their own limited domain-specific language.  Maak embraces the powerful *λ Lisp* and the amazing Guile Scheme programming language.
 
-This also means your code is flexible, robust and reliable (+declarative) for at least the next 50 years.
+/This also means your code is flexible, robust and reliable (+declarative) for at least the next 50 years./
 #+end_quote
 
 #+begin_src
