@@ -3,6 +3,7 @@
 , stdenv ? pkgs.stdenv
 , guile ? pkgs.guile
 , coreutils ? pkgs.coreutils
+, bash ? pkgs.bash
 , util-linux ? pkgs.util-linux
 , makeWrapper ? pkgs.makeWrapper
 }:
@@ -22,6 +23,7 @@ stdenv.mkDerivation rec {
     guile
     coreutils
     util-linux
+    bash
   ];
 
   buildPhase = ''
@@ -101,7 +103,7 @@ stdenv.mkDerivation rec {
 
     # Wrap binary with required PATH and Guile module search paths
     wrapProgram $out/bin/maak \
-      --prefix PATH : ${lib.makeBinPath [ guile coreutils util-linux ]} \
+      --prefix PATH : ${lib.makeBinPath [ guile coreutils util-linux bash ]} \
       --prefix GUILE_LOAD_PATH : "$out/share/guile/site/3.0" \
       --prefix GUILE_LOAD_COMPILED_PATH : "$out/lib/guile/3.0/site-ccache"
 
