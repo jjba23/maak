@@ -6,9 +6,11 @@
 [[https://jointhefreeworld.org/ggg/dist/jointhefreeworld-org.svg]]
 
 
-Most build tools invent their own limited domain-specific language.  Maak embraces the powerful *λ Lisp*.
+#+begin_quote
+Most build tools invent their own limited domain-specific language.  Maak embraces the powerful *λ Lisp* and the amazing Guile Scheme programming language.
 
-This also means your code is solid, reliable and robust for the next 50 years at least.
+This also means your code is flexible, robust and reliable (+declarative) for at least the next 50 years.
+#+end_quote
 
 #+begin_src
 +----------------------------------------------------------------------------+
