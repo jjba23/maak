@@ -290,6 +290,22 @@ Then you can run Maak from the container, and bind your local filesystem to give
      maak -f /home/joe/hacking/maak/maak.scm --list
 #+end_src
 
+** On Nix
+
+~maak~ also is packaged via Nix.
+
+#+begin_src shell
+# Building via legacy Nix
+nix-build default.nix
+
+# Testing the result
+./result/bin/maak --help
+
+# Building via Nix Flakes
+nix build
+./result/bin/maak --list
+#+end_src
+
 ---------
 
 * Shell completions: Bash, ZSH, Fish
