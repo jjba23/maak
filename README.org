@@ -5,13 +5,25 @@
 [[https://jointhefreeworld.org/ggg/dist/scheme-guile.svg]]  [[https://jointhefreeworld.org/ggg/dist/gnu-guix.svg]]   [[https://jointhefreeworld.org/ggg/dist/maak.svg]]  [[https://jointhefreeworld.org/ggg/dist/license-gpl3+.svg]]  [[https://jointhefreeworld.org/ggg/dist/license-fdl13+.svg]]
 [[https://jointhefreeworld.org/ggg/dist/jointhefreeworld-org.svg]]
 
-/The infinitely extensible command runner, control plane and project automator à la Make (Guile Scheme - Lisp)/
-
-If you like my work, please support me by [[https://bmc.link/jjbigorra][buying me a cup of coffee ☕]] so I can continue with a lot of motivation.
 
 Most build tools invent their own limited domain-specific language.  Maak embraces the powerful *λ Lisp*.
 
 This also means your code is solid, reliable and robust for the next 50 years at least.
+
+#+begin_src
++----------------------------------------------------------------------------+
+
+ ,---.       ,---.
+(     \     /     )
+ )  (  \____/  )  (
+(    \ @  @ /    )      [ Maak ]
+ )    ( oo )    (       The infinitely extensible
+(      \__/      )      command runner, control plane,
+  `------------'        and project automator.
+#+end_src
+
+If you like my work, please support me by [[https://bmc.link/jjbigorra][buying me a cup of coffee ☕]] so I can continue with a lot of motivation.
+
 
 -------------
 
@@ -29,30 +41,7 @@ All you will need to do to use Maak is to write a file (by default ~./maak.scm~)
   #:use-module (maak maak))
 #+end_src
 
---------
-
-* Defining tasks
-
-Any function (with or without arguments) you define in this file becomes a runnable task.
-
-** Task Export & Visibility Rule
-- *Open Fallback (No Exports)*: If you do not write an ~#:export~ directive in your module (or leave it empty), Maak is completely "open season": all procedures in the file are treated as runnable tasks.
-- *Strict Lock (With Exports)*: If you define anything in your ~#:export~ directive (e.g., ~#:export (quick-math)~), then only the explicitly exported procedures will be treated as tasks. Any other functions become private helper procedures and are completely hidden from the CLI and ~--list~ command.
-
-If no task is passed via command-line, Maak will run the ~default~ task.
-
-Tasks can:
-- Run shell commands with the ~$~ helper.
-- Print logs with ~log-info~.
-- Call other Maak tasks.
-- Use any Guile Scheme function you define (or import from a library).
-- Some syntactic sugar for working with Guix dev shells and time-machine, e.g.  ~manifest-shell~ and ~program-shell~ as well as ~time-machine-manifest-shell~ and more
-
-⚠️ Beware not to use names for tasks that conflict with names of built-in Scheme functions as this can cause some problems. For example, avoid calling something ~format~ or ~display~, choose something else instead.
-
-You can extend Maak by defining new tasks — just like writing functions in Scheme.
-
-Here’s an example:
+Then declare some /runnable/ jobs (a.k.a. tasks). Any function can be a task,  with or without arguments:
 
 #+begin_src scheme
 (define (hello)
@@ -74,6 +63,31 @@ You can now run it:
 maak hello
 maak quick-math 23 42
 #+end_src
+
+--------
+
+*
+
+* Defining tasks
+
+Any function (with or without arguments) you define in this file becomes a runnable task.
+
+** Task Export & Visibility Rule
+- *Open Fallback (No Exports)*: If you do not write an ~#:export~ directive in your module (or leave it empty), Maak is completely "open season": all procedures in the file are treated as runnable tasks.
+- *Strict Lock (With Exports)*: If you define anything in your ~#:export~ directive (e.g., ~#:export (quick-math)~), then only the explicitly exported procedures will be treated as tasks. Any other functions become private helper procedures and are completely hidden from the CLI and ~--list~ command.
+
+If no task is passed via command-line, Maak will run the ~default~ task.
+
+Tasks can:
+- Run shell commands with the ~$~ helper.
+- Print logs with ~log-info~.
+- Call other Maak tasks.
+- Use any Guile Scheme function you define (or import from a library).
+- Some syntactic sugar for working with Guix dev shells and time-machine, e.g.  ~manifest-shell~ and ~program-shell~ as well as ~time-machine-manifest-shell~ and more
+
+⚠️ Beware not to use names for tasks that conflict with names of built-in Scheme functions as this can cause some problems. For example, avoid calling something ~format~ or ~display~, choose something else instead.
+
+You can extend Maak by defining new tasks — just like writing functions in Scheme.
 
 You can also run multiple tasks easily (sequentially) via a comma-separated list :
 
