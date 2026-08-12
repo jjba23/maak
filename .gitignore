@@ -2,3 +2,5 @@
 .nrepl-port
 doc/
 tmp/
+result
+result/
