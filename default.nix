@@ -27,7 +27,7 @@
 
 stdenv.mkDerivation {
   pname = "maak";
-  version = "0.1.0";
+  version = "0.8.3";
 
   src = ./.;
 
