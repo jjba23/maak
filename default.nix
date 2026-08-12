@@ -27,28 +27,36 @@ stdenv.mkDerivation rec {
   buildPhase = ''
     runHook preBuild
 
-    # Determine scheme source directory (supports root or src/ directory layout)
+    SITE_DIR="$out/share/guile/site/3.0"
+    CCACHE_DIR="$out/lib/guile/3.0/site-ccache"
+
+    mkdir -p "$SITE_DIR" "$CCACHE_DIR"
+
+    # Copy Scheme sources into $SITE_DIR/maak preserving module structure
     if [ -d "src/maak" ]; then
-      SCHEME_SRC="src/maak"
+      cp -r src/maak "$SITE_DIR/"
     elif [ -d "src" ]; then
-      SCHEME_SRC="src"
+      mkdir -p "$SITE_DIR/maak"
+      cp -r src/* "$SITE_DIR/maak/"
+    elif [ -d "maak" ]; then
+      cp -r maak "$SITE_DIR/"
     else
-      SCHEME_SRC="."
+      mkdir -p "$SITE_DIR/maak"
+      find . -maxdepth 1 -name "*.scm" -exec cp {} "$SITE_DIR/maak/" \;
     fi
 
-    # Create destination directories for Guile sources and compiled bytecode
-    mkdir -p $out/share/guile/site/3.0/maak
-    mkdir -p $out/lib/guile/3.0/site-ccache/maak
+    # Export load paths so guild compile can resolve (maak ...) cross-module imports
+    export GUILE_LOAD_PATH="$SITE_DIR:$GUILE_LOAD_PATH"
+    export GUILE_LOAD_COMPILED_PATH="$CCACHE_DIR:$GUILE_LOAD_COMPILED_PATH"
 
-    # Copy scheme source files
-    cp $SCHEME_SRC/dsl.scm $out/share/guile/site/3.0/maak/
-    cp $SCHEME_SRC/maak.scm $out/share/guile/site/3.0/maak/
-    cp $SCHEME_SRC/main.scm $out/share/guile/site/3.0/maak/
-
-    # Byte-compile Guile Scheme modules (.scm -> .go)
-    guild compile -L $out/share/guile/site/3.0 -o $out/lib/guile/3.0/site-ccache/maak/dsl.go $out/share/guile/site/3.0/maak/dsl.scm
-    guild compile -L $out/share/guile/site/3.0 -o $out/lib/guile/3.0/site-ccache/maak/maak.go $out/share/guile/site/3.0/maak/maak.scm
-    guild compile -L $out/share/guile/site/3.0 -o $out/lib/guile/3.0/site-ccache/maak/main.go $out/share/guile/site/3.0/maak/main.scm
+    # Dynamically byte-compile all Scheme module files (.scm -> .go)
+    cd "$SITE_DIR"
+    find maak -name "*.scm" | while read -r scm_file; do
+      go_file="$CCACHE_DIR/''${scm_file%.scm}.go"
+      mkdir -p "$(dirname "$go_file")"
+      guild compile -L "$SITE_DIR" -o "$go_file" "$scm_file" || true
+    done
+    cd -
 
     runHook postBuild
   '';
@@ -56,7 +64,7 @@ stdenv.mkDerivation rec {
   installPhase = ''
     runHook preInstall
 
-    # Install executable script
+    # Install executable wrapper script
     mkdir -p $out/bin
     if [ -f "scripts/maak" ]; then
       cp scripts/maak $out/bin/maak
@@ -65,14 +73,14 @@ stdenv.mkDerivation rec {
     fi
     chmod +x $out/bin/maak
 
-    # Install resources (help text)
+    # Install resources
     mkdir -p $out/share/resources
     if [ -f "resources/help.txt" ]; then
       cp resources/help.txt $out/share/resources/
     fi
 
-    # Helper function to locate and copy files from scripts/ or root
-    copy_script() {
+    # Locate shell completion scripts
+    copy_completion() {
       local src_file=$1
       local dest_path=$2
       if [ -f "scripts/$src_file" ]; then
@@ -82,16 +90,16 @@ stdenv.mkDerivation rec {
       fi
     }
 
-    # Install shell completion scripts
+    # Install completion scripts for Bash, Fish, and Zsh
     mkdir -p $out/share/bash-completion/completions
     mkdir -p $out/share/fish/vendor_completions.d
     mkdir -p $out/share/zsh/site-functions
 
-    copy_script "maak-completion.bash" "$out/share/bash-completion/completions/maak"
-    copy_script "maak-completion.fish" "$out/share/fish/vendor_completions.d/maak.fish"
-    copy_script "maak-completion.zsh" "$out/share/zsh/site-functions/_maak"
+    copy_completion "maak-completion.bash" "$out/share/bash-completion/completions/maak"
+    copy_completion "maak-completion.fish" "$out/share/fish/vendor_completions.d/maak.fish"
+    copy_completion "maak-completion.zsh" "$out/share/zsh/site-functions/_maak"
 
-    # Wrap binary with required runtime PATH and Guile module load paths
+    # Wrap binary with required PATH and Guile module search paths
     wrapProgram $out/bin/maak \
       --prefix PATH : ${lib.makeBinPath [ guile coreutils util-linux ]} \
       --prefix GUILE_LOAD_PATH : "$out/share/guile/site/3.0" \
