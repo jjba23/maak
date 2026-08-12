@@ -13,8 +13,6 @@ Most build tools invent their own limited domain-specific language.  Maak embrac
 #+end_quote
 
 #+begin_src
-+----------------------------------------------------------------------------+
-
  ,---.       ,---.
 (     \     /     )
  )  (  \____/  )  (
