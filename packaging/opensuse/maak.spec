@@ -49,7 +49,7 @@ done
 
 %install
 # Install the main CLI executable wrapper
-install -D -m 0755 maak %{buildroot}%{_bindir}/maak
+install -D -m 0755 scripts/maak %{buildroot}%{_bindir}/maak
 
 # Install help resources expected by the wrapper script
 install -D -m 0644 resources/help.txt %{buildroot}%{_datadir}/resources/help.txt
