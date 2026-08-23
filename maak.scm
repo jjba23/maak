@@ -120,6 +120,33 @@
              (~ "docker.io/jjba23/~a:~a" project-name latest-tag))
        #:verbose? #t)))
 
+(define (rpm-build)
+  "Build RPM package for openSUSE and Fedora/RHEL"
+  (let* ((latest-tag (syscall-with-output "git describe --tags --abbrev=0"))
+         (latest-tag-num (string-trim-both (string-drop latest-tag 1))))
+    ($ '("rpmdev-setuptree")
+       #:verbose? #t)
+    ($ (list "git archive --format=tar.gz"
+             (~ "--prefix=maak-~a/" latest-tag-num)
+             (~ "-o ~~/rpmbuild/SOURCES/maak-~a.tar.gz" latest-tag-num)
+             latest-tag)
+       #:verbose? #t)
+    ($ '("cp packaging/opensuse/maak.spec ~/rpmbuild/SPECS/")
+       #:verbose? #t)
+    ($ '("rpmbuild -ba ~/rpmbuild/SPECS/maak.spec")
+       #:verbose? #t)
+    ($ '("ls ~/rpmbuild/RPMS/x86_64/maak-[0-9]*.rpm"))
+    (let* ((latest-rpm (syscall-with-output
+                        "ls -t ~/rpmbuild/RPMS/x86_64/maak-[0-9]*.rpm | head -n 1"))
+           (latest-src-rpm (syscall-with-output
+                            "ls -t ~/rpmbuild/SRPMS/maak-[0-9]*.rpm | head -n 1")))
+      ($ '("cp packaging/opensuse/maak-rpmlintrc ~/rpmbuild/RPMS/x86_64/")
+         #:verbose? #t)
+      ($ (list (~ "rpmlint ~a" latest-rpm))
+         #:verbose? #t)
+      ($ (list (~ "rpmlint ~a" latest-src-rpm))
+         #:verbose? #t))))
+
 (define (hot-reload)
   "Hot-reloading developer's setup."
   (manifest-shell (list "watchexec 'maak --list'"
