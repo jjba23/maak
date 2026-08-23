@@ -306,7 +306,7 @@ Then you can run Maak from the container, and bind your local filesystem to give
      maak -f /home/joe/hacking/maak/maak.scm --list
 #+end_src
 
-** openSUSE (RPM distros) and OBS
+** 🧪 openSUSE (RPM distros) and OBS
 
 ~maak~ is packaged at OBS: https://build.opensuse.org/package/show/home:jjba23/maak and you can download it from there or add the Zypper repo.
 
@@ -339,7 +339,7 @@ sudo zypper install ~/rpmbuild/RPMS/x86_64/maak-0.1.0-0.x86_64.rpm
 
 Then you can run ~maak~.
 
-** On Nix
+** 🧪 On Nix
 
 ~maak~ also is packaged via Nix.
 
