@@ -1,5 +1,5 @@
 Name: maak
-Version: 0.8.7
+Version: 0.8.8
 Release: 0
 Summary: Command runner à la Make using Guile Scheme
 License: GPL-3.0-or-later
@@ -8,9 +8,13 @@ URL: https://codeberg.org/jjba23/maak
 Source0: %{name}-%{version}.tar.gz
 
 BuildRequires: guile-devel
+BuildRequires: bash-completion
+BuildRequires: fish
+BuildRequires: zsh
+
 Requires: bash
 Requires: coreutils
-Requires: guile3
+Requires: guile
 Requires: util-linux
 
 %description
