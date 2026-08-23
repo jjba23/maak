@@ -248,8 +248,8 @@ You can see the program's help by invoking ggg with the ~--help~ argument or loo
 maak is officially distributed via:
 - Guix package manager
 - Podman/Docker images
-- RPM (openSUSE  @ OBS)
-- experimental: Nix (see flake and default.nix)
+- 🧪 RPM (openSUSE  @ OBS)
+- 🧪 Nix (see flake and default.nix)
 
 /That being said, feel free to use it as you wish, within the terms of the GNU General Public License v3 or newer./
 
