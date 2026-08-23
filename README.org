@@ -248,6 +248,8 @@ You can see the program's help by invoking ggg with the ~--help~ argument or loo
 maak is officially distributed via:
 - Guix package manager
 - Podman/Docker images
+- RPM (openSUSE  @ OBS)
+- experimental: Nix (see flake and default.nix)
 
 /That being said, feel free to use it as you wish, within the terms of the GNU General Public License v3 or newer./
 
@@ -303,6 +305,39 @@ Then you can run Maak from the container, and bind your local filesystem to give
      docker.io/jjba23/maak:latest \
      maak -f /home/joe/hacking/maak/maak.scm --list
 #+end_src
+
+** openSUSE (RPM distros) and OBS
+
+~maak~ is packaged at OBS: https://build.opensuse.org/package/show/home:jjba23/maak and you can download it from there or add the Zypper repo.
+
+To build the RPM locally on Tumbleweed, install the packaging tools and setup the developer directories. See also the ~rpm-build~ maak task.
+
+#+begin_src shell
+sudo zypper install rpm-build  rpmdevtools  osc  rpmlint
+rpmdev-setuptree
+#+end_src
+
+Create the source tarball. You can do this with ~git archive~ (or also simply copying the directory and manually ~tar -cvzf~). This tarball should be placed in =~/rpmbuild/SOURCES/=
+
+Copy the spec and build the RPM:
+#+begin_src shell
+cp packaging/opensuse/maak.spec ~/rpmbuild/SPECS/
+rpmbuild -ba ~/rpmbuild/SPECS/maak.spec
+#+end_src
+
+Then you should get the RPM files successfully generated:
+#+begin_src shell
+~/rpmbuild/RPMS/x86_64/maak-0.1.0-0.x86_64.rpm
+~/rpmbuild/SRPMS/maak-0.1.0-0.src.rpm
+#+end_src
+
+Test the resulting package. Install it:
+
+#+begin_src shell
+sudo zypper install ~/rpmbuild/RPMS/x86_64/maak-0.1.0-0.x86_64.rpm
+#+end_src
+
+Then you can run ~maak~.
 
 ** On Nix
 
