@@ -1,5 +1,5 @@
 Name: maak
-Version: 0.8.9
+Version: 0.8.10
 Release: 0
 Summary: Command runner à la Make using Guile Scheme
 License: GPL-3.0-or-later
@@ -65,6 +65,10 @@ install -D -m 0644 scripts/maak-completion.zsh %{buildroot}%{_datadir}/zsh/site-
 %dir %{_datadir}/guile/site
 %{_datadir}/guile/site/3.0/
 %dir %{_datadir}/guile/site/3.0/maak
+
+%dir %{_libdir}/guile
+%dir %{_libdir}/guile/3.0
+%dir %{_libdir}/guile/3.0/site-ccache
 %{_libdir}/guile/3.0/site-ccache/maak
 
 %dir %{_datadir}/resources
