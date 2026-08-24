@@ -248,7 +248,7 @@ You can see the program's help by invoking ggg with the ~--help~ argument or loo
 maak is officially distributed via:
 - Guix package manager
 - Podman/Docker images
-- 🧪 RPM (openSUSE  @ OBS)
+- RPM (openSUSE)
 - 🧪 Nix (see flake and default.nix)
 
 /That being said, feel free to use it as you wish, within the terms of the GNU General Public License v3 or newer./
@@ -306,9 +306,9 @@ Then you can run Maak from the container, and bind your local filesystem to give
      maak -f /home/joe/hacking/maak/maak.scm --list
 #+end_src
 
-** 🧪 openSUSE (RPM distros) and OBS
+** openSUSE (RPM distros) and OBS
 
-~maak~ is packaged at OBS: https://build.opensuse.org/package/show/home:jjba23/maak and you can download it from there or add the Zypper repo.
+~maak~ is packaged at OBS: https://build.opensuse.org/package/show/devel:tools:building/maak and you can download it from there or add the Zypper repo.
 
 To build the RPM locally on Tumbleweed, install the packaging tools and setup the developer directories. See also the ~rpm-build~ maak task.
 
