@@ -365,10 +365,6 @@ This is done by reading the current file and extracting task names from it with 
 
 See the scripts at ~./scripts~ . In most situations, these scripts will *automatically be installed for you*.
 
-For ZSH and fish shell, scripts are also provided, and should be loaded in similar fashion.
-
-ZSH users will want to add the Maak completion script to ~$FPATH~. Fish users will want to look at ~$fish_complete_path~.
-
 #+begin_export html
 <details>
   <summary>See a Bash example of manual completion load</summary>
