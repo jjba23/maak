@@ -1,5 +1,5 @@
 Name:           maak
-Version:        0.8.15
+Version:        0.8.16
 Release:        0
 Summary:        Command runner à la Make using Guile Scheme
 License:        GPL-3.0-or-later
