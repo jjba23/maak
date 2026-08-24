@@ -1,5 +1,5 @@
 Name:           maak
-Version:        0.8.12
+Version:        0.8.14
 Release:        0
 Summary:        Command runner à la Make using Guile Scheme
 License:        GPL-3.0-or-later
@@ -22,6 +22,9 @@ It allows you to use Guile Scheme to define tasks, build steps, and automation.
 %prep
 %autosetup -n %{name}-%{version}
 sed -i '1s|^#!%{_bindir}/env \(.*\)$|#!%{_bindir}/\1|' scripts/maak
+sed -i '1s|^#!%{_bindir}/env \(.*\)$|#!%{_bindir}/\1|' scripts/maak-completion.bash
+sed -i '1s|^#!%{_bindir}/env \(.*\)$|#!%{_bindir}/\1|' scripts/maak-completion.fish
+sed -i '1s|^#!%{_bindir}/env \(.*\)$|#!%{_bindir}/\1|' scripts/maak-completion.zsh
 
 %build
 
