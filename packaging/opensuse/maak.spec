@@ -1,21 +1,19 @@
-Name: maak
-Version: 0.8.10
-Release: 0
-Summary: Command runner à la Make using Guile Scheme
-License: GPL-3.0-or-later
-Group: Development/Tools/Building
-URL: https://codeberg.org/jjba23/maak
-Source0: %{name}-%{version}.tar.gz
-
-BuildRequires: guile-devel
-BuildRequires: bash-completion
-BuildRequires: fish
-BuildRequires: zsh
-
-Requires: bash
-Requires: coreutils
-Requires: guile
-Requires: util-linux
+Name:           maak
+Version:        0.8.11
+Release:        0
+Summary:        Command runner à la Make using Guile Scheme
+License:        GPL-3.0-or-later
+Group:          Development/Tools/Building
+URL:            https://codeberg.org/jjba23/maak
+Source0:        %{name}-%{version}.tar.gz
+BuildRequires:  bash-completion
+BuildRequires:  fish
+BuildRequires:  guile-devel
+BuildRequires:  zsh
+Requires:       bash
+Requires:       coreutils
+Requires:       guile
+Requires:       util-linux
 
 %description
 Maak is an extensible command runner and control plane for your projects.
@@ -23,6 +21,7 @@ It allows you to use Guile Scheme to define tasks, build steps, and automation.
 
 %prep
 %autosetup -n %{name}-%{version}
+sed -i '1s|^#!%{_bindir}/env \(.*\)$|#!%{_bindir}/\1|' bin/my-script
 
 %build
 
@@ -53,9 +52,9 @@ done
 install -D -m 0755 scripts/maak %{buildroot}%{_bindir}/maak
 install -D -m 0644 resources/help.txt %{buildroot}%{_datadir}/resources/help.txt
 
-install -D -m 0644 scripts/maak-completion.bash %{buildroot}%{_datadir}/bash-completion/completions/maak
-install -D -m 0644 scripts/maak-completion.fish %{buildroot}%{_datadir}/fish/vendor_completions.d/maak.fish
-install -D -m 0644 scripts/maak-completion.zsh %{buildroot}%{_datadir}/zsh/site-functions/_maak
+install -D -m 0755 scripts/maak-completion.bash %{buildroot}%{_datadir}/bash-completion/completions/maak
+install -D -m 0755 scripts/maak-completion.fish %{buildroot}%{_datadir}/fish/vendor_completions.d/maak.fish
+install -D -m 0755 scripts/maak-completion.zsh %{buildroot}%{_datadir}/zsh/site-functions/_maak
 
 %files
 %license COPYING
