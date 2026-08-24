@@ -77,7 +77,7 @@ function __fish_maak_targets
             if (in_export) {
                 line = $0
                 sub(/.*#:export/, "", line)
-                while (match(line, /[a-zA-Z0-9_---+*\/<>=!?]+/)) {
+                while (match(line, /[-a-zA-Z0-9_+=!*?\/<>]+/)) {
                     sym = substr(line, RSTART, RLENGTH)
                     exports[sym] = 1
                     has_exports = 1
@@ -87,10 +87,10 @@ function __fish_maak_targets
             }
 
             # Match procedure definitions: (define (task-name arg1 ...)
-            if (match($0, /^[ \t]*\([ \t]*define[ \t]+\([ \t]*[a-zA-Z0-9_---+*\/<>=!?]+/)) {
+            if (match($0, /^[ \t]*\([ \t]*define[ \t]+\([ \t]*[-a-zA-Z0-9_+=!*?\/<>]+/)) {
                 str = $0
                 sub(/^[ \t]*\([ \t]*define[ \t]+\([ \t]*/, "", str)
-                match(str, /^[a-zA-Z0-9_---+*\/<>=!?]+/)
+                match(str, /^[-a-zA-Z0-9_+=!*?\/<>]+/)
                 task = substr(str, RSTART, RLENGTH)
 
                 if (task != "") {
@@ -101,7 +101,7 @@ function __fish_maak_targets
                         # Extract signature arguments
                         sig = str
                         sub(/\).*/, "", sig)
-                        sub(/^[a-zA-Z0-9_---+*\/<>=!?]+[ \t]*/, "", sig)
+                        sub(/^[-a-zA-Z0-9_+=!*?\/<>]+[ \t]*/, "", sig)
                         gsub(/[ \t]+/, " ", sig)
                         gsub(/^ | $/, "", sig)
                         task_args[task] = sig
