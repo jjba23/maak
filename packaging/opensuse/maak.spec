@@ -1,19 +1,19 @@
-Name:           maak
-Version:        0.8.11
-Release:        0
-Summary:        Command runner à la Make using Guile Scheme
-License:        GPL-3.0-or-later
-Group:          Development/Tools/Building
-URL:            https://codeberg.org/jjba23/maak
-Source0:        %{name}-%{version}.tar.gz
-BuildRequires:  bash-completion
-BuildRequires:  fish
-BuildRequires:  guile-devel
-BuildRequires:  zsh
-Requires:       bash
-Requires:       coreutils
-Requires:       guile
-Requires:       util-linux
+Name: maak
+Version: 0.8.12
+Release: 0
+Summary: Command runner à la Make using Guile Scheme
+License: GPL-3.0-or-later
+Group: Development/Tools/Building
+URL: https://codeberg.org/jjba23/maak
+Source0: %{name}-%{version}.tar.gz
+BuildRequires: bash-completion
+BuildRequires: fish
+BuildRequires: guile-devel
+BuildRequires: zsh
+Requires: bash
+Requires: coreutils
+Requires: guile
+Requires: util-linux
 
 %description
 Maak is an extensible command runner and control plane for your projects.
@@ -21,7 +21,7 @@ It allows you to use Guile Scheme to define tasks, build steps, and automation.
 
 %prep
 %autosetup -n %{name}-%{version}
-sed -i '1s|^#!%{_bindir}/env \(.*\)$|#!%{_bindir}/\1|' bin/my-script
+sed -i '1s|^#!%{_bindir}/env \(.*\)$|#!%{_bindir}/\1|' scripts/maak
 
 %build
 
