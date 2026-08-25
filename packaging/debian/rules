@@ -1,0 +1,79 @@
+#!/usr/bin/make -f
+
+export DH_VERBOSE = 1
+
+GUILE_VER = 3.0
+SITE_DIR = debian/maak/usr/share/guile/site/$(GUILE_VER)
+CCACHE_DIR = debian/maak/usr/lib/guile/$(GUILE_VER)/site-ccache
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	mkdir -p build/site/maak build/ccache/maak
+
+	# Locate Scheme sources
+	if [ -d "src/maak" ]; then \
+		cp -r src/maak/* build/site/maak/ ; \
+	elif [ -d "src" ]; then \
+		cp -r src/* build/site/maak/ ; \
+	elif [ -d "maak" ]; then \
+		cp -r maak/* build/site/maak/ ; \
+	else \
+		find . -maxdepth 1 -name "*.scm" -exec cp {} build/site/maak/ \; ; \
+	fi
+
+	# Byte-compile Scheme modules using guild
+	find build/site/maak -name "*.scm" | while read -r scm_file; do \
+		rel_path="$${scm_file#build/site/}"; \
+		go_file="build/ccache/$${rel_path%.scm}.go"; \
+		mkdir -p "$$(dirname "$$go_file")"; \
+		guild compile -L build/site -o "$$go_file" "$$scm_file" || true; \
+	done
+
+override_dh_auto_install:
+	# Executable wrapper
+	mkdir -p debian/maak/usr/bin
+	if [ -f "scripts/maak" ]; then \
+		install -m 0755 scripts/maak debian/maak/usr/bin/maak; \
+	elif [ -f "maak" ]; then \
+		install -m 0755 maak debian/maak/usr/bin/maak; \
+	fi
+
+	# Guile site files & compiled cache
+	mkdir -p $(SITE_DIR) $(CCACHE_DIR)
+	cp -r build/site/maak $(SITE_DIR)/
+	cp -r build/ccache/maak $(CCACHE_DIR)/
+
+	# Help resources
+	mkdir -p debian/maak/usr/share/resources
+	if [ -f "resources/help.txt" ]; then \
+		install -m 0644 resources/help.txt debian/maak/usr/share/resources/help.txt; \
+	fi
+
+	# Shell completions
+	mkdir -p debian/maak/usr/share/bash-completion/completions
+	mkdir -p debian/maak/usr/share/fish/vendor_completions.d
+	mkdir -p debian/maak/usr/share/zsh/vendor-completions
+
+	if [ -f "scripts/maak-completion.bash" ]; then \
+		install -m 0644 scripts/maak-completion.bash debian/maak/usr/share/bash-completion/completions/maak; \
+	elif [ -f "maak-completion.bash" ]; then \
+		install -m 0644 maak-completion.bash debian/maak/usr/share/bash-completion/completions/maak; \
+	fi
+
+	if [ -f "scripts/maak-completion.fish" ]; then \
+		install -m 0644 scripts/maak-completion.fish debian/maak/usr/share/fish/vendor_completions.d/maak.fish; \
+	elif [ -f "maak-completion.fish" ]; then \
+		install -m 0644 maak-completion.fish debian/maak/usr/share/fish/vendor_completions.d/maak.fish; \
+	fi
+
+	if [ -f "scripts/maak-completion.zsh" ]; then \
+		install -m 0644 scripts/maak-completion.zsh debian/maak/usr/share/zsh/vendor-completions/_maak; \
+	elif [ -f "maak-completion.zsh" ]; then \
+		install -m 0644 maak-completion.zsh debian/maak/usr/share/zsh/vendor-completions/_maak; \
+	fi
+
+override_dh_auto_clean:
+	rm -rf build
+	dh_auto_clean

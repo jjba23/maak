@@ -1,0 +1,26 @@
+Source: maak
+Section: utils
+Priority: optional
+Maintainer: Josep Bigorra <jjbigorra@gmail.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ guile-3.0-dev,
+ guile-3.0
+Standards-Version: 4.6.2
+Homepage: https://codeberg.org/jjba23/maak
+Vcs-Git: https://codeberg.org/jjba23/maak.git
+Rules-Requires-Root: no
+
+Package: maak
+Architecture: any
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends},
+ bash,
+ coreutils,
+ guile-3.0,
+ util-linux
+Description: Command runner à la Make using Guile Scheme
+ Maak is an extensible command runner and control plane for your projects.
+ It allows you to use Guile Scheme to define tasks, build steps, and
+ automation, integrating easily with external shell commands.
