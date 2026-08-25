@@ -4,3 +4,32 @@ doc/
 tmp/
 result
 result/
+/build/
+
+# ==============================================================================
+# Guile Scheme Bytecode
+# ==============================================================================
+*.go
+.cache/guile/
+
+
+# ==============================================================================
+# Debian Packaging Artifacts
+# ==============================================================================
+# Package files generated during debuild
+*.deb
+*.dbgsym.deb
+*.buildinfo
+*.changes
+*.dsc
+*.tar.gz
+*.tar.xz
+
+# Temporary Debian staging directories & stamps
+/packaging/debian/.debhelper/
+/packaging/debian/debhelper-build-stamp
+/packaging/debian/files
+/packaging/debian/maak/
+/packaging/debian/maak-build-deps/
+/packaging/debian/*.log
+/packaging/debian/*.substvars

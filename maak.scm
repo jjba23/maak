@@ -89,8 +89,8 @@
   "Generate technical API documentation for Maak."
   (delete-file-recursively "doc")
   (manifest-shell (list "documenta api ./src/maak && "
-                        (~ "texi2any -v --html --css-ref=~a -o index_html" api-docs-css-url)
-                        "./doc/api/index.texi"))
+                        (~ "texi2any -v --html --css-ref=~a -o index_html"
+                           api-docs-css-url) "./doc/api/index.texi"))
   (mv "./index_html" "./doc/api-dist"))
 
 (define (deploy)
@@ -119,6 +119,37 @@
     ($ (list (~ "podman push localhost/~a:latest" project-name)
              (~ "docker.io/jjba23/~a:~a" project-name latest-tag))
        #:verbose? #t)))
+
+(define deb-packages
+  (make-parameter (map symbol->string
+                       '(build-essential debhelper devscripts cme lintian
+                                         guile-3.0-dev))))
+
+(define (deb-build)
+  "Build .deb package (unsigned)"
+  ($ '("sudo apt update")
+     #:verbose? #t)
+  ($ (cons "sudo apt install -y"
+           (deb-packages))
+     #:verbose? #t)
+
+  (dynamic-wind
+   ;; Setup: create temporary symlink at project root
+   (lambda ()
+     ($ '("ln -s packaging/debian debian")
+        #:verbose? #t))
+
+   ;; Execution: run debian build commands against ./debian
+   (lambda ()
+     ($ '("sudo mk-build-deps -i -r debian/control")
+        #:verbose? #t)
+     ($ '("debuild -b -uc -us")
+        #:verbose? #t))
+
+   ;; Cleanup: remove symlink safely (leaves packaging/debian intact)
+   (lambda ()
+     ($ '("rm -rf debian")
+        #:verbose? #t))))
 
 (define (rpm-build)
   "Build RPM package for openSUSE and Fedora/RHEL"
