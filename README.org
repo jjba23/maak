@@ -249,8 +249,8 @@ maak is officially distributed via:
 - Guix package manager
 - Podman/Docker images
 - RPM (openSUSE, Fedora)
--  🧪 DEB (APT based, Debian, Ubuntu)
-- 🧪 Nix (see flake and default.nix)
+- DEB (APT based, Debian, Ubuntu)
+- Nix (see flake and default.nix)
 
 /That being said, feel free to use it as you wish, within the terms of the GNU General Public License v3 or newer./
 
