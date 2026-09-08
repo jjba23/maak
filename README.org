@@ -260,8 +260,9 @@ You can see the program's help by invoking ggg with the ~--help~ argument or loo
 maak is officially distributed via:
 - Guix package manager
 - Podman/Docker images
-- RPM (openSUSE)
-- 🧪 Nix (see flake and default.nix)
+- RPM (openSUSE, Fedora)
+- DEB (APT based, Debian, Ubuntu)
+- Nix (see flake and default.nix)
 
 /That being said, feel free to use it as you wish, within the terms of the GNU General Public License v3 or newer./
 
@@ -351,7 +352,26 @@ sudo zypper install ~/rpmbuild/RPMS/x86_64/maak-0.1.0-0.x86_64.rpm
 
 Then you can run ~maak~.
 
-** 🧪 On Nix
+
+** Debian (APT distros) 🧪
+
+Install the required build tools and compile the package. See also the ~deb-build~ maak task.
+
+#+begin_src shell
+# Install build dependencies on your Debian/Ubuntu system
+sudo apt update
+sudo apt install build-essential debhelper devscripts cme lintian guile-3.0-dev
+
+# Build the package (unsigned binary build)
+# you will need to copy the packaging/debian/* to root of repo or equivalent approach
+debuild -b -uc -us
+#+end_src
+
+** Arch Linux 🧪
+
+TODO 🚧
+
+** On Nix 🧪
 
 ~maak~ also is packaged via Nix.
 
