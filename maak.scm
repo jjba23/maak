@@ -55,6 +55,14 @@
   "Default task to run, call program's help."
   (list-tasks))
 
+(define (man)
+  "Preview the maak manual page without installing it."
+  ($ '("man ./man/maak.1")))
+
+(define (version)
+  "Print the maak version."
+  (print-version))
+
 (define (arithmetics)
   "Do some quick math."
   (let* ((entries '(1 3 5 7 9))
@@ -203,9 +211,41 @@
        "bash coreutils util-linux-with-udev guile" "-- maak --list")
      #:verbose? #t))
 
-;; ====== Maak test playground =======
+(define (nix-dev)
+  "Enter the Nix development shell this project's flake declares."
+  (nix-develop (list "maak --list")))
+
+(define (flake-check)
+  "Validate every output of this project's Nix flake."
+  (nix-flake-check #:flake "."))
+
+;; ====== Maak tests ======
+
+;; The veritas invocation is shared by the `test' and `container' tasks so the
+;; two environments can never drift apart.  The variables are set through
+;; `env' rather than as a `VAR=value' prefix: everything after `guix shell --'
+;; is executed directly, so a prefix would be looked up as a program name.
+(define test-command
+  (list "env VERITAS_TEST_MODULE=veritas VERITAS_TEST_TOP_DIR=test VERITAS_TEST_TYPE=unit"
+        "VERITAS_RUN_BENCHMARKS=false"
+        "guile -L ./src -L ./test -c '(exit ((@ (veritas runner) run-tests)))'"))
 
 (define (test)
+  "Run the project's unit test suite with Veritas.
+
+The specs live under test/veritas/unit and are located by the veritas runner,
+which needs both the library sources and the test tree on the load path."
+  (manifest-shell test-command))
+
+(define (container)
+  "Run the same unit test suite inside a Guix container, with no network."
+  (guix-container test-command
+                  #:manifest "manifest.scm"))
+
+;; ====== Maak test playground =======
+
+(define (test-playground)
+  "Play with temporary files and dry-run scopes."
   (define (new-temp-file)
     (let* ((now (localtime (current-time)))
            (time-string (string-replace-substring (strftime "%c" now) " " "-"))

@@ -30,6 +30,10 @@
   #:use-module (srfi srfi-13)
   #:use-module (ice-9 getopt-long)
   #:use-module (maak dsl)
+  #:use-module (maak shell)
+  #:use-module (maak nix)
+  #:use-module (maak i18n)
+  #:use-module (maak version)
   #:re-export (log-message log-info
                            log-error
                            log-separator
@@ -52,10 +56,91 @@
                            $
                            ~
                            syscall
-                           cat)
-  #:export (resolve-maak-tasks list-tasks run-tasks run-task))
+                           cat
+                           ;; ====== Errors ======
+                           &maak-error
+                           make-maak-error
+                           maak-error?
+                           maak-error-message
+                           maak-error-hint
+                           raise-maak-error
+                           ;; ====== Load paths ======
+                           maak-load-path
+                           add-load-path!
+                           add-load-paths!
+                           with-load-path
+                           split-load-path
+                           environment-load-paths
+                           ;; ====== Pretty strings ======
+                           string-lines
+                           unlines
+                           unwords
+                           dedent-string
+                           indent-string
+                           text
+                           ;; ====== Guix shells and containers ======
+                           guix-shell
+                           guix-container
+                           guix-pack
+                           ;; ====== Shell helpers ======
+                           shell-quote
+                           which
+                           command-exists?
+                           require-command
+                           capture
+                           touch
+                           ln-s
+                           chmod-file
+                           with-directory
+                           cd
+                           env-get
+                           env-set!
+                           env-unset!
+                           with-env
+                           with-env-vars
+                           home-dir
+                           tmp-dir
+                           read-file
+                           write-file
+                           ;; ====== Nix helpers ======
+                           nix-shell
+                           nix-develop
+                           nix-build
+                           nix-flake-build
+                           nix-flake-check
+                           nix-run
+                           ;; ====== i18n helpers ======
+                           i18n-locale-dir
+                           i18n-po-file
+                           i18n-mo-file
+                           i18n-pot-file
+                           i18n-source-globs
+                           i18n-extract
+                           i18n-init
+                           i18n-merge
+                           i18n-compile
+                           i18n-init-all
+                           i18n-merge-all
+                           i18n-compile-all
+                           i18n-refresh
+                           i18n-translator
+                           i18n-language
+                           ;; ====== Version ======
+                           maak-version
+                           maak-version-string
+                           maak-homepage
+                           maak-license
+                           print-version)
+  #:export (resolve-maak-tasks list-tasks run-tasks run-task
+                              format-task-doc available-task-names
+                              unknown-task-error))
 
 (define* (resolve-maak-tasks #:key (module-name '(maak)))
+  "Return the runnable tasks of MODULE-NAME as `(NAME . VARIABLE)' pairs.
+
+When the module declares exports, only those are considered; otherwise every
+procedure the module defines counts as a task.  See the export rules in the
+README."
   (let* ((mod (resolve-module module-name))
          (public-mod (module-public-interface mod))
          ;; Check if a public interface exists AND contains at least one export.
@@ -73,77 +158,123 @@
                                         (else #f))) target-mod))))
     tasks))
 
+(define (task-name<? a b)
+  "Order two tasks by name, so a listing or an error message is stable."
+  (string<? (symbol->string (car a))
+            (symbol->string (car b))))
+
+(define (available-task-names)
+  "Return the names of the tasks maak can currently run, sorted."
+  (map (lambda (task)
+         (symbol->string (car task)))
+       (sort (resolve-maak-tasks) task-name<?)))
+
+(define (format-task-doc name doc)
+  "Return the lines that describe task NAME, given its docstring DOC.
+
+One line prints inline after the name.  A two line docstring starts inline and
+aligns its continuation under the first word of the documentation.  Anything
+longer prints as a block: the name on its own line, then every line of the
+documentation indented to the same column, which keeps a multi paragraph
+docstring readable instead of letting it fall back to the left margin.
+
+Common leading indentation is removed first with `dedent-string', so a
+docstring written inside an indented function still reads flush left."
+  (let* ((label (string-append (bold-output name) ":"))
+         (prefix (string-append name ": "))
+         ;; The column the documentation aligns to: the visible length of the
+         ;; name and its colon and space.  The ANSI codes `bold-output' adds
+         ;; occupy no column, which is why the margin comes from PREFIX rather
+         ;; than from LABEL.
+         (margin (make-string (string-length prefix) #\space))
+         (text (and (string? doc) (dedent-string doc)))
+         (lines (if (and text (not (string=? text "")))
+                    (string-split text #\newline)
+                    '())))
+    (cond
+      ((null? lines)
+       (list label))
+      ((= 1 (length lines))
+       (list (string-append prefix (car lines))))
+      ((= 2 (length lines))
+       (list (string-append prefix (car lines))
+             (string-append margin (cadr lines))))
+      (else
+       (cons label
+             (map (lambda (line)
+                    ;; A blank line inside the documentation stays blank
+                    ;; rather than being padded out to the margin.
+                    (if (string=? line "") ""
+                        (string-append margin line)))
+                  lines))))))
+
 (define* (list-tasks #:key (as-is? #f))
-  "List documentation for all maak tasks defined in the currently
-loaded module. Sorts alphabetically by default unless AS-IS? is #t."
+  "List documentation for every maak task in the loaded file.
+
+Tasks are sorted by name unless AS-IS? is #t.  Each docstring is laid out so
+its lines align under the task name rather than wrapping back to the left
+margin; see `format-task-doc'."
   (let* ((raw-tasks (resolve-maak-tasks))
-         (tasks (if as-is? raw-tasks
-                    (sort raw-tasks
-                          (lambda (a b)
-                            (string<? (symbol->string (car a))
-                                      (symbol->string (car b))))))))
+         (tasks (if as-is? raw-tasks (sort raw-tasks task-name<?))))
     (log-separator)
     (for-each (lambda (task)
-                (let* ((function-docstring (procedure-documentation (variable-ref
-                                                                     (cdr task)))))
+                (let* ((proc (variable-ref (cdr task)))
+                       (doc (procedure-documentation proc))
+                       (lines (format-task-doc (symbol->string (car task))
+                                               doc)))
                   (newline)
-                  (if (string? function-docstring)
-                      (log-message (format #f "~a: ~a"
-                                           (bold-output (car task))
-                                           function-docstring))
-                      (log-message (format #f "~a"
-                                           (bold-output (car task))))))) tasks)
+                  (log-message (string-join lines "\n"))))
+              tasks)
     (newline)
     (newline)))
 
+(define (unknown-task-error task)
+  "Raise a maak error saying TASK is not runnable, listing the tasks that are."
+  (let ((available (available-task-names)))
+    (raise-maak-error
+     (if (equal? 'default task)
+         "Could not find a `default' task in this Maak file."
+         (format #f "Unknown task: ~a" task))
+     #:hint
+     (if (null? available)
+         "No runnable tasks are defined. Define a function, and export it if the module declares exports."
+         (format #f "Available tasks: ~a" (string-join available ", "))))))
+
 (define* (run-tasks tasks
                     #:key (task-args '()))
-  "Runs a list of tasks sequentially."
+  "Run TASKS sequentially, in the order given.
+
+Every task must name a procedure the loaded Maak file makes visible; otherwise
+a maak error lists the tasks that do exist.  TASK-ARGS are passed to each task."
   (for-each (lambda (task)
               (unless (get-module-var task)
-                (cond
-                  ((equal? 'default task)
-                   (raise-exception (make-exception-with-message (format #f
-                                                                         (string-join '
-                                                                          ("Could not find default task."
-                                                                           "Have you defined a function named `default' in your Maak file?"))
-                                                                         task))))
-                  (else (raise-exception (make-exception-with-message (format
-                                                                              #f
-                                                                              "Could not find task: ~a"
-                                                                              task))))))
+                (unknown-task-error task))
               (run-task task
                         #:task-args task-args)) tasks))
 
 (define* (run-task task
                    #:key (task-args '()))
-  "Runs a given task if it is a valid maak task.
-Logs information about the task and its documentation before execution.
+  "Run TASK, a single Maak task, logging its documentation first.
 
-   Args:
-     task: A symbol representing the name of the task to be executed.
-     task-args: Additional arguments to be passed to the task.
+Args:
+  task: a symbol naming the task to run.
+  task-args: the arguments to pass to the task procedure.
 
-   Returns:
-     The result of calling the task procedure.
-
-   Errors:
-     Signals an error if the task is not a valid function
-     as determined by `maak-task?`."
+Returns the value of the task procedure.  Raises a maak error when TASK does
+not name a runnable task, either because it is missing or because it exists but
+is not visible as a task (see the export rules in the README)."
   (let* ((proc (get-module-var task))
-         (proc-doc (procedure-documentation proc))
+         (proc-doc (and (maak-proc? proc) (procedure-documentation proc)))
          (valid-tasks (resolve-maak-tasks)))
     (cond
-      ;; Ensure the procedure is valid AND exists in the exported tasks list
+      ;; Ensure the procedure is valid AND exists in the exported tasks list.
       ((and (maak-proc? proc)
             (assoc task valid-tasks))
        (log-separator)
-       (log-info "=> Running Maak task: ~a\n" task proc)
-       (when (and (not (equal? #f proc-doc))
-                  (not (equal? "" proc-doc)))
+       (log-info "=> Running Maak task: ~a\n" task)
+       (when (and (string? proc-doc)
+                  (not (string=? proc-doc "")))
          (log-info "  ~a" proc-doc))
        (newline)
        (apply proc task-args))
-      (else (error (format #f
-                    "Task ~a was not a valid maak task. Please double-check for typos and on the function visibility!"
-                    task)) #f))))
+      (else (unknown-task-error task)))))

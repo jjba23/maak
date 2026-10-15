@@ -74,6 +74,12 @@ override_dh_auto_install:
 		install -m 0644 maak-completion.zsh debian/maak/usr/share/zsh/vendor-completions/_maak; \
 	fi
 
+	# Manual page
+	mkdir -p debian/maak/usr/share/man/man1
+	if [ -f "man/maak.1" ]; then \
+		install -m 0644 man/maak.1 debian/maak/usr/share/man/man1/maak.1; \
+	fi
+
 override_dh_auto_clean:
 	rm -rf build
 	dh_auto_clean

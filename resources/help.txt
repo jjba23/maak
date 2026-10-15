@@ -24,11 +24,25 @@ Options:
     -l, --list
         List all available tasks in the currently loaded Maak file.
 
+    -L, --load-path DIR
+        Add DIR to Guile's load path, so a Maak file can require modules
+        that live outside its own directory.  Repeat the flag, or separate
+        several directories with ':' in one flag.  The directory of the
+        Maak file, and the directories named by the MAAK_LOAD_PATH
+        environment variable, are added automatically.
+
     -n, --dry-run
         Run in dry-run mode. Print shell commands instead of executing them.
 
     -q, --quiet
         Quiet mode. Suppress standard logging, banners, and header outputs.
+
+    -v, --version
+        Display the Maak version and exit.
+
+    --debug
+        Show the Guile backtrace on an error.  The same as setting the
+        MAAK_DEBUG environment variable.
 
 +----------------------------------------------------------------------------+
 
@@ -45,5 +59,8 @@ Examples:
 
     # Quietly test run a pipeline without modifying files
     maak -n -q -- clean,build,deploy
+
+    # Let the Maak file require modules from ./lib
+    maak -L ./lib -- build
 
 +----------------------------------------------------------------------------+

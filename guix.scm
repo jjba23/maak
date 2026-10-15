@@ -55,6 +55,8 @@
                     (share (string-append #$output "/share")))
                 (install-file "resources/help.txt"
                               (string-append share "/resources"))
+                (install-file "man/maak.1"
+                              (string-append share "/man/man1"))
                 (install-file "scripts/maak" bin)
                 (chmod (string-append bin "/maak") #o755))))
           (add-after 'unpack 'fix-paths

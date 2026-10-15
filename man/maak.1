@@ -1,0 +1,250 @@
+.\" maak - the infinitely extensible command runner
+.\" Copyright (C) Josep Bigorra <jjbigorra@gmail.com>
+.\"
+.\" This documentation is free documentation: you can redistribute it and/or
+.\" modify it under the terms of the GNU Free Documentation License, version
+.\" 1.3 or (at your option) any later version.
+.TH MAAK 1 "2026" "maak 0.8.17" "User Commands"
+.SH NAME
+maak \- run project tasks written in GNU Guile Scheme
+.SH SYNOPSIS
+.B maak
+.RI [ OPTIONS ]
+.RI [ \-\- \ [ TASKS ] ...\ [ TASK_ARGS ] ...]
+.SH DESCRIPTION
+.B maak
+is a command runner and control plane: instead of a bespoke build DSL it uses
+the full GNU Guile Scheme language, so a task is simply a procedure in a file
+called a
+.IR "Maak file" .
+.PP
+By default
+.B maak
+loads
+.B ./maak.scm
+and runs the task named
+.BR default .
+A Maak file declares the module
+.B (maak)
+and imports the library:
+.PP
+.RS 4
+.EX
+(define\-module (maak)
+  #:declarative? #t
+  #:use\-module (maak maak))
+
+(define (hello)
+  "Say hello from Maak!"
+  (display "Hello from Maak!\\n"))
+.EE
+.RE
+.PP
+Every procedure the module makes visible is a runnable task.  When the module
+declares
+.BR #:export ,
+only the exported procedures are tasks; other procedures become private
+helpers.
+.PP
+Several tasks may be run in one invocation by separating their names with
+commas:
+.BR "maak fmt,test" .
+Arguments can be passed to a task after a literal
+.BR \-\- .
+.SH OPTIONS
+.TP
+.BR \-f ", " \-\-file " " FILE
+Load
+.I FILE
+instead of
+.BR ./maak.scm .
+.TP
+.BR \-h ", " \-\-help
+Display a help screen and exit.
+.TP
+.BR \-l ", " \-\-list
+List every task in the loaded Maak file, with its documentation.
+.TP
+.BR \-L ", " \-\-load\-path " " DIR
+Add
+.I DIR
+to Guile's load path so the Maak file can require modules that live outside
+its own directory.  The flag may be repeated, or several directories given at
+once separated by colons, as in
+.BR PATH .
+The directory holding the Maak file, and the directories named by
+.BR MAAK_LOAD_PATH ,
+are added automatically.
+.TP
+.BR \-n ", " \-\-dry\-run
+Print the shell commands a task would run instead of running them.  The same
+effect is available inside a task by parameterising
+.BR dry\-run? .
+.TP
+.BR \-q ", " \-\-quiet
+Suppress the banner, the log lines and the header output.
+.TP
+.BR \-v ", " \-\-version
+Print the version, the license and the homepage, then exit.
+.TP
+.B \-\-debug
+Let an error reach Guile's own top level handler so the full backtrace is
+printed.  Equivalent to setting
+.BR MAAK_DEBUG .
+.TP
+.BR \-t ", " \-\-tasks " " LIST
+A comma separated list of tasks to run.  Normally the tasks are given as
+positional arguments; this option is what the launcher passes on.
+.SH ENVIRONMENT
+.TP
+.B GUILE_LOAD_PATH
+Guile's own load path; honoured as usual and extended by
+.BR \-L .
+.TP
+.B MAAK_LOAD_PATH
+A colon separated list of extra directories to add to the load path.  Unlike
+.BR GUILE_LOAD_PATH
+it does not replace anything, which makes it convenient to set per project.
+.TP
+.B MAAK_DEBUG
+When set to a non\-empty value, print the Guile backtrace on an error instead
+of the short maak message.
+.SH TASK AUTHORING
+A task is an ordinary procedure.  Its docstring is shown by
+.B \-\-list
+and before the task runs.
+.PP
+The following helpers are available from
+.BR "(maak maak)" ;
+all of them honour dry\-run and quiet modes.
+.SS Shell
+.TP
+.B ($ parts)
+Run a shell command built from a list of strings, joined by spaces.  With
+.BR #:verbose? " #t"
+the command is logged first.
+.TP
+.B (syscall command)
+Run
+.I command
+and raise an error when it exits non\-zero.
+.TP
+.B (capture command)
+Run
+.I command
+and return its standard output as a string.
+.TP
+.B (which command)
+Return the absolute path of
+.IR command ,
+or
+.BR #f .
+.TP
+.B (require\-command command)
+Like
+.BR which ,
+but raise a maak error when the command is missing.
+.TP
+.B (shell\-quote string)
+Quote
+.I string
+so a shell reads it as one literal word.
+.SS Files
+.BR cp ", " mv ", " mkdir\-p ", " remkdir\-p ", " delete\-file\-recursively ", " cat ", "
+.BR touch ", " ln\-s ", " chmod\-file ", " read\-file ", " write\-file
+.SS Directory and environment
+.BR with\-directory ", " cd ", " env\-get ", " env\-set! ", " env\-unset! ", " with\-env ", "
+.BR with\-env\-vars ", " home\-dir ", " tmp\-dir
+.SS Load paths
+.BR add\-load\-path! ", " add\-load\-paths! ", " with\-load\-path ", " split\-load\-path ", "
+.BR environment\-load\-paths ", " maak\-load\-path
+.SS Pretty multiline strings
+.BR string\-lines ", " unlines ", " unwords ", " dedent\-string ", " indent\-string ", "
+.BR text
+.SS Guix
+.BR guix\-shell ", " guix\-container ", " guix\-pack ", " manifest\-shell ", " program\-shell ", "
+.BR time\-machine ", " time\-machine\-manifest\-shell ", " time\-machine\-program\-shell
+.SS Nix
+.BR nix\-shell ", " nix\-develop ", " nix\-build ", " nix\-flake\-build ", " nix\-flake\-check ", "
+.BR nix\-run
+.SS Internationalisation
+.BR i18n\-extract ", " i18n\-init ", " i18n\-merge ", " i18n\-compile ", " i18n\-refresh ", "
+.BR i18n\-init\-all ", " i18n\-merge\-all ", " i18n\-compile\-all ", " i18n\-translator ", "
+.BR i18n\-locale\-dir ", " i18n\-po\-file ", " i18n\-mo\-file ", " i18n\-pot\-file ", "
+.BR i18n\-source\-globs ", " i18n\-language
+.SH EXIT STATUS
+.TP
+.B 0
+Every requested task finished successfully.
+.TP
+.B 1
+The Maak file was missing, a task failed, or an option was invalid.
+.SH FILES
+.TP
+.B ./maak.scm
+The default Maak file.
+.TP
+.B ./channels.scm
+The Guix channels file used by the
+.B time\-machine
+helpers, when present.
+.TP
+.B ./manifest.scm
+The Guix manifest used by the
+.B manifest\-shell
+helpers, when present.
+.SH EXAMPLES
+Run the default task:
+.PP
+.RS 4
+.EX
+maak
+.EE
+.RE
+.PP
+Run two tasks in sequence:
+.PP
+.RS 4
+.EX
+maak clean,build
+.EE
+.RE
+.PP
+Pass arguments to a task:
+.PP
+.RS 4
+.EX
+maak quick\-math \-\- 23 42
+.EE
+.RE
+.PP
+List the tasks of another file, quietly:
+.PP
+.RS 4
+.EX
+maak \-q \-f ./tools/tasks.scm \-\-list
+.EE
+.RE
+.PP
+Let the Maak file require modules from
+.BR ./lib ,
+and dry\-run the release pipeline:
+.PP
+.RS 4
+.EX
+maak \-L ./lib \-n \-\- release
+.EE
+.RE
+.SH SEE ALSO
+.BR guile (1),
+.BR guix (1),
+.BR make (1)
+.PP
+The Maak manual and the technical Guile Scheme API documentation are published
+at the project homepage listed below.
+.SH LICENSE
+Maak is licensed under the GNU General Public License, version 3 or later.
+This manual page is licensed under the GNU Free Documentation License, version
+1.3 or later.
+.PP
+Homepage: https://codeberg.org/jjba23/maak

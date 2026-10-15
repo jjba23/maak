@@ -75,6 +75,8 @@ install -D -m 0755 scripts/maak-completion.bash %{buildroot}%{_datadir}/bash-com
 install -D -m 0755 scripts/maak-completion.fish %{buildroot}%{_datadir}/fish/vendor_completions.d/maak.fish
 install -D -m 0755 scripts/maak-completion.zsh %{buildroot}%{_datadir}/zsh/site-functions/_maak
 
+install -D -m 0644 man/maak.1 %{buildroot}%{_mandir}/man1/maak.1
+
 %files
 %license COPYING
 %doc README.org
@@ -95,5 +97,7 @@ install -D -m 0755 scripts/maak-completion.zsh %{buildroot}%{_datadir}/zsh/site-
 %{_datadir}/bash-completion/completions/maak
 %{_datadir}/fish/vendor_completions.d/maak.fish
 %{_datadir}/zsh/site-functions/_maak
+
+%{_mandir}/man1/maak.1%{?ext_man}
 
 %changelog
