@@ -251,16 +251,51 @@ margin; see `format-task-doc'."
          (format #f "Available tasks: ~a" (string-join available ", "))))))
 
 (define* (run-tasks tasks
-                    #:key (task-args '()))
+                    #:key (task-args '())
+                    (keep-going? #f)
+                    (on-failure #f))
   "Run TASKS sequentially, in the order given.
 
 Every task must name a procedure the loaded Maak file makes visible; otherwise
-a maak error lists the tasks that do exist.  TASK-ARGS are passed to each task."
-  (for-each (lambda (task)
-              (unless (get-module-var task)
-                (unknown-task-error task))
-              (run-task task
-                        #:task-args task-args)) tasks))
+a maak error lists the tasks that do exist.  TASK-ARGS are passed to each task.
+Returns the names of the tasks that failed, in the order they were given -- the
+empty list when everything succeeded.
+
+With KEEP-GOING? a task that fails stops nothing: the tasks after it still run.
+ON-FAILURE is then called with the task name and the exception it raised, as
+`(ON-FAILURE TASK KEY VALUE ...)', so the caller can report the failure where
+it happened and decide what a run full of them means.  Without KEEP-GOING? the
+first failure is raised as it always was, backtrace and all."
+  (let loop ((remaining tasks)
+             (failed '()))
+    (cond
+      ((null? remaining) (reverse failed))
+      (else
+       (let ((task (car remaining)))
+         (if (not keep-going?)
+             (begin
+               (unless (get-module-var task)
+                 (unknown-task-error task))
+               (run-task task
+                         #:task-args task-args)
+               (loop (cdr remaining) failed))
+             (let ((failure #f))
+               (catch #t
+                 (lambda ()
+                   (unless (get-module-var task)
+                     (unknown-task-error task))
+                   (run-task task
+                             #:task-args task-args))
+                 (lambda (key . vals)
+                   (set! failure (cons key vals))))
+               (if failure
+                   (begin
+                     (when on-failure
+                       ;; The key and its values go on as they arrived, so the
+                       ;; callback can tell a maak error from anything else.
+                       (apply on-failure task failure))
+                     (loop (cdr remaining) (cons task failed)))
+                   (loop (cdr remaining) failed)))))))))
 
 (define* (run-task task
                    #:key (task-args '()))

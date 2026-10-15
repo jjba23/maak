@@ -24,7 +24,10 @@ _maak() {
     cword=$COMP_CWORD
   }
 
-  local opts="-f --file -h --help -l --list -n --dry-run -q --quiet"
+  local opts="-C --directory -e --env-file -f --file -h --help -i --ignore-errors
+    -k --keep-going -l --list -L --load-path -n --dry-run -q --quiet
+    -v --version --banner --no-banner --no-env-file --no-print-directory
+    --debug"
 
   # Complete options if the current token starts with a hyphen
   if [[ "$cur" == -* ]]; then
@@ -35,6 +38,14 @@ _maak() {
   # Complete files if the previous token was -f or --file
   if [[ "$prev" == "-f" || "$prev" == "--file" ]]; then
     mapfile -t COMPREPLY < <(compgen -f -- "$cur")
+    return 0
+  fi
+
+  # Complete directories if the previous token was -C, --directory, -L or
+  # --load-path
+  if [[ "$prev" == "-C" || "$prev" == "--directory" || "$prev" == "-L" ||
+    "$prev" == "--load-path" ]]; then
+    mapfile -t COMPREPLY < <(compgen -d -- "$cur")
     return 0
   fi
 

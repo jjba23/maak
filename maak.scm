@@ -20,7 +20,8 @@
   #:use-module (ice-9 string-fun)
   #:use-module (ice-9 textual-ports)
   #:use-module (ice-9 popen)
-  #:use-module (maak maak))
+  #:use-module (maak maak)
+  #:use-module (maak veritas))
 
 ;; ====== Maak file constants ======
 
@@ -221,14 +222,36 @@
 
 ;; ====== Maak tests ======
 
-;; The veritas invocation is shared by the `test' and `container' tasks so the
-;; two environments can never drift apart.  The variables are set through
-;; `env' rather than as a `VAR=value' prefix: everything after `guix shell --'
-;; is executed directly, so a prefix would be looked up as a program name.
-(define test-command
+;; The veritas invocation is shared by the `test', `container' and `audit-tests'
+;; tasks so the environments can never drift apart.  The variables are set
+;; through `env' rather than as a `VAR=value' prefix: everything after
+;; `guix shell --' is executed directly, so a prefix would be looked up as a
+;; program name.
+(define veritas-command-head
   (list "env VERITAS_TEST_MODULE=veritas VERITAS_TEST_TOP_DIR=test VERITAS_TEST_TYPE=unit"
-        "VERITAS_RUN_BENCHMARKS=false"
-        "guile -L ./src -L ./test -c '(exit ((@ (veritas runner) run-tests)))'"))
+        "VERITAS_RUN_BENCHMARKS=false"))
+
+(define veritas-command-tail
+  (list "guile -L ./src -L ./test -c '(exit ((@ (veritas runner) run-tests)))'"))
+
+(define test-command
+  (append veritas-command-head veritas-command-tail))
+
+;; The same suite, reported as JSON, so the audit can read the lines back as
+;; data rather than read the decoration.  The capture is kept under `reports/',
+;; which is where the test runs already write and which git ignores.
+(define audit-command
+  (append veritas-command-head
+          (list "VERITAS_REPORTER=json-reporter")
+          veritas-command-tail))
+
+(define audit-report-file
+  "reports/veritas-audit.json")
+
+;; The report names a file the way the runner ran it -- `dsl.scm' -- which is
+;; relative to the directory of the test type.
+(define veritas-test-dir
+  "test/veritas/unit")
 
 (define (test)
   "Run the project's unit test suite with Veritas.
@@ -241,6 +264,53 @@ which needs both the library sources and the test tree on the load path."
   "Run the same unit test suite inside a Guix container, with no network."
   (guix-container test-command
                   #:manifest "manifest.scm"))
+
+(define (audit-tests)
+  "Fail when any Veritas test of the suite runs no case at all.
+
+A case has to evaluate to an assertion.  A test whose body ends in a side
+effect -- a cleanup, a `display' -- evaluates to something that is not a
+procedure instead, so Veritas gives the test no case and the test passes
+without checking anything.  This task runs the same suite as `test', with the
+reporter that writes its lines as JSON, reads that report back, and fails with
+the name and file of every test that reported no case of its own."
+  (define (describe test)
+    (let ((file (veritas-test-file test)))
+      (if file
+          (~ "~s (~a/~a)" (veritas-test-name test) veritas-test-dir file)
+          (~ "~s" (veritas-test-name test)))))
+  (if (dry-run?)
+      (log-info "  A dry run reads no report, so nothing was checked here.\n")
+      (let* ((_ (mkdir-p "reports"))
+             (passed? (manifest-shell
+                       (append audit-command
+                               (list (~ "> ~a 2>&1"
+                                        (shell-quote audit-report-file))))
+                       #:allow-failure? #t))
+             (events (veritas-report-events
+                      (read-file audit-report-file #:default "")))
+             (totals (veritas-report-totals events))
+             (vacuous (veritas-vacuous-tests events)))
+        (cond
+          ((null? (veritas-report-tests events))
+           (task-error "the Veritas report holds no tests at all"
+                       #:hint (format #f
+                                      "The suite did not get as far as writing one; `~a' holds what it printed.  `maak test' runs the same suite with the readable reporter."
+                                      audit-report-file)))
+          ((pair? vacuous)
+           (task-error (~ "~a test~a of the suite asserted nothing: ~a"
+                          (length vacuous)
+                          (if (= 1 (length vacuous)) "" "s")
+                          (string-join (map describe vacuous) ", "))
+                       #:hint "A test has to evaluate to an assertion: a body ending in a side effect is no case at all, and such a test passes in silence.  See the Tests section of the README."))
+          ((not passed?)
+           (task-error "the suite failed, so the scan of it stopped early"
+                       #:hint "Fix what failed first: `maak test' runs the same suite and prints the failures."))
+          (else
+           (log-info "  ~a tests, ~a cases, and no test without a case.  Report: ~a\n"
+                     (assoc-ref totals 'tests)
+                     (assoc-ref totals 'cases)
+                     audit-report-file))))))
 
 ;; ====== Maak test playground =======
 

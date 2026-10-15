@@ -77,6 +77,22 @@ file beside the Maak file.
 Read no environment file at all, whatever the environment or the checkout
 says.
 .TP
+.BR \-C ", " \-\-directory " " DIR
+Change to
+.I DIR
+before anything else: the Maak file (
+.BR \-f ,
+the default
+.BR ./maak.scm )
+and the
+.B .env
+file beside it are then looked up inside
+.IR DIR ,
+and the directory entered is reported.  The flag may be repeated, or several
+directories given at once separated by colons, and they are entered in the
+order given.  A directory that is not there is an error rather than a quiet
+fallback, so a task never runs somewhere it was not asked to.
+.TP
 .B \-\-banner
 Print the greeting banner.  This is the default, and is what turns the banner
 back on after
@@ -88,6 +104,18 @@ Skip the greeting banner, keeping everything else the run would print.
 .TP
 .BR \-h ", " \-\-help
 Display a help screen and exit.
+.TP
+.BR \-i ", " \-\-ignore\-errors
+Carry on after a task fails, and let the run succeed anyway: each failure is
+reported where it happened, as a warning.  This is
+.B \-\-keep\-going
+with a different verdict.
+.TP
+.BR \-k ", " \-\-keep\-going
+Carry on after a task fails instead of ending the run there.  Each failure is
+reported where it happened, naming the task that raised it, and the run then
+fails with the list of tasks that did not succeed.  Without this flag the first
+failure ends the run, which is what a pipeline of tasks usually wants.
 .TP
 .BR \-l ", " \-\-list
 List every task in the loaded Maak file, with its documentation.
@@ -107,6 +135,15 @@ are added automatically.
 Print the shell commands a task would run instead of running them.  The same
 effect is available inside a task by parameterising
 .BR dry\-run? .
+.TP
+.B \-\-no\-print\-directory
+Do not report the directories
+.B \-C
+changes to.  A run says which directory it entered, because a task that ran
+somewhere else is worth knowing about; this is the switch that leaves those
+lines out, for a run whose output is read by something other than a person.
+.BR \-q
+silences them as well, among other things.
 .TP
 .BR \-q ", " \-\-quiet
 Suppress the banner, the log lines and the header output.

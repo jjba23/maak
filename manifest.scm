@@ -63,11 +63,16 @@ on legible, maintainable tests.  Veritas shuffles tests and runs them
 concurrently by default.")
     (license license:lgpl3+)))
 
+;; guile-json-4 comes with guile-veritas already (it is what the JSON reporter
+;; writes with); it is named here too because the `audit-tests' task reads that
+;; report back through `(maak veritas)', and a dependency the tests rely on is
+;; worth stating outright.
 (packages->manifest (list guile-3.0-latest
                           guile-documenta
                           texinfo
                           guile-ares-rs
                           guile-veritas
+                          guile-json-4
                           coreutils
                           util-linux
                           watchexec))

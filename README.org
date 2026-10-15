@@ -153,7 +153,10 @@ Maak provides standard CLI options to manage your execution pipeline:
 | Short Flag | Long Flag    | Argument | Description                                                          |
 |------------+--------------+----------+----------------------------------------------------------------------|
 | ~-f~         | ~--file~       | ~FILE~     | Specify the path to the Maak file (defaults to ~./maak.scm~).          |
+| ~-C~         | ~--directory~  | ~DIR~      | Change to ~DIR~ before the Maak file is read (repeatable; ~:~-separated allowed). |
 | ~-h~         | ~--help~       | None     | Display the help screen and exit.                                    |
+| ~-i~         | ~--ignore-errors~ | None    | Keep going after a failure, and let the run succeed anyway.         |
+| ~-k~         | ~--keep-going~ | None     | A task that fails does not stop the tasks after it.                  |
 | ~-l~         | ~--list~       | None     | List all available tasks in the currently loaded Maak file.          |
 | ~-L~         | ~--load-path~  | ~DIR~      | Add ~DIR~ to Guile's load path (repeatable; ~:~-separated allowed).    |
 | ~-n~         | ~--dry-run~    | None     | Dry-run mode. Print shell commands instead of executing them.        |
@@ -161,6 +164,7 @@ Maak provides standard CLI options to manage your execution pipeline:
 | ~-v~         | ~--version~    | None     | Display the Maak version and exit.                                   |
 | ~-e~         | ~--env-file~   | ~FILE~     | Read ~NAME=VALUE~ assignments from ~FILE~ (repeatable; ~:~-separated allowed). |
 |              | ~--no-env-file~ | None     | Read no environment file at all, whatever the environment says.      |
+|              | ~--no-print-directory~ | None | Do not report the directories ~-C~ changes to.                      |
 |              | ~--banner~     | None     | Print the greeting banner (the default; overrides ~MAAK_NO_BANNER~).  |
 |              | ~--no-banner~  | None     | Skip the greeting banner, keeping everything else.                   |
 |              | ~--debug~      | None     | Print the Guile backtrace on error (same as ~MAAK_DEBUG=1~).           |
@@ -182,6 +186,40 @@ maak -n -q -- clean,build
 # Run a custom task with arguments
 maak -f ./my-tasks.scm -- deploy production
 #+end_src
+
+** Running several tasks, and from another directory
+
+Three of Maak's switches are Make's, because the situations they answer come up
+in any project and not only in a build:
+
+- ~-k~ / ~--keep-going~ keeps going after a task fails.  Every failure is
+  reported where it happened, naming the task that raised it, and the run fails
+  at the end with the list of tasks that did not succeed.  Without it the first
+  failure ends the run, which is what a pipeline of tasks usually wants.
+- ~-i~ / ~--ignore-errors~ is the same run with a different verdict: the
+  failures are warnings and the run still succeeds.  It is what exercises the
+  rest of a pipeline while one step is known to be broken.
+- ~-C~ / ~--directory~ changes directory before anything else -- before the
+  Maak file is found, before a ~.env~ beside it is read, and before any task
+  runs -- and says which directory it entered.
+
+#+begin_src shell
+# Run every task of the pipeline, and see all of the failures at once
+maak -k -- fmt,lint,test
+
+# Run the tasks of another checkout's Maak file
+maak -C ../other-project -- build
+#+end_src
+
+~-C~ may be repeated, and the directories are entered in the order given, so
+~maak -C build -C signatures -- sign~ runs from ~build/signatures~.  A directory
+that is not there is an error rather than a quiet fallback, because a task must
+never run somewhere it was not asked to.
+
+The directory a run enters is reported, which is what Make's ~-w~ prints; ~--no-print-directory~
+is the switch that leaves those lines out, for a run whose output is read by
+something other than a person.  ~-q~ asks for that silence too, along with the
+rest of what the run would say.
 
 --------
 
@@ -469,6 +507,53 @@ Maak gives you the power of Scheme. You're not restricted to a limited, weird sy
 Instead of having to learn a new, limited language, you can leverage your existing Lisp knowledge to define tasks, manage data, and automate your workflows. This leads to code that is much easier to read, write, and maintain. For example, you can write a simple loop to process all your source files instead of writing a separate rule for each one.
 
 Maak is designed to be your central control plane. While Make is primarily focused on building software from source, Maak is a general-purpose command runner. This means you can use it for tasks like running tests, deploying applications, or managing your development environment. It's meant to be a more flexible and powerful alternative for all your project's automation needs.
+
+* What Maak takes from Make, and what it leaves behind
+
+Maak shares Make's command line wherever the two answer the same question, so
+a ~make~ habit usually lands. This is where each of Make's options ends up:
+
+| ~make~                            | Maak                                                            |
+|-----------------------------------+-----------------------------------------------------------------|
+| ~-f FILE~                          | ~-f/--file FILE~, and ~./maak.scm~ when it is not given          |
+| ~-C DIR~                           | ~-C/--directory DIR~, which also prints the directory it entered |
+| ~-n/--dry-run~                     | ~-n/--dry-run~                                                   |
+| ~-s/--silent~                      | ~-q/--quiet~ (Make's own ~-q~ asks a different question)          |
+| ~-k/--keep-going~                  | ~-k/--keep-going~                                                |
+| ~-i/--ignore-errors~               | ~-i/--ignore-errors~                                             |
+| ~-I DIR~                           | ~-L/--load-path DIR~                                             |
+| ~-h~, ~-v~                         | ~-h/--help~, ~-v/--version~                                      |
+| ~-w/--print-directory~             | the default with ~-C~; ~--no-print-directory~ leaves it out         |
+| ~-p/--print-data-base~             | ~--list~                                                         |
+| ~--debug~                          | ~--debug~ (the Guile backtrace of the error)                     |
+| ~-e/--environment-overrides~       | the environment already beats a ~.env~ file; ~-e~ is ~--env-file~ here |
+| ~.DEFAULT_GOAL~                    | the ~default~ task, and a clear error when there is none          |
+| ~.PHONY~                           | nothing: every task runs when it is asked to                     |
+| ~MAKEFLAGS~, ~MFLAGS~              | ~MAAK_ENV_FILE~, ~MAAK_LOAD_PATH~, ~MAAK_NO_BANNER~, ~MAAK_DEBUG~  |
+| ~$(shell ...)~, ~$(wildcard ...)~    | any Scheme: ~capture~, ~syscall~, ~$~, ~file-exists?~              |
+| ~include other.mk~                 | ~use-modules~, or ~load~ from a Maak file                        |
+
+Three families of Make options have no counterpart, and each is a design
+decision rather than an omission:
+
+- *File targets and timestamps.*  Make decides whether to run a recipe by
+  comparing the timestamps of files (~-B~, ~-t~, ~-o~, ~-W~, pattern rules,
+  ~VPATH~, implicit rules).  Maak has no targets to compare and runs the task it
+  was asked for; a task that wants to skip work says so itself, in Scheme, where
+  the condition can be anything -- a hash, a row in a database, a check over the
+  network -- and not only the age of a file.
+- *Parallel jobs.*  Make's ~-j~ and the jobserver that coordinates recursive
+  runs exist to keep a build's cores busy.  A run of Maak tasks is sequential,
+  which keeps the output in order and every failure where it happened; a task
+  that wants to do several things at once uses Guile's own concurrency inside
+  the task (the test suite, for instance, is split over worker processes with
+  ~VERITAS_JOBS~).  The refinements of job control (~-l~, ~-S~, ~--output-sync~,
+  ~--trace~) follow it.
+- *The Makefile language itself.*  Variables, ~$(...)~ expansion and the recipe
+  prefixes ~@~, ~-~ and ~+~ have nothing to do here: a Maak file is Scheme, and
+  a task's commands are the strings it builds.  ~-r~, ~-R~ and
+  ~--warn-undefined-variables~ exist to tame built-in rules and variables that
+  Maak does not have; an unbound variable is already an error with a hint.
 
 --------
 
@@ -812,19 +897,44 @@ The fixtures those tests use -- a module with exports and one without -- live
 under ~test/maak/fixtures~ and are deliberately kept out of the directory the
 runner scans.
 
-Two things are worth knowing when adding a test, because breaking either one
-fails quietly rather than loudly:
+Three things are worth knowing when adding a test, because breaking any one of
+them fails quietly rather than loudly:
 
 - A case has to *evaluate to an assertion*, which is a procedure of one
   validation client.  A bare ~assert-*~ call is one, and so is a ~let~ whose
   last form is one.  A body that ends in ~(delete-file ...)~ is not: the case
   becomes no case at all, and the test passes without checking anything.
   Cleanup therefore belongs in a ~#:after~ hook, or before the assertion is
-  built.
+  built.  ~maak audit-tests~ fails the run when it finds a test like that.
+- One assertion per case.  A case is the value a form evaluates to, so an
+  assertion wrapped in a body of several forms -- a ~let~ around five ~assert-*~
+  calls, say -- is evaluated while the file loads and then dropped: only the
+  *last* form of the body is the case that runs and can fail.  The four before
+  it still run, but nothing reads their verdict, so they cannot fail the run.
+  Write one assertion per form and give each one the setup it needs; a run of
+  the CLI costs milliseconds, which is cheaper than a test that cannot fail.
 - Anything left directly in a ~suite~, outside any ~test~, is treated as a case
   of the suite, and its result is read as though it were an assertion: the run
   then dies with "could not read assertion success from unknown type".  A
   parenthesis that closes a ~test~ a line too early is enough to do it.
+
+*** Auditing the suite for tests that assert nothing
+
+~maak audit-tests~ runs the same suite as ~maak test~, with Veritas' JSON
+reporter, and reads that report back: a test that produced no case of its own is
+one whose body never became an assertion, and the task fails, naming the test
+and the file it is in.
+
+#+begin_src shell
+maak test          # the suite, with the readable report
+maak audit-tests   # the same suite again, plus a failure per test that checks nothing
+#+end_src
+
+It reads the report rather than the source, so it judges what the runner
+actually ran.  What it cannot see is a case that does run while the assertions
+inside it are dropped anyway -- the one-assertion-per-case rule above, which the
+report has no way to show.  The report the task reads is left at
+~reports/veritas-audit.json~.
 
 -------
 

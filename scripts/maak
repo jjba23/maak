@@ -75,15 +75,19 @@ show_help() {
   cat "$resources_dir/help.txt"
 }
 
-parsed_options=$(getopt -n "maak" -o e:lf:hL:nqv --longoptions list,file:,help,dry-run,quiet,load-path:,env-file:,no-env-file,banner,no-banner,version,debug -- "$@")
+parsed_options=$(getopt -n "maak" -o C:e:iklf:hL:nqv --longoptions list,file:,help,dry-run,quiet,load-path:,env-file:,no-env-file,banner,no-banner,version,debug,directory:,keep-going,ignore-errors,no-print-directory -- "$@")
 eval set -- "$parsed_options"
 
+# The Maak file is resolved once every -C has been honoured, so it is kept as
+# it was given until then.
 file_arg=""
 # Repeated -L flags are collected and handed to Guile as one colon separated
 # list, the same shape as PATH and GUILE_LOAD_PATH.
 load_paths=()
 # Repeated -e flags are collected the same way.
 env_files=()
+# Repeated -C flags are collected in order, and entered in that order.
+directories=()
 
 guile_cmd_args=(
   "-L" "${scheme_sources_dir}"
@@ -93,18 +97,29 @@ guile_cmd_args=(
 
 while true; do
   case "${1}" in
+  -C | --directory)
+    if [ -z "${2:-}" ]; then
+      log_error "The --directory option needs a path."
+      exit 1
+    fi
+    directories+=("${2}")
+    shift 2
+    ;;
   -f | --file)
     if [ -z "${2:-}" ]; then
       log_error "The --file option needs a path."
       exit 1
     fi
     file_arg="${2}"
-    if [ ! -f "${file_arg}" ]; then
-      log_error "No such Maak file: '${file_arg}'"
-      exit 1
-    fi
-    guile_cmd_args+=("--file" "$(realpath "${file_arg}")")
     shift 2
+    ;;
+  -i | --ignore-errors)
+    guile_cmd_args+=("--ignore-errors")
+    shift
+    ;;
+  -k | --keep-going)
+    guile_cmd_args+=("--keep-going")
+    shift
     ;;
   -h | --help)
     show_help
@@ -124,6 +139,10 @@ while true; do
     ;;
   -n | --dry-run)
     guile_cmd_args+=("--dry-run")
+    shift
+    ;;
+  --no-print-directory)
+    guile_cmd_args+=("--no-print-directory")
     shift
     ;;
   -q | --quiet)
@@ -181,15 +200,50 @@ if [ "${#env_files[@]}" -gt 0 ]; then
   guile_cmd_args+=("--env-file" "${joined_env_files}")
 fi
 
-if [[ -z "${file_arg}" ]]; then
-  # Default to the maak file in the current directory.  An absolute path keeps
-  # Guile from resolving it against its own module directory.
-  if [ ! -f ./maak.scm ]; then
-    log_error "No Maak file found: './maak.scm'"
-    log_info "Create one, or name another with -f/--file. Run 'maak --help' for the options."
+# -C is honoured here, before the Maak file is looked for, so that `-f maak.scm'
+# with `-C sub' names sub/maak.scm and the default is the ./maak.scm of the
+# directory entered -- which is what `make -C' does.  A value may name several
+# directories at once separated by ':', the way -L and -e do, and they are
+# entered in the order given.  The directories are then handed to Guile as one
+# colon separated list of absolute paths, because it is the library that
+# reports each one it enters, and because `getopt-long' keeps only the last
+# value of a single-valued option.
+if [ "${#directories[@]}" -gt 0 ]; then
+  entered_directories=()
+  for dir in "${directories[@]}"; do
+    IFS=':' read -r -a dir_parts <<<"${dir}"
+    for part in "${dir_parts[@]}"; do
+      # `a::b' and `a:' name the same directories as `a:b' and `a'.
+      if [ -z "${part}" ]; then
+        continue
+      fi
+      if ! cd -- "${part}" 2>/dev/null; then
+        log_error "no such directory: '${part}'"
+        exit 1
+      fi
+      entered_directories+=("$(pwd -P)")
+    done
+  done
+  if [ "${#entered_directories[@]}" -gt 0 ]; then
+    joined_directories=$(IFS=:; echo "${entered_directories[*]}")
+    guile_cmd_args+=("--directory" "${joined_directories}")
+  fi
+fi
+
+# An absolute path keeps Guile from resolving the Maak file against its own
+# module directory.
+if [ -n "${file_arg}" ]; then
+  if [ ! -f "${file_arg}" ]; then
+    log_error "No such Maak file: '${file_arg}'"
     exit 1
   fi
+  guile_cmd_args+=("--file" "$(realpath "${file_arg}")")
+elif [ -f ./maak.scm ]; then
   guile_cmd_args+=("--file" "$(realpath ./maak.scm)")
+else
+  log_error "No Maak file found: './maak.scm'"
+  log_info "Create one, or name another with -f/--file. Run 'maak --help' for the options."
+  exit 1
 fi
 
 # Run Guile application

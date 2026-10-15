@@ -50,6 +50,7 @@
   #:export (main maak-option-spec maak-default-file resolve-maak-file
                  resolve-banner? resolve-env-files truthy-string?
                  exception->message error-message-string
+                 resolve-print-directory?
                  report-maak-error report-generic-error))
 
 (define maak-default-file
@@ -77,6 +78,24 @@
     (tasks (single-char #\t)
            (value #t)
            (required? #f))
+    ;; make's `-C': change to DIR before the Maak file, its environment files
+    ;; and the tasks are looked at.  Several directories are given as one
+    ;; colon separated list, as with `-L', and they are entered in order.
+    (directory (single-char #\C)
+               (value #t)
+               (required? #f))
+    ;; make's `-k': a task that fails stops nothing else.
+    (keep-going (single-char #\k)
+                (value #f)
+                (required? #f))
+    ;; make's `-i': the same, except that a run full of failures still succeeds.
+    (ignore-errors (single-char #\i)
+                   (value #f)
+                   (required? #f))
+    ;; make's `--no-print-directory', the switch that turns off the `-w' lines:
+    ;; a run that changes directory says so unless it is asked not to.
+    (no-print-directory (value #f)
+                        (required? #f))
     ;; `getopt-long' keeps only the last occurrence of a single-valued
     ;; option, so several directories are given as one colon separated list,
     ;; exactly like PATH.  The wrapper script joins repeated -L flags that way.
@@ -237,6 +256,20 @@ after `MAAK_NO_BANNER' was exported for the shell as a whole."
     ((truthy-string? (getenv "MAAK_NO_BANNER")) #f)
     (else #t)))
 
+(define (resolve-print-directory? options)
+  "Return whether the directories `-C/--directory' enters should be reported.
+
+A run that changes directory says where it ended up, because a task that ran
+somewhere else is the kind of thing that is worth knowing without asking.  The
+report is what make's `-w' prints, and `--no-print-directory' is the switch of
+make's that turns it off -- useful when the output of a run is read by
+something other than a person.  `--quiet' asks for the same silence, among
+other things, and so does not bring the lines back."
+  (cond
+    ((option-ref options 'no-print-directory #f) #f)
+    ((option-ref options 'quiet #f) #f)
+    (else #t)))
+
 (define (resolve-env-files options file)
   "Return the environment files to read for OPTIONS and maak file FILE.
 
@@ -329,6 +362,80 @@ be searched for as `maak/maak.scm' and could load a completely different file."
         (display (call-with-input-file help-file get-string-all))
         (display "Usage: maak [OPTIONS] [-- [TASKS]... [TASK_ARGS]...]\n"))))
 
+;; ====== Several tasks in one run ======
+
+(define* (enter-directories! directories #:key (silent? #f))
+  "Change to each of the colon separated DIRECTORIES in turn, in order.
+
+SILENT? keeps the change of directory unannounced, which is what
+`--no-print-directory' asks for, and what `--quiet' asks for before the quiet
+parameter is in place.  A `-C' without either reports every directory it
+enters, because a task that ran somewhere else is worth knowing about.
+
+This is make's `-C/--directory': everything read after it -- the default
+`./maak.scm', a relative `-f', the task arguments -- is read against the
+directory it changed to, which is what makes a recursive `maak -C build' work.
+A directory that is not there is an error rather than a silent fallback, so
+`maak -C typo -- deploy' cannot deploy whatever the current directory holds."
+  (for-each (lambda (directory)
+              (unless (file-exists? directory)
+                (raise-maak-error
+                 (format #f "no such directory: ~a" directory)
+                 #:hint "`-C/--directory DIR' changes to DIR before the Maak file is read."))
+              (catch #t
+                (lambda () (chdir directory))
+                (lambda (key . vals)
+                  (raise-maak-error
+                   (format #f "could not change to directory: ~a (~a)"
+                           directory (exception->message key vals))
+                   #:hint "Check that the directory exists and that you may enter it.")))
+              (unless (or silent? (quiet?))
+                (log-info "maak: Entering directory '~a'\n" (getcwd))))
+            (split-load-path directories)))
+
+(define (report-task-failure task key . vals)
+  "Print the failure of TASK and let the run carry on, for `--keep-going'.
+
+The line reads like the one a run that stops prints, with the task named,
+because a failure in the middle of a run of several has to say which one it
+was.  KEY and VALS are the key and values the exception arrived with, which is
+the shape `find-maak-error' reads: Guile hands a raised condition over as
+`(%exception <the condition>)'."
+  (let ((error (find-maak-error key vals)))
+    (if error
+        (begin
+          (format (current-error-port)
+                  "\n\x1b[0;31mmaak: error (task ~a):\x1b[0m ~a\n"
+                  task
+                  (maak-error-message error))
+          (when (maak-error-hint error)
+            (format (current-error-port)
+                    "        hint: ~a\n"
+                    (maak-error-hint error))))
+        (report-generic-error key vals))))
+
+(define (report-failed-tasks failed ignore-errors?)
+  "Decide what a run does about the tasks in FAILED that did not succeed.
+
+Each failure has already been printed where it happened.  IGNORE-ERRORS? turns
+the lot into a warning, so the run still succeeds; otherwise the run fails with
+one line naming the tasks that did not."
+  (cond
+    ((null? failed) #f)
+    (else
+     (let ((names (string-join (map symbol->string failed) ", ")))
+       (if ignore-errors?
+           (log-info "maak: warning: ~a task~a failed and --ignore-errors was given: ~a\n"
+                     (length failed)
+                     (if (null? (cdr failed)) "" "s")
+                     names)
+           (raise-maak-error
+            (format #f "~a task~a failed: ~a"
+                    (length failed)
+                    (if (null? (cdr failed)) "" "s")
+                    names)
+            #:hint "Each failure is reported above with the message the task gave it."))))))
+
 ;; ====== Running ======
 
 (define (run-maak options)
@@ -353,6 +460,11 @@ be searched for as `maak/maak.scm' and could load a completely different file."
        (print-version)
        0)
       (else
+       ;; `-C' comes first, before the Maak file is found and before an
+       ;; environment file beside it is looked for, so a relative `-f' means
+       ;; what it says inside the directory entered.
+       (enter-directories! (option-ref options 'directory #f)
+                           #:silent? (not (resolve-print-directory? options)))
        (let* ((file (resolve-maak-file (option-ref options
                                                    'file #f)))
               (raw-tasks (filter (lambda (task)
@@ -365,7 +477,12 @@ be searched for as `maak/maak.scm' and could load a completely different file."
               (tasks (map string->symbol string-tasks))
               (task-args (option-ref options
                                      '() '()))
-              (env-files (resolve-env-files options file)))
+              (env-files (resolve-env-files options file))
+              ;; `--ignore-errors' is `--keep-going' and then some: nothing
+              ;; stops the run either way, and only the exit status differs.
+              (keep-going? (or (option-ref options 'keep-going #f)
+                               (option-ref options 'ignore-errors #f)))
+              (ignore-errors? (option-ref options 'ignore-errors #f)))
          (apply-load-paths! (split-load-path (option-ref options
                                                            'load-path #f))
                             file)
@@ -392,8 +509,12 @@ be searched for as `maak/maak.scm' and could load a completely different file."
                    (log-info "Executing Maak tasks: ~a\n"
                              (string-join (map symbol->string
                                                tasks) " =>")))
-                 (run-tasks tasks
-                            #:task-args task-args)))
+                 (report-failed-tasks
+                  (run-tasks tasks
+                             #:task-args task-args
+                             #:keep-going? keep-going?
+                             #:on-failure report-task-failure)
+                  ignore-errors?)))
            0))))))
 
 (define* (main #:key (args (command-line)))
