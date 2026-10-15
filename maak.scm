@@ -221,6 +221,17 @@
   (nix-flake-check #:flake "."))
 
 ;; ====== Maak tests ======
+;;
+;; The suite runs once, and the run is read twice.  Reported as JSON it is data,
+;; which is the only form in which a test that asserted nothing can be told from
+;; one that asserted something: both look the same in a report meant for a
+;; person.  Reported through Veritas' own reporter it is still the report a
+;; person reads, because that reporter decorates the very events the JSON lines
+;; carry, and the report is replayed through it.  One run, two readers -- so
+;; `test' can fail on a test that checked nothing without running the suite a
+;; second time to find out.  The specs are read alongside the report for the one
+;; thing no report can hold: an assertion written in a case the run did read and
+;; then dropped.
 
 ;; The veritas invocation is shared by the `test', `container' and `audit-tests'
 ;; tasks so the environments can never drift apart.  The variables are set
@@ -237,13 +248,16 @@
 (define test-command
   (append veritas-command-head veritas-command-tail))
 
-;; The same suite, reported as JSON, so the audit can read the lines back as
-;; data rather than read the decoration.  The capture is kept under `reports/',
-;; which is where the test runs already write and which git ignores.
-(define audit-command
+;; The same suite, reported as the lines a program can read rather than the
+;; lines a person reads.  The capture is kept under `reports/', which is where
+;; the test runs already write and which git ignores.
+(define report-command
   (append veritas-command-head
           (list "VERITAS_REPORTER=json-reporter")
           veritas-command-tail))
+
+(define test-report-file
+  "reports/veritas-test.json")
 
 (define audit-report-file
   "reports/veritas-audit.json")
@@ -253,12 +267,111 @@
 (define veritas-test-dir
   "test/veritas/unit")
 
-(define (test)
-  "Run the project's unit test suite with Veritas.
+(define (run-suite-to report-file)
+  "Run the unit test suite, leaving its JSON report at REPORT-FILE.
 
-The specs live under test/veritas/unit and are located by the veritas runner,
-which needs both the library sources and the test tree on the load path."
-  (manifest-shell test-command))
+The specs live under test/veritas/unit and are located by the Veritas runner,
+which needs both the library sources and the test tree on the load path.  The
+status is returned rather than raised: the report is worth reading either way,
+and what a failure means is the audit's to say."
+  (mkdir-p "reports")
+  (manifest-shell (append report-command
+                          (list (~ "> ~a 2>&1"
+                                   (shell-quote report-file))))
+                  #:allow-failure? #t))
+
+(define (report-events report-file)
+  "Return the events of the report at REPORT-FILE, or none when there is none."
+  (veritas-report-events (read-file report-file #:default "")))
+
+(define (unread-findings events)
+  "Return the cases the run's specs write assertions a run cannot read.
+
+A case is read for its last form only, so a body of several assertions leaves
+all but the last one unread -- and nothing about that reaches a report, because
+an assertion that is never called never logs.  The specs are read instead, and
+only the ones the report says the runner ran, so a filtered run is judged on
+what it ran.  Each finding is `(FILE NAME COUNT)'."
+  (veritas-unread-findings events
+                          (lambda (file)
+                            (read-file (~ "~a/~a" veritas-test-dir file)
+                                       #:default ""))))
+
+(define (describe-test test)
+  "Return the reported TEST as `NAME (FILE)' when the report named its file."
+  (let ((file (veritas-test-file test)))
+    (if file
+        (~ "~s (~a/~a)" (veritas-test-name test) veritas-test-dir file)
+        (~ "~s" (veritas-test-name test)))))
+
+(define (describe-unread finding)
+  "Return one unread finding as `NAME (FILE)', with the count of its assertions."
+  (let ((file (car finding))
+        (name (cadr finding))
+        (count (caddr finding)))
+    (~ "~a writes ~a assertion~a it never reads (~a/~a)"
+       (if name (~ "~s" name) "a test the source does not name")
+       count
+       (if (= 1 count) "" "s")
+       veritas-test-dir
+       file)))
+
+(define (audit-report report-file passed?)
+  "Fail the run when REPORT-FILE holds a test or a case that asserted nothing.
+
+Three questions are asked of one run.  Did it report any tests at all?  Did any
+test produce no case of its own?  Did any assertion written inside a case the
+run did read go unread?  The last is what the report cannot answer -- an
+assertion that is never called logs nothing, so the run leaves no trace of it --
+and the specs are read for it instead."
+  (let* ((events (report-events report-file))
+         (totals (veritas-report-totals events))
+         (vacuous (veritas-vacuous-tests events))
+         (unread (unread-findings events)))
+    (cond
+      ((null? (veritas-report-tests events))
+       (task-error "the Veritas report holds no tests at all"
+                   #:hint (format #f
+                                  "The suite did not get as far as writing one; `~a' holds what it printed there."
+                                  report-file)))
+      ((pair? vacuous)
+       (task-error (~ "~a test~a of the suite asserted nothing: ~a"
+                      (length vacuous)
+                      (if (= 1 (length vacuous)) "" "s")
+                      (string-join (map describe-test vacuous) ", "))
+                   #:hint "A test has to evaluate to an assertion: a body ending in a side effect is no case at all, and such a test passes in silence.  See the Tests section of the README."))
+      ((pair? unread)
+       (task-error (~ "~a case~a of the suite write~a assertions the run never reads: ~a"
+                      (length unread)
+                      (if (= 1 (length unread)) "" "s")
+                      (if (= 1 (length unread)) "s" "")
+                      (string-join (map describe-unread unread) ", "))
+                   #:hint "A case is read for its last form only, so one assertion per case is what the run can check: give each case the setup it needs, or end the body in the one assertion that matters.  See the Tests section of the README."))
+      ((not passed?)
+       (task-error "the suite failed"
+                   #:hint (format #f
+                                  "The failures are in the report above; `~a' holds the same run as data."
+                                  report-file)))
+      (else
+       (log-info "  ~a tests, ~a cases, and no test that asserted nothing and no assertion the run never read.  Report: ~a\n"
+                 (assoc-ref totals 'tests)
+                 (assoc-ref totals 'cases)
+                 report-file)))))
+
+(define (test)
+  "Run the project's unit test suite with Veritas, and audit it as it runs.
+
+The suite runs once, reported as JSON, and that one report is read twice: once
+through Veritas' own reporter, so the output is the report a person expects, and
+once as data, so a test that asserted nothing, or an assertion the run never
+read, fails the run.  The audit is `audit-tests', run here rather than
+remembered: a suite that is only checked when someone asks to check it is not
+checked."
+  (if (dry-run?)
+      (log-info "  A dry run reads no report, so nothing was checked here.\n")
+      (let ((passed? (run-suite-to test-report-file)))
+        (veritas-report-render (read-file test-report-file #:default ""))
+        (audit-report test-report-file passed?))))
 
 (define (container)
   "Run the same unit test suite inside a Guix container, with no network."
@@ -266,51 +379,22 @@ which needs both the library sources and the test tree on the load path."
                   #:manifest "manifest.scm"))
 
 (define (audit-tests)
-  "Fail when any Veritas test of the suite runs no case at all.
+  "Fail when a test asserted nothing, or an assertion of it went unread.
 
 A case has to evaluate to an assertion.  A test whose body ends in a side
 effect -- a cleanup, a `display' -- evaluates to something that is not a
-procedure instead, so Veritas gives the test no case and the test passes
-without checking anything.  This task runs the same suite as `test', with the
-reporter that writes its lines as JSON, reads that report back, and fails with
-the name and file of every test that reported no case of its own."
-  (define (describe test)
-    (let ((file (veritas-test-file test)))
-      (if file
-          (~ "~s (~a/~a)" (veritas-test-name test) veritas-test-dir file)
-          (~ "~s" (veritas-test-name test)))))
+procedure instead, so Veritas gives the test no case, and the test passes
+without checking anything.  Worse, a case whose body holds several assertions
+gives the run its last one and drops the rest, so a suite can go green while
+checking a fraction of what it says it checks.
+
+`maak test' runs this audit on the suite it already ran.  This task is the audit
+on its own: the same suite, reported as JSON and left as data rather than read,
+which is what a machine wants and a person does not."
   (if (dry-run?)
       (log-info "  A dry run reads no report, so nothing was checked here.\n")
-      (let* ((_ (mkdir-p "reports"))
-             (passed? (manifest-shell
-                       (append audit-command
-                               (list (~ "> ~a 2>&1"
-                                        (shell-quote audit-report-file))))
-                       #:allow-failure? #t))
-             (events (veritas-report-events
-                      (read-file audit-report-file #:default "")))
-             (totals (veritas-report-totals events))
-             (vacuous (veritas-vacuous-tests events)))
-        (cond
-          ((null? (veritas-report-tests events))
-           (task-error "the Veritas report holds no tests at all"
-                       #:hint (format #f
-                                      "The suite did not get as far as writing one; `~a' holds what it printed.  `maak test' runs the same suite with the readable reporter."
-                                      audit-report-file)))
-          ((pair? vacuous)
-           (task-error (~ "~a test~a of the suite asserted nothing: ~a"
-                          (length vacuous)
-                          (if (= 1 (length vacuous)) "" "s")
-                          (string-join (map describe vacuous) ", "))
-                       #:hint "A test has to evaluate to an assertion: a body ending in a side effect is no case at all, and such a test passes in silence.  See the Tests section of the README."))
-          ((not passed?)
-           (task-error "the suite failed, so the scan of it stopped early"
-                       #:hint "Fix what failed first: `maak test' runs the same suite and prints the failures."))
-          (else
-           (log-info "  ~a tests, ~a cases, and no test without a case.  Report: ~a\n"
-                     (assoc-ref totals 'tests)
-                     (assoc-ref totals 'cases)
-                     audit-report-file))))))
+      (let ((passed? (run-suite-to audit-report-file)))
+        (audit-report audit-report-file passed?))))
 
 ;; ====== Maak test playground =======
 

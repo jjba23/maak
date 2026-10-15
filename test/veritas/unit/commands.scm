@@ -62,6 +62,56 @@
                  (quiet? #f))
     (strip-ansi (with-output-to-string thunk))))
 
+;; A case is read for its last form only: a body of several forms leaves every
+;; assertion but the last one unread, so each case below holds one assertion and
+;; calls for whatever setup it needs.  The helpers that build a command are here
+;; rather than repeated inside the cases.
+
+(define (nix-shell-command . arguments)
+  "Return the command a Nix shell builds for ARGUMENTS, without running it."
+  (apply dry-run-command
+         (list (lambda () (apply nix-shell arguments)))))
+
+(define (i18n-extract-command)
+  "Return the command a first extraction builds, in a directory of its own."
+  (let* ((dir (format #f "~a/maak-test-i18n-~a" (tmp-dir) (getpid)))
+         (sources (string-append dir "/sources")))
+    (mkdir-p sources)
+    (dry-run-command
+     (lambda ()
+       (i18n-extract #:dir dir
+                     #:textdomain "maak"
+                     #:directories (list sources))))))
+
+(define (allowed-failure-command)
+  "Return the command an allowed failure builds, as dry-run mode prints it."
+  (dry-run-command
+   (lambda ()
+     ($ '("make failing-target") #:allow-failure? #t))))
+
+(define (async-command-result)
+  "Return what starting a slow command in the background says, and how long it took."
+  (let* ((start (get-internal-real-time))
+         (result ($ '("sleep 3") #:async? #t))
+         (elapsed (/ (- (get-internal-real-time) start)
+                     (exact->inexact internal-time-units-per-second))))
+    (list result elapsed)))
+
+(define (env-command-path)
+  "Return a path of its own for the `#:env' test to have the command write to."
+  (format #f "~a/maak-env-~a" (tmp-dir) (getpid)))
+
+(define (run-env-command path)
+  "Run the command that writes MAAK_TEST_ENV to PATH, with `#:env'."
+  (env-unset! "MAAK_TEST_ENV")
+  (parameterize ((quiet? #t))
+    ($ (list (format #f
+                     "sh -c 'printf %s \"$MAAK_TEST_ENV\" > ~a'"
+                     path))
+       ;; Reaches the command, not the shell that expands the redirection: it
+       ;; is `env' that sets the name for it.
+       #:env '("MAAK_TEST_ENV=from-dollar"))))
+
 (define guix-suite
   (suite "Guix command construction"
          #:concurrent? #f
@@ -106,22 +156,24 @@
   (suite "Nix command construction"
          #:concurrent? #f
          #:shuffle? #f
-         (test "nix-shell passes packages and a run command"
-               (let ((command (dry-run-command
-                               (lambda ()
-                                 (nix-shell '("echo hi")
-                                            #:packages '("python3"))))))
-                 (assert-contains #:expect command #:got "nix-shell")
-                 (assert-contains #:expect command #:got "--packages python3")
-                 (assert-contains #:expect command #:got "--run 'echo hi'")))
-         (test "nix-shell can be pure and file based"
-               (let ((command (dry-run-command
-                               (lambda ()
-                                 (nix-shell '("echo hi")
-                                            #:pure? #t
-                                            #:file "shell.nix")))))
-                 (assert-contains #:expect command #:got "--pure")
-                 (assert-contains #:expect command #:got "--file shell.nix")))
+         (test "nix-shell runs the command it is given"
+               (assert-contains #:expect (nix-shell-command '("echo hi"))
+                                #:got "--run 'echo hi'"))
+         (test "nix-shell passes packages"
+               (assert-contains #:expect (nix-shell-command '("echo hi")
+                                                         #:packages '("python3"))
+                                #:got "--packages python3"))
+         (test "nix-shell names itself"
+               (assert-contains #:expect (nix-shell-command '("echo hi"))
+                                #:got "nix-shell"))
+         (test "nix-shell can be pure"
+               (assert-contains #:expect (nix-shell-command '("echo hi")
+                                                         #:pure? #t)
+                                #:got "--pure"))
+         (test "nix-shell can be file based"
+               (assert-contains #:expect (nix-shell-command '("echo hi")
+                                                         #:file "shell.nix")
+                                #:got "--file shell.nix"))
          (test "nix-develop runs a flake's shell"
                (let ((command (dry-run-command
                                (lambda ()
@@ -175,56 +227,60 @@
                (assert-equal #:expect "sys/i18n/locale/translate.pot"
                              #:got (i18n-pot-file #:dir "sys/i18n/locale/"
                                                   #:textdomain "translate")))
+         (test "source globs keep the directories that exist"
+               ;; `assert-true' wants #t exactly, so the globs themselves are
+               ;; compared: `member' returns the tail of the list, not #t.
+               (assert-equal #:expect '("src/*.scm")
+                             #:got (i18n-source-globs '("src"
+                                                       "no-such-directory"))))
          (test "source globs skip directories that do not exist"
-               (let ((globs (i18n-source-globs '("src"
-                                                 "no-such-directory"))))
-                 (assert-true (member "src/*.scm" globs))
-                 (assert-false (any (lambda (glob)
-                                      (string-contains glob
-                                                       "no-such-directory"))
-                                    globs))))
+               (assert-false
+                (any (lambda (glob)
+                       (string-contains glob "no-such-directory"))
+                     (i18n-source-globs '("src" "no-such-directory")))))
          (test "i18n-compile builds a msgfmt command"
-               (let ((command (dry-run-command
-                               (lambda ()
-                                 (i18n-compile "nl_NL")))))
-                 (assert-contains #:expect command
-                                  #:got "msgfmt -v -o po/nl_NL/LC_MESSAGES/messages.mo")
-                 (assert-contains #:expect command
-                                  #:got "po/nl_NL/LC_MESSAGES/messages.po")))
+               (assert-contains #:expect (dry-run-command
+                                          (lambda ()
+                                            (i18n-compile "nl_NL")))
+                                #:got "msgfmt -v -o po/nl_NL/LC_MESSAGES/messages.mo"))
+         (test "i18n-compile names the catalogue it compiles"
+               (assert-contains #:expect (dry-run-command
+                                          (lambda ()
+                                            (i18n-compile "nl_NL")))
+                                #:got "po/nl_NL/LC_MESSAGES/messages.po"))
          (test "i18n-merge builds a msgmerge command"
                (let ((command (dry-run-command
                                (lambda ()
                                  (i18n-merge "nl_NL")))))
                  (assert-contains #:expect command #:got "msgmerge -U")))
          (test "i18n-init builds a msginit command"
-               (let ((command (dry-run-command
-                               (lambda ()
-                                 (i18n-init "nl_NL")))))
-                 (assert-contains #:expect command
-                                  #:got "msginit -l nl_NL.UTF8")
-                 (assert-contains #:expect command
-                                  #:got "--no-translator")))
+               (assert-contains #:expect (dry-run-command
+                                          (lambda ()
+                                            (i18n-init "nl_NL")))
+                                #:got "msginit -l nl_NL.UTF8"))
+         (test "i18n-init asks for no translator"
+               (assert-contains #:expect (dry-run-command
+                                          (lambda ()
+                                            (i18n-init "nl_NL")))
+                                #:got "--no-translator"))
+         (test "a first extraction runs xgettext"
+               (assert-contains #:expect (i18n-extract-command)
+                                #:got "xgettext"))
+         (test "a first extraction knows it is reading Scheme"
+               (assert-contains #:expect (i18n-extract-command)
+                                #:got "--language=Scheme"))
+         (test "a first extraction collects the translated strings"
+               (assert-contains #:expect (i18n-extract-command)
+                                #:got "--keyword=G_"))
          (test "the first extraction does not join an existing template"
-               (let* ((dir (format #f "~a/maak-test-i18n-~a"
-                                   (tmp-dir) (getpid)))
-                      (sources (string-append dir "/sources"))
-                      (command (begin
-                                 (mkdir-p sources)
-                                 (dry-run-command
-                                  (lambda ()
-                                    (i18n-extract #:dir dir
-                                                  #:textdomain "maak"
-                                                  #:directories
-                                                  (list sources)))))))
-                 (assert-contains #:expect command #:got "xgettext")
-                 (assert-contains #:expect command #:got "--language=Scheme")
-                 (assert-contains #:expect command #:got "--keyword=G_")
-                 (assert-false (string-contains command "--join-existing"))))
-         (test "i18n-language strips the encoding and modifier"
-               (let ((language (i18n-language)))
-                 (assert-true (string? language))
-                 (assert-false (string-contains language "."))
-                 (assert-false (string-contains language "@"))))))
+               (assert-false (string-contains (i18n-extract-command)
+                                              "--join-existing")))
+         (test "i18n-language is a language"
+               (assert-true (string? (i18n-language))))
+         (test "i18n-language strips the encoding"
+               (assert-false (string-contains (i18n-language) ".")))
+         (test "i18n-language strips the modifier"
+               (assert-false (string-contains (i18n-language) "@")))))
 
 (define decoration-suite
   (suite "Command decorations"
@@ -256,20 +312,19 @@
                                #:dev-null? #t)))
                 #:got "sudo env CI=1 systemctl daemon-reload >/dev/null 2>&1"))
          (test "a backgrounded command is started, not waited for"
-               (let ((command (dry-run-command
-                               (lambda ()
-                                 ($ '("make -j") #:async? #t)))))
-                 (assert-contains #:expect command #:got "make -j &")))
+               (assert-contains #:expect (dry-run-command
+                                          (lambda ()
+                                            ($ '("make -j") #:async? #t)))
+                                #:got "make -j &"))
+         (test "an allowed failure still runs the command it was given"
+               (assert-contains #:expect (allowed-failure-command)
+                                #:got "make failing-target"))
          (test "an allowed failure is not turned into a `|| true' shell"
                ;; The command line is left exactly as the task wrote it: the
                ;; exit code is read instead, so that the task is still told
                ;; whether the command worked.
-               (let ((command (dry-run-command
-                               (lambda ()
-                                 ($ '("make failing-target")
-                                    #:allow-failure? #t)))))
-                 (assert-contains #:expect command #:got "make failing-target")
-                 (assert-false (string-contains command "|| true"))))
+               (assert-false (string-contains (allowed-failure-command)
+                                              "|| true")))
          (test "the Guix shells forward the decorations"
                (assert-contains
                 #:expect (dry-run-command
@@ -365,39 +420,31 @@
                (parameterize ((quiet? #t))
                  (assert-equal #:expect #t
                                #:got ($ '("true") #:allow-failure? #t))))
-         (test "a backgrounded command is started, not waited for"
-               (let* ((start (get-internal-real-time))
-                      (result ($ '("sleep 3") #:async? #t))
-                      (elapsed (/ (- (get-internal-real-time) start)
-                                  (exact->inexact
-                                   internal-time-units-per-second))))
-                 (assert-equal #:expect #t #:got result)
-                 ;; Back in under the time the command needs: it was started,
-                 ;; not waited for.
-                 (assert-true (< elapsed 1.0))))
+         (test "a backgrounded command reports it was started"
+               (assert-equal #:expect #t
+                             #:got (car (async-command-result))))
+         (test "a backgrounded command is not waited for"
+               ;; Back in under the time the command needs: it was started,
+               ;; not waited for.
+               (assert-true (< (cadr (async-command-result)) 1.0)))
          (test "a discarded command still runs"
                (parameterize ((quiet? #t))
                  (assert-equal #:expect #t
                                #:got ($ '("echo ignored") #:dev-null? #t))))
-         ;; A case has to evaluate to an assertion (a procedure of one
-         ;; validation client), so the setup a case needs is done in the `let'
-         ;; that wraps it and only the assertion is left as the last form.
+         ;; A case is read for its last form only, so the setup a case needs is
+         ;; done in the `let' that wraps it, with one assertion left as the last
+         ;; form.  A body may hold as much work as it likes and still end in the
+         ;; assertion: what is dropped is the assertions before it, not the work.
          (test "#:env reaches the command itself"
-               (let* ((path (format #f "~a/maak-env-~a"
-                                    (tmp-dir) (getpid)))
-                      (value (begin
-                               (env-unset! "MAAK_TEST_ENV")
-                               (parameterize ((quiet? #t))
-                                 ($ (list (format #f
-                                                  "sh -c 'printf %s \"$MAAK_TEST_ENV\" > ~a'"
-                                                  path))
-                                    ;; Reaches the command, not the shell that
-                                    ;; expands the redirection: it is `env'
-                                    ;; that sets the name for it.
-                                    #:env '("MAAK_TEST_ENV=from-dollar")))
-                               (read-file path))))
+               (let ((path (env-command-path)))
+                 (run-env-command path)
+                 (let ((value (read-file path)))
+                   (delete-file path)
+                   (assert-equal #:expect "from-dollar" #:got value))))
+         (test "#:env reaches one command, not the whole task"
+               (let ((path (env-command-path)))
+                 (run-env-command path)
                  (delete-file path)
-                 (assert-equal #:expect "from-dollar" #:got value)
                  ;; The parent environment is left alone: the name was set for
                  ;; the one command, not for the whole task.
                  (assert-false (env-get "MAAK_TEST_ENV"))))))

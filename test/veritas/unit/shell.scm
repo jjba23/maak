@@ -45,6 +45,14 @@
     (mkdir-p dir)
     dir))
 
+;; A case is read for its last form only, so a case holds one assertion and
+;; asks for what it needs: the same path twice, rather than two assertions in
+;; one case.
+
+(define (missing-file-path)
+  "Return the path of a file that is not there, in a scratch directory."
+  (string-append (scratch-directory "missing") "/nope.txt"))
+
 (define quoting-suite
   (suite "Shell quoting and lookup"
          #:concurrent? #f
@@ -105,13 +113,12 @@
                  (delete-file-recursively dir)
                  (assert-equal #:expect "onetwo" #:got content)))
          (test "read-file returns its default for a missing file"
-               (let ((missing (string-append (scratch-directory "missing")
-                                             "/nope.txt")))
-                 (assert-equal #:expect "fallback"
-                               #:got (read-file missing
-                                                #:default "fallback"))
-                 (assert-equal #:expect #f
-                               #:got (read-file missing))))
+               (assert-equal #:expect "fallback"
+                             #:got (read-file (missing-file-path)
+                                              #:default "fallback")))
+         (test "read-file of a missing file is #f without a default"
+               (assert-equal #:expect #f
+                             #:got (read-file (missing-file-path))))
          (test "touch creates a file"
                (let* ((dir (scratch-directory "touch"))
                       (file (string-append dir "/touched"))
@@ -121,12 +128,15 @@
                                   (file-exists? file))))
                  (delete-file-recursively dir)
                  (assert-true created?)))
-         (test "with-directory changes and restores the directory"
-               (let* ((start (getcwd))
-                      (inside (with-directory (tmp-dir)
-                                              (lambda ()
-                                                (getcwd)))))
-                 (assert-true (string? inside))
+         (test "with-directory changes the directory"
+               (assert-true (string? (with-directory (tmp-dir)
+                                        (lambda ()
+                                          (getcwd))))))
+         (test "with-directory restores the directory"
+               (let ((start (getcwd)))
+                 (with-directory (tmp-dir)
+                                 (lambda ()
+                                   (getcwd)))
                  (assert-equal #:expect start
                                #:got (getcwd))))))
 
@@ -192,11 +202,13 @@
                            . "postgres://localhost/dev?sslmode=disable")
                           ("INDENTED" . "spaced"))
                 #:got (env-file-entries "test/maak/fixtures/demo.env")))
-         (test "comments, blank lines and lines without an = are skipped"
-               (let ((entries (env-file-entries
-                               "test/maak/fixtures/demo.env")))
-                 (assert-false (assoc "NO_EQUALS_LINE" entries))
-                 (assert-false (assoc "#" entries))))
+         (test "environment files skip lines without an ="
+               (assert-false
+                (assoc "NO_EQUALS_LINE"
+                       (env-file-entries "test/maak/fixtures/demo.env"))))
+         (test "environment files skip comments"
+               (assert-false
+                (assoc "#" (env-file-entries "test/maak/fixtures/demo.env"))))
          (test "a file that does not exist has no assignments"
                (assert-equal #:expect '()
                              #:got (env-file-entries "no/such/file.env")))

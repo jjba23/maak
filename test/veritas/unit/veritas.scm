@@ -114,7 +114,13 @@
                                       (line "pass" "got: 5")
                                       (line "test" "asserts nothing")))))
                  (assert-equal #:expect '("adds numbers" "asserts nothing")
-                               #:got (names events))
+                               #:got (names events))))
+         (test "a test with no line of its own has no cases"
+               (let ((events (veritas-report-events
+                              (report (line "test" "adds numbers")
+                                      (line "pass" "got: 4")
+                                      (line "pass" "got: 5")
+                                      (line "test" "asserts nothing")))))
                  (assert-equal #:expect '(2 0) #:got (cases events))))
          (test "a failing or erroring case still counts as a case"
                (let ((events (veritas-report-events
@@ -137,8 +143,13 @@
                               (report (line "test" "last with a case")
                                       (line "pass" "got: ok")
                                       (line "test" "last without one")))))
-                 (assert-equal #:expect '("last without a case" "last without one")
-                               #:got (names events))
+                 (assert-equal #:expect '("last with a case" "last without one")
+                               #:got (names events))))
+         (test "a test at the very end of the report keeps its cases"
+               (let ((events (veritas-report-events
+                              (report (line "test" "last with a case")
+                                      (line "pass" "got: ok")
+                                      (line "test" "last without one")))))
                  (assert-equal #:expect '(1 0) #:got (cases events))))
          (test "every test is filed under the file the runner was running"
                (let ((events (veritas-report-events
@@ -167,8 +178,15 @@
                                        (line "test" "cleans up instead"))))
                       (vacuous (veritas-vacuous-tests events)))
                  (assert-equal #:expect '("prints instead" "cleans up instead")
-                               #:got (map veritas-test-name vacuous))
-                 (assert-equal #:expect '("dsl.scm" "dsl.scm")
+                               #:got (map veritas-test-name vacuous))))
+         (test "a finding names the file it was reported under"
+               (let* ((events (veritas-report-events
+                               (report "running unit tests from file: dsl.scm, entrypoint: spec"
+                                       (line "test" "checks something")
+                                       (line "pass" "got: ok")
+                                       (line "test" "prints instead"))))
+                      (vacuous (veritas-vacuous-tests events)))
+                 (assert-equal #:expect '("dsl.scm")
                                #:got (map veritas-test-file vacuous))))
          (test "a report where every test has a case has no finding"
                (assert-equal
@@ -194,9 +212,214 @@
                              #:got (veritas-report-tests
                                     (veritas-report-events ""))))))
 
+(define failures-suite
+  (suite "Which failures the report reported"
+         #:concurrent? #f
+         #:shuffle? #f
+         (test "a fail line is a failed case of the test it follows"
+               (assert-equal
+                #:expect '(1 0)
+                #:got (map veritas-test-failed-cases
+                          (veritas-report-tests
+                           (veritas-report-events
+                            (report (line "test" "fails")
+                                    (line "fail" "expected 1, got 2")
+                                    (line "test" "passes")
+                                    (line "pass" "got: ok")))))))
+         (test "an error line is not a failed case"
+               ;; The run logs its own giving up as an error, and that line
+               ;; belongs to no test: counting it would let a case that recorded
+               ;; no assertion look like one that reported a failure.
+               (assert-equal
+                #:expect '(0)
+                #:got (map veritas-test-failed-cases
+                          (veritas-report-tests
+                           (veritas-report-events
+                            (report (line "test" "quiet")
+                                    (line "error"
+                                          "aborting due to error in test case...")))))))
+         (test "a passing test has no failed case"
+               (assert-equal
+                #:expect '(0)
+                #:got (map veritas-test-failed-cases
+                          (veritas-report-tests
+                           (veritas-report-events
+                            (report (line "test" "one")
+                                    (line "pass" "got: 1")))))))))
+
+(define rendering-suite
+  (suite "Rendering a report for a person"
+         #:concurrent? #f
+         #:shuffle? #f
+         (test "every event is handed over, in the order the report holds it"
+               (let ((written '())
+                     (port (open-output-string)))
+                 (veritas-report-render
+                  (report (line "test" "one")
+                          (line "pass" "got: 1")
+                          (line "fail" "expected 2, got 1"))
+                  #:logger (lambda (level message)
+                             (set! written (cons (cons level message) written)))
+                  #:port port)
+                 (assert-equal
+                  #:expect '(("test" . "one")
+                             ("pass" . "got: 1")
+                             ("fail" . "expected 2, got 1"))
+                  #:got (reverse written))))
+         (test "the runner's own lines are printed as they stand"
+               (let ((port (open-output-string)))
+                 (veritas-report-render
+                  (report "scanning directories for unit tests..."
+                          (line "test" "one"))
+                  #:logger (lambda (level message) '())
+                  #:port port)
+                 (assert-contains
+                  #:expect (get-output-string port)
+                  #:got "scanning directories for unit tests...")))
+         (test "what a test printed after an event is kept"
+               (let ((port (open-output-string)))
+                 (veritas-report-render
+                  (report (string-append (line "pass" "got: #f")
+                                         "and the words it printed"))
+                  #:logger (lambda (level message) '())
+                  #:port port)
+                 (assert-contains #:expect (get-output-string port)
+                                  #:got "and the words it printed")))
+         (test "a level Veritas does not decorate is printed plainly"
+               (let ((port (open-output-string)))
+                 (parameterize ((current-output-port port))
+                   ((veritas-report-logger) "warn" "a level of its own"))
+                 (assert-contains #:expect (get-output-string port)
+                                  #:got "a level of its own")))))
+
+(define source-suite
+  (suite "The assertions a run cannot read"
+         #:concurrent? #f
+         #:shuffle? #f
+         (test "a case of one assertion is read"
+               (assert-equal #:expect '()
+                             #:got (veritas-source-findings
+                                    "(test \"one\" (assert-true #t))")))
+         (test "a case whose body holds two assertions drops one"
+               (assert-equal
+                #:expect '(("two" . 1))
+                #:got (veritas-source-findings
+                       "(test \"two\" (let ((x 1)) (assert-true x) (assert-true x)))")))
+         (test "every assertion before the last one is dropped"
+               (assert-equal
+                #:expect '(("many" . 2))
+                #:got (veritas-source-findings
+                       "(test \"many\" (begin (assert-true #t) (assert-true #t) (assert-true #t)))")))
+         (test "a case that calls the assertion it builds is read"
+               (assert-equal #:expect '()
+                             #:got (veritas-source-findings
+                                    "(test \"calls\" (lambda (vc) ((assert-true #t) vc)))")))
+         (test "an assertion a lambda case builds and never calls is dropped"
+               (assert-equal
+                #:expect '(("lambda" . 1))
+                #:got (veritas-source-findings
+                       "(test \"lambda\" (lambda (vc) (assert-true #t)))")))
+         (test "both branches of a conditional are followed"
+               (assert-equal
+                #:expect '()
+                #:got (veritas-source-findings
+                       "(test \"if\" (if (even? 2) (assert-true #t) (assert-true #f)))")))
+         (test "a test nested in a suite is read"
+               (assert-equal
+                #:expect '(("inner" . 1))
+                #:got (veritas-source-findings
+                       "(suite \"outer\" (test \"inner\" (let ((x 1)) (assert-true x) (assert-true x))))")))
+         (test "a test's flags and hooks are not cases"
+               (assert-equal
+                #:expect '()
+                #:got (veritas-source-findings
+                       "(test \"hooked\" #:before (lambda (vc) #t) (assert-true #t))")))
+         (test "a source with no test in it has no finding"
+               (assert-equal #:expect '()
+                             #:got (veritas-source-findings "(define (helper) 1)")))
+         (test "a source that cannot be read has no finding"
+               (assert-equal #:expect '()
+                             #:got (veritas-source-findings "(test \"unclosed\"")))
+         (test "a test the source does not name is still a finding"
+               (assert-equal
+                #:expect '((#f . 1))
+                #:got (veritas-source-findings
+                       "(test (make-name) (let ((x 1)) (assert-true x) (assert-true x)))")))))
+
+(define (spec-reader files)
+  "Return a procedure reading the spec names of FILES from the source they hold."
+  (lambda (file)
+    (or (assoc-ref files file) "")))
+
+(define unread-suite
+  (suite "The unread assertions of a run"
+         #:concurrent? #f
+         #:shuffle? #f
+         (test "the files the report names are the ones a run read"
+               (assert-equal
+                #:expect '("dsl.scm" "rot.scm")
+                #:got (veritas-report-files
+                       (veritas-report-events
+                        (report "running unit tests from file: dsl.scm, entrypoint: spec"
+                                (line "test" "one")
+                                "running unit tests from file: rot.scm, entrypoint: spec"
+                                (line "test" "two"))))))
+         (test "a file the report names twice is listed once"
+               (assert-equal
+                #:expect '("dsl.scm")
+                #:got (veritas-report-files
+                       (veritas-report-events
+                        (report "running unit tests from file: dsl.scm, entrypoint: spec"
+                                (line "test" "one")
+                                (line "test" "two"))))))
+         (test "a report that names no file lists none"
+               (assert-equal
+                #:expect '()
+                #:got (veritas-report-files
+                       (veritas-report-events
+                        (report (line "test" "one"))))))
+         (test "a dropped assertion is found in the file it is in"
+               (assert-equal
+                #:expect '(("rot.scm" "two" 1))
+                #:got (veritas-unread-findings
+                       (veritas-report-events
+                        (report "running unit tests from file: rot.scm, entrypoint: spec"
+                                (line "test" "two")))
+                       (spec-reader
+                        '(("rot.scm" .
+                           "(test \"two\" (let ((x 1)) (assert-true x) (assert-true x)))"))))))
+         (test "every file a run named is read for its own findings"
+               (assert-equal
+                #:expect '(("dsl.scm" #f 1) ("rot.scm" "two" 1))
+                #:got (veritas-unread-findings
+                       (veritas-report-events
+                        (report "running unit tests from file: dsl.scm, entrypoint: spec"
+                                (line "test" "one")
+                                "running unit tests from file: rot.scm, entrypoint: spec"
+                                (line "test" "two")))
+                       (spec-reader
+                        '(("dsl.scm" .
+                           "(test (make-name) (let ((x 1)) (assert-true x) (assert-true x)))")
+                          ("rot.scm" .
+                           "(test \"two\" (let ((x 1)) (assert-true x) (assert-true x)))"))))))
+         (test "a file the report did not run is not read"
+               (let ((asked '()))
+                 (veritas-unread-findings
+                  (veritas-report-events
+                   (report "running unit tests from file: rot.scm, entrypoint: spec"
+                           (line "test" "two")))
+                  (lambda (file)
+                    (set! asked (cons file asked))
+                    ""))
+                 (assert-equal #:expect '("rot.scm") #:got asked)))))
+
 (define (spec)
   (veritas-run #:concurrent? #f
                #:shuffle? #f
                reading-suite
                counting-suite
-               findings-suite))
+               findings-suite
+               failures-suite
+               rendering-suite
+               source-suite
+               unread-suite))

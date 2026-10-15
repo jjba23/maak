@@ -884,7 +884,8 @@ guix time-machine --channels=channels.scm -- \
 ** Tests
 
 The unit tests live under ~test/veritas/unit~ and are written with
-[[https://codeberg.org/jjba23/veritas][Veritas]].  ~maak test~ runs them; the same run by hand is:
+[[https://codeberg.org/jjba23/veritas][Veritas]].  ~maak test~ runs them, auditing the run as it goes, and fails when
+the suite checked less than it says it did; the same run by hand is:
 
 #+begin_src shell
 VERITAS_TEST_MODULE=veritas VERITAS_TEST_TOP_DIR=test \
@@ -905,7 +906,7 @@ them fails quietly rather than loudly:
   last form is one.  A body that ends in ~(delete-file ...)~ is not: the case
   becomes no case at all, and the test passes without checking anything.
   Cleanup therefore belongs in a ~#:after~ hook, or before the assertion is
-  built.  ~maak audit-tests~ fails the run when it finds a test like that.
+  built.  ~maak test~ fails the run when it finds a test like that.
 - One assertion per case.  A case is the value a form evaluates to, so an
   assertion wrapped in a body of several forms -- a ~let~ around five ~assert-*~
   calls, say -- is evaluated while the file loads and then dropped: only the
@@ -913,6 +914,8 @@ them fails quietly rather than loudly:
   it still run, but nothing reads their verdict, so they cannot fail the run.
   Write one assertion per form and give each one the setup it needs; a run of
   the CLI costs milliseconds, which is cheaper than a test that cannot fail.
+  ~maak test~ reads the specs, and fails the run naming every case that leaves
+  an assertion unread.
 - Anything left directly in a ~suite~, outside any ~test~, is treated as a case
   of the suite, and its result is read as though it were an assertion: the run
   then dies with "could not read assertion success from unknown type".  A
@@ -920,21 +923,33 @@ them fails quietly rather than loudly:
 
 *** Auditing the suite for tests that assert nothing
 
-~maak audit-tests~ runs the same suite as ~maak test~, with Veritas' JSON
-reporter, and reads that report back: a test that produced no case of its own is
-one whose body never became an assertion, and the task fails, naming the test
-and the file it is in.
+Every ~maak test~ audits the suite it just ran.  The suite runs once, and that
+one run is read twice: through Veritas' own reporter, so the output is the
+report a person expects, and as data, so a test that checks nothing fails the
+run.  Nobody has to remember to audit, because there is no separate step to
+remember.
 
 #+begin_src shell
-maak test          # the suite, with the readable report
-maak audit-tests   # the same suite again, plus a failure per test that checks nothing
+maak test          # the suite, audited as it runs
+maak audit-tests   # the same suite and the same audit, as data on its own
 #+end_src
 
-It reads the report rather than the source, so it judges what the runner
-actually ran.  What it cannot see is a case that does run while the assertions
-inside it are dropped anyway -- the one-assertion-per-case rule above, which the
-report has no way to show.  The report the task reads is left at
-~reports/veritas-audit.json~.
+Two things fail the run, and they are caught in different places.
+
+- A *test that asserted nothing*.  It produced no case of its own, so nothing
+  about it was ever reported again, and it passes where a test that checks
+  something passes too.  The report says which tests those are -- a test with a
+  count of zero cases -- so the audit reads the report.
+- An *assertion the run never read*.  The case runs, and an assertion written
+  inside it is evaluated and dropped: only the last form of a case is read.  No
+  report can hold this, because an assertion that is never called logs nothing,
+  so the specs are read instead.  A case is followed to the assertion it
+  evaluates to, or to the one it calls, and every other ~assert-*~ written in it
+  is named as unread.
+
+Both are failures of ~maak test~ itself.  ~maak audit-tests~ is the same audit
+run on its own, leaving the run it read as data in ~reports/veritas-audit.json~
+rather than rendering it for a person, which is what a machine wants.
 
 -------
 

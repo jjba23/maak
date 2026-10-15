@@ -49,6 +49,40 @@
       (thunk))
     (get-output-string port)))
 
+;; A case is read for its last form only, so a case holds one assertion and
+;; calls for the report it checks.  These build the reports the cases below
+;; read: the same one twice, rather than two assertions in one case.
+
+(define (primitive-message)
+  "Return the message of a failure inside a primitive."
+  (caught-message (lambda () (car 1))))
+
+(define (reported-maak-error message hint)
+  "Return what reporting the maak error MESSAGE with HINT writes."
+  (reported (lambda ()
+              (report-maak-error (make-maak-error message hint)))))
+
+(define (reported-generic-error key arguments)
+  "Return what reporting an error of KEY with ARGUMENTS writes."
+  (reported (lambda ()
+              (report-generic-error key arguments))))
+
+(define (debug-switch-report)
+  "Return what reporting an error that is not a maak error writes."
+  (reported-generic-error #f (list #f "boom" '() #f)))
+
+(define (missing-module-report)
+  "Return what reporting a module Guile could not find writes."
+  (reported-generic-error 'misc-error
+                          (list #f "no code for module ~S"
+                                '((no such module)) #f)))
+
+(define (unbound-variable-report)
+  "Return what reporting a variable that is not bound writes."
+  (reported-generic-error #f
+                          (list #f "Unbound variable: ~S"
+                                '(no-such-binding) #f)))
+
 (define message-suite
   (suite "Messages of caught errors"
          #:concurrent? #f
@@ -63,12 +97,12 @@
                                       (eval 'no-such-binding
                                             (current-module))))))
          (test "a primitive failure explains itself"
-               (let ((message (caught-message (lambda () (car 1)))))
-                 (assert-contains #:expect message
-                                  #:got "expecting pair")
-                 ;; The name of the procedure is the first string Guile
-                 ;; attaches, and it is not the message.
-                 (assert-false (string=? message "car"))))
+               (assert-contains #:expect (primitive-message)
+                                #:got "expecting pair"))
+         (test "a primitive failure is not named by the procedure"
+               ;; The name of the procedure is the first string Guile
+               ;; attaches, and it is not the message.
+               (assert-false (string=? (primitive-message) "car")))
          (test "a missing module is named the way Guile names it"
                ;; `resolve-interface' rather than `use-modules': the latter is
                ;; expanded where it stands, so it would fail while compiling
@@ -94,58 +128,61 @@
   (suite "Reporting to the user"
          #:concurrent? #f
          #:shuffle? #f
-         (test "a maak error prints one line and its hint"
-               (let ((output (reported (lambda ()
-                                         (report-maak-error
-                                          (make-maak-error
-                                           "Unknown task: nope"
-                                           "Available tasks: build, test"))))))
-                 (assert-contains #:expect output #:got "maak: error:")
-                 (assert-contains #:expect output
-                                  #:got "Unknown task: nope")
-                 (assert-contains #:expect output
-                                  #:got "hint: Available tasks: build, test")
-                 (assert-false (string-contains output "Backtrace"))))
-         (test "a maak error without a hint prints only the message"
-               (let ((output (reported (lambda ()
-                                         (report-maak-error
-                                          (make-maak-error "nope" #f))))))
-                 (assert-contains #:expect output #:got "maak: error: nope")
+         (test "a maak error is labelled"
+               (assert-contains #:expect (reported-maak-error
+                                          "Unknown task: nope"
+                                          "Available tasks: build, test")
+                                #:got "maak: error:"))
+         (test "a maak error prints its message"
+               (assert-contains #:expect (reported-maak-error
+                                          "Unknown task: nope"
+                                          "Available tasks: build, test")
+                                #:got "Unknown task: nope"))
+         (test "a maak error prints its hint"
+               (assert-contains #:expect (reported-maak-error
+                                          "Unknown task: nope"
+                                          "Available tasks: build, test")
+                                #:got "hint: Available tasks: build, test"))
+         (test "a maak error prints no backtrace"
+               (assert-false
+                (string-contains (reported-maak-error
+                                  "Unknown task: nope"
+                                  "Available tasks: build, test")
+                                 "Backtrace")))
+         (test "a maak error without a hint prints its message"
+               ;; The label is colour-escaped, so the message is what is looked
+               ;; for rather than the label and the message in one string.
+               (let ((output (reported-maak-error "nope" #f)))
+                 (assert-contains #:expect output #:got "nope")))
+         (test "a maak error without a hint prints no hint"
+               (let ((output (reported-maak-error "nope" #f)))
                  (assert-false (string-contains output "hint:"))))
+         (test "an unexpected error prints what went wrong"
+               (assert-contains #:expect (debug-switch-report) #:got "boom"))
          (test "an unexpected error points at the debug switch"
-               (let ((output (reported (lambda ()
-                                         (report-generic-error
-                                          #f (list #f "boom" '() #f))))))
-                 (assert-contains #:expect output #:got "boom")
-                 (assert-contains #:expect output #:got "MAAK_DEBUG=1")
-                 (assert-false (string-contains output "Backtrace"))))
-         (test "a missing module points at the load path"
-               (let ((output (reported (lambda ()
-                                         (report-generic-error
-                                          'misc-error
-                                          (list #f
-                                                "no code for module ~S"
-                                                '((no such module))
-                                                #f))))))
-                 (assert-contains #:expect output
-                                  #:got "no code for module (no such module)")
-                 (assert-contains #:expect output
-                                  #:got "-L/--load-path")
-                 (assert-contains #:expect output
-                                  #:got "MAAK_LOAD_PATH")))
+               (assert-contains #:expect (debug-switch-report)
+                                #:got "MAAK_DEBUG=1"))
+         (test "an unexpected error prints no backtrace"
+               (assert-false (string-contains (debug-switch-report)
+                                              "Backtrace")))
+         (test "a missing module names the module"
+               (assert-contains #:expect (missing-module-report)
+                                #:got "no code for module (no such module)"))
+         (test "a missing module points at the load path switch"
+               (assert-contains #:expect (missing-module-report)
+                                #:got "-L/--load-path"))
+         (test "a missing module names the load path variable"
+               (assert-contains #:expect (missing-module-report)
+                                #:got "MAAK_LOAD_PATH"))
+         (test "an unbound variable is named"
+               (assert-contains #:expect (unbound-variable-report)
+                                #:got "no-such-binding"))
+         (test "an unbound variable says where it is not bound"
+               (assert-contains #:expect (unbound-variable-report)
+                                #:got "is not bound here"))
          (test "an unbound variable explains the import rule"
-               (let ((output (reported (lambda ()
-                                         (report-generic-error
-                                          #f
-                                          (list #f
-                                                "Unbound variable: ~S"
-                                                '(no-such-binding)
-                                                #f))))))
-                 (assert-contains #:expect output #:got "no-such-binding")
-                 (assert-contains #:expect output
-                                  #:got "is not bound here")
-                 (assert-contains #:expect output
-                                  #:got "resolve-module")))))
+               (assert-contains #:expect (unbound-variable-report)
+                                #:got "resolve-module"))))
 
 (define (spec)
   (veritas-run #:concurrent? #f

@@ -72,10 +72,10 @@
          (test "a module without exports is open season"
                (assert-equal #:expect '("one" "two")
                              #:got (task-names '(maak fixtures noexport))))
-         (test "available-task-names returns a list of strings"
-               (let ((names (available-task-names)))
-                 (assert-true (list? names))
-                 (assert-true (every string? names))))
+         (test "available-task-names returns a list"
+               (assert-true (list? (available-task-names))))
+         (test "available-task-names returns strings"
+               (assert-true (every string? (available-task-names))))
          (test "available-task-names is sorted"
                (let ((names (available-task-names)))
                  (assert-equal #:expect names
@@ -97,10 +97,13 @@
                        (lambda ()
                          (unknown-task-error 'default)))))
          (test "the error carries a hint"
-               (let ((hint (caught-hint (lambda ()
-                                          (unknown-task-error 'nope)))))
-                 (assert-true (string? hint))
-                 (assert-true (positive? (string-length hint)))))
+               (assert-true (string? (caught-hint (lambda ()
+                                                    (unknown-task-error 'nope))))))
+         (test "the hint says something"
+               (assert-true (positive?
+                             (string-length (caught-hint
+                                             (lambda ()
+                                               (unknown-task-error 'nope)))))))
          (test "run-task raises for a task that does not exist"
                (assert-error (lambda ()
                                (run-task 'definitely-missing-task))))
