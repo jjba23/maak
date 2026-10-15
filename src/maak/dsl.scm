@@ -63,6 +63,8 @@
                         raise-maak-error
                         find-maak-error
                         task-error
+                        exception->message
+                        error-message-string
                         ;; ====== Load paths ======
                         maak-load-path
                         add-load-path!
@@ -154,6 +156,91 @@ report the value that made it give up.
                         (format #f "~a" message)
                         (apply format #f message args))
                     #:hint hint))
+
+;; ====== Reading a caught error ======
+;;
+;; What `catch' hands over is not yet a sentence: a raise arrives as a key and
+;; a list of values whose shape depends on who raised it, and Guile spells many
+;; of them as a `format' template plus the arguments to fill it with.  The two
+;; readers below turn that into the one line a user reads.  They live beside the
+;; error types rather than in the command line, because the library needs them
+;; where the command line does: `main' reports a task's failure, and the library
+;; re-raises the one it can explain itself -- a task given words it does not take.
+
+(define (first-string-in lst)
+  "Return the first string found in LST, or #f.
+
+Guile spells an error raised with `error' as a key followed by a message and
+its irritants; the message is the only part worth showing."
+  (cond
+    ((null? lst) #f)
+    ((string? (car lst)) (car lst))
+    (else (first-string-in (cdr lst)))))
+
+(define (error-message-string key vals)
+  "Return the most descriptive string Guile attached to a caught error.
+
+The shape of the arguments depends on who raised the error.  A call to `error'
+arrives as (#f MESSAGE () #f), where the message is the second element, while a
+primitive failure such as `(car 1)' arrives as (#f MESSAGE (1) (1)) whose
+*first* string is only the name of the procedure -- reporting that as the
+message would hide the one sentence the user needs.  The second element is the
+message in both shapes, so it is preferred, and the remaining values are
+searched only when it is not a string, as when `throw' is handed a key and a
+message but no irritants."
+  (let* ((preferred (and (pair? vals)
+                         (pair? (cdr vals))
+                         (string? (cadr vals))
+                         (cadr vals)))
+         (candidates (if (string? key) vals (cons key vals))))
+    (or preferred (first-string-in candidates))))
+
+(define (fill-template message parts)
+  "Fill the error TEMPLATE MESSAGE with the irritants that follow it in PARTS.
+
+Guile keeps the arguments of a `scm-error' style message in a list of their
+own, so the entry right after the message is the argument list: a failed module
+lookup leaves `((no such module))' there, which formats as `(no such module)',
+and `(error \"boom\" 'x 'y)' leaves `(x y)'.  A few raises hand over a single
+value instead, which is wrapped so it still formats.  When the template cannot
+be filled at all it is returned as it stands: showing a raw `~S' is better than
+raising a second error while reporting the first."
+  (let* ((after (cond
+                  ((member message parts) => cdr)
+                  (else '())))
+         (irritants (cond
+                      ((null? after) '())
+                      ((list? (car after)) (car after))
+                      (else (list (car after))))))
+    (if (null? irritants)
+        ;; Nothing to fill the template with, and `format' complains loudly on
+        ;; the error port before it raises, so it is not even asked.  A message
+        ;; that is only a template is still more use than silence.
+        message
+        (catch #t
+          (lambda () (apply format #f message irritants))
+          (lambda args message)))))
+
+(define (exception->message key vals)
+  "Return a one-line human message for a caught error.
+
+It prefers an attached exception message, then the message among the raising
+values, and only then falls back to the raw key.  Guile raises many errors with
+a format *template* (for example `no code for module ~S') plus the arguments;
+those are filled in here so the user never sees a bare `~S'."
+  (let* ((object (if (exception? key) key
+                     (if (pair? vals) (car vals) #f)))
+         (attached (and (exception? object)
+                        (exception-with-message? object)
+                        (exception-message object)))
+         (message (or attached
+                      (error-message-string key vals))))
+    (cond
+      (attached attached)
+      ((not (string? message)) (format #f "~a" key))
+      ((string-contains message "~")
+       (fill-template message (cons key vals)))
+      (else message))))
 
 (define dry-run?
   (make-parameter #f))

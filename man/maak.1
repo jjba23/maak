@@ -8,9 +8,15 @@
 .SH NAME
 maak \- run project tasks written in GNU Guile Scheme
 .SH SYNOPSIS
-.B maak
+.BR maak
 .RI [ OPTIONS ]
-.RI [ \-\- \ [ TASKS ] ...\ [ TASK_ARGS ] ...]
+.RI [ TASKS ]
+.RI [ TASK_ARGS ] ...
+.PP
+.BR maak
+.RI [ OPTIONS ]
+.RI \-\- \ TASKS ...
+.RI [ \-\- \ TASK_ARGS ] ...
 .SH DESCRIPTION
 .B maak
 is a command runner and control plane: instead of a bespoke build DSL it uses
@@ -46,11 +52,75 @@ declares
 only the exported procedures are tasks; other procedures become private
 helpers.
 .PP
-Several tasks may be run in one invocation by separating their names with
-commas:
-.BR "maak fmt,test" .
-Arguments can be passed to a task after a literal
-.BR \-\- .
+The tasks to run are named on the command line, and the words that follow
+them are passed to them as their arguments.  Several tasks may be run in one
+invocation -- as one comma separated word, or one word each after a
+.B \-\-
+-- and a
+.B \-\-
+may set the arguments apart from the tasks they belong to.  See
+.B TASKS AND ARGUMENTS
+below.
+.SH TASKS AND ARGUMENTS
+A run names the tasks it is to run, and passes the words that follow them on
+to them as their arguments:
+.PP
+.RS 4
+.EX
+maak hello                 one task
+maak quick\-math 23 42      a task, then its arguments
+.EE
+.RE
+.PP
+A
+.B \-\-
+may set the arguments apart from the task, which is how an argument that
+begins with a dash is passed on without being read as an option:
+.PP
+.RS 4
+.EX
+maak quick\-math \-\- \-23 42
+.EE
+.RE
+.PP
+Several tasks are named as one word, separated by commas:
+.PP
+.RS 4
+.EX
+maak clean,build,test
+.EE
+.RE
+.PP
+or, when a
+.B \-\-
+comes before any task word, as one word each:
+.PP
+.RS 4
+.EX
+maak \-\- clean build test
+.EE
+.RE
+.PP
+So a
+.B \-\-
+before the first task word ends the options and introduces the task list, and
+a
+.B \-\-
+after a task word ends the task list and starts the arguments of the tasks
+named before it.  A run that wants to name its tasks one word each and give
+them arguments writes both separators:
+.PP
+.RS 4
+.EX
+maak \-\- clean build \-\- \-v
+.EE
+.RE
+.PP
+Everything after the separator that begins the arguments is passed on as it
+stands:
+.B maak
+reads no options there, and a word that names one of its own tasks is an
+argument like any other.
 .SH OPTIONS
 .TP
 .BR \-f ", " \-\-file " " FILE
@@ -157,8 +227,13 @@ printed.  Equivalent to setting
 .BR MAAK_DEBUG .
 .TP
 .BR \-t ", " \-\-tasks " " LIST
-A comma separated list of tasks to run.  Normally the tasks are given as
-positional arguments; this option is what the launcher passes on.
+Run the tasks named in
+.IR LIST ,
+a comma separated list.  The tasks named as words on the command line are
+turned into this option, which is what
+.B maak
+hands to the library; naming the tasks here instead leaves every other word on
+the line as an argument for them.
 .SH ENVIRONMENT
 .TP
 .B GUILE_LOAD_PATH
@@ -347,11 +422,27 @@ maak clean,build
 .EE
 .RE
 .PP
+Run three tasks, named one word each:
+.PP
+.RS 4
+.EX
+maak \-\- clean build test
+.EE
+.RE
+.PP
 Pass arguments to a task:
 .PP
 .RS 4
 .EX
 maak quick\-math \-\- 23 42
+.EE
+.RE
+.PP
+Give a task an argument that begins with a dash:
+.PP
+.RS 4
+.EX
+maak quick\-math \-\- \-23 42
 .EE
 .RE
 .PP

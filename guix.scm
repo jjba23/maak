@@ -89,10 +89,6 @@
                            "/share/fish/vendor_completions.d" "maak.fish")
                           ("scripts/maak-completion.zsh"
                            "/share/zsh/site-functions" "_maak"))))))))
-    ;; `(maak veritas)' reads a Veritas report, and that report is JSON, so the
-    ;; library needs guile-json the way it needs Guile itself.  It is propagated
-    ;; rather than a private input because the module ships with maak.
-    (propagated-inputs (list guile-json-4))
     (inputs (list guile-3.0 bash-minimal coreutils util-linux))
     (home-page "https://codeberg.org/jjba23/maak")
     (synopsis "Command runner à la Make using Guile Scheme")

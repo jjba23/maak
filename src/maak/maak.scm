@@ -250,6 +250,68 @@ margin; see `format-task-doc'."
          "No runnable tasks are defined. Define a function, and export it if the module declares exports."
          (format #f "Available tasks: ~a" (string-join available ", "))))))
 
+;; ====== The words a task was given ======
+;;
+;; A run names its tasks and passes the words that follow them on as arguments,
+;; so a run that meant to name two tasks and wrote one of them as a word after
+;; the other is not an error about tasks at all: the first task is handed the
+;; second task's name.  Whether that is what happened is something only the
+;; loaded Maak file can answer, so it is asked -- and only when a task has
+;; already failed for being handed words it does not take.
+
+(define (arguments-naming-tasks task-args tasks)
+  "Return the words of TASK-ARGS that name one of TASKS, in the order given.
+
+TASKS is the alist `resolve-maak-tasks' returns, so this asks the loaded Maak
+file rather than a list of names: a word that merely looks like a task name is
+not one, and a word that is one is answered for by the file itself."
+  (filter (lambda (arg)
+            (and (string? arg)
+                 (assoc (string->symbol arg) tasks)))
+          task-args))
+
+(define (words-are-tasks-hint task named)
+  "Return the hint for TASK, handed the task names in NAMED as arguments.
+
+A task handed the name of another task has almost always been given a run that
+wanted two tasks and wrote them the way a shell command takes words, without
+the `--' that introduces a task list.  The hint therefore spells out the run
+that was probably meant, in both of the spellings the command line accepts."
+  (let* ((quoted (string-join (map (lambda (name) (format #f "`~a'" name))
+                                   named)
+                              ", "))
+         (names (cons (symbol->string task) named))
+         (as-list (string-join names ","))
+         (as-words (string-join names " ")))
+    (format #f
+            "~a ~a a task of this Maak file, so ~a received ~a as an argument.  To run several tasks, name them in one comma separated list (`maak ~a') or one word each after `--' (`maak -- ~a'); a task's arguments are the words that follow its name."
+            quoted
+            (if (null? (cdr named)) "names" "name")
+            task
+            (if (null? (cdr named)) "it" "them")
+            as-list
+            as-words)))
+
+(define (run-task-procedure task proc task-args tasks)
+  "Run PROC for TASK with TASK-ARGS, naming any of them that are tasks.
+
+A task handed more arguments than it takes fails with Guile's complaint about
+arity, which says nothing about where the words came from and leaves a run that
+meant to name two tasks reading like a broken task.  When one of the words is a
+task of the same Maak file, the failure is raised again as a maak error whose
+hint says how to write the run that was meant.  Everything else -- a task that
+fails for its own reasons, a failure with no task names among its arguments --
+is passed on exactly as it arrived."
+  (catch #t
+    (lambda () (apply proc task-args))
+    (lambda (key . vals)
+      (let ((named (and (eq? key 'wrong-number-of-args)
+                        (arguments-naming-tasks task-args tasks))))
+        (if (pair? named)
+            (raise-maak-error (exception->message key vals)
+                              #:hint (words-are-tasks-hint task named))
+            (apply throw key vals))))))
+
 (define* (run-tasks tasks
                     #:key (task-args '())
                     (keep-going? #f)
@@ -321,5 +383,5 @@ is not visible as a task (see the export rules in the README)."
                   (not (string=? proc-doc "")))
          (log-info "  ~a" proc-doc))
        (newline)
-       (apply proc task-args))
+       (run-task-procedure task proc task-args valid-tasks))
       (else (unknown-task-error task)))))

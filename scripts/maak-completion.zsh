@@ -31,6 +31,7 @@ _maak() {
         '(-L --load-path)'{-L,--load-path}'[Add a directory to the Guile load path]:directory:_directories'
         '(-n --dry-run)'{-n,--dry-run}'[Dry-run mode (print shell commands without executing)]'
         '(-q --quiet)'{-q,--quiet}'[Quiet mode (suppress logging output)]'
+        '(-t --tasks)'{-t,--tasks}'[Run the tasks named in a comma separated list]:task:_maak_tasks'
         '(-v --version)'{-v,--version}'[Print the version and exit]'
         '--banner[Print the greeting banner]'
         '--no-banner[Skip the greeting banner]'

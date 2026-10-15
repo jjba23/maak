@@ -64,6 +64,10 @@
 (define fixture-env "test/maak/fixtures/cli.env")
 (define keep-going-fixture "test/maak/fixtures/keep-going.scm")
 (define subdir "test/maak/fixtures/subdir")
+;; A fixture for the arguments a run passes on: tasks that take none, so a word
+;; that reached one as an argument fails rather than passes quietly, and a task
+;; that takes any number of them and prints what it was given.
+(define several-fixture "test/maak/fixtures/several.scm")
 
 (define (options-for . args)
   "Return the parsed command line ARGS, as `main' would see it."
@@ -398,6 +402,64 @@ unaffected."
                (assert-false (string-contains (stdout-of (quiet-subdir-run))
                                               "Entering directory")))))
 
+(define (arg-printing-run)
+  "Run the fixture task that prints the arguments a run passed it.
+
+This is the contract the launcher relies on: it names the tasks with `--tasks'
+and hands the words that follow the task list over as they stand, so the unit
+below the command line is what has to pass them on to the task."
+  (run-cli-fixture several-fixture
+                   "--tasks" "echo-args"
+                   "--" "one" "two"))
+
+(define (words-naming-a-task-run)
+  "Run a task that takes no arguments, handed the name of another task.
+
+This is the run a shell habit writes -- `maak alpha beta' -- and the one the
+library has something to say about: the second word is an argument, and the
+task it reaches takes none."
+  (run-cli-fixture several-fixture "--tasks" "alpha" "--" "beta"))
+
+(define (word-naming-no-task-run)
+  "The same run, handed a word that names no task of the fixture."
+  (run-cli-fixture several-fixture "--tasks" "alpha" "--" "nothing"))
+
+(define arguments-suite
+  (suite "The arguments a run passes on"
+         #:concurrent? #f
+         #:shuffle? #f
+         (test "the words after `--' reach the task that was named"
+               (assert-contains #:expect (stdout-of (arg-printing-run))
+                                #:got "args=one,two"))
+         (test "a task that takes no arguments is handed none"
+               (assert-equal #:expect 0
+                             #:got (status-of
+                                    (run-cli-fixture several-fixture
+                                                     "--tasks" "alpha"))))
+         (test "the arity failure is still the one Guile raised"
+               (assert-contains #:expect (plain (stderr-of (words-naming-a-task-run)))
+                                #:got "Wrong number of arguments"))
+         (test "a word that names a task is pointed out as an argument"
+               (assert-contains #:expect (plain (stderr-of (words-naming-a-task-run)))
+                                #:got "`beta' names a task of this Maak file"))
+         (test "the hint spells out the run that was probably meant"
+               (assert-contains
+                #:expect (plain (stderr-of (words-naming-a-task-run)))
+                #:got "To run several tasks, name them in one comma separated list (`maak alpha,beta') or one word each after `--' (`maak -- alpha beta')"))
+         (test "a word that names no task leaves the arity error alone"
+               (assert-false
+                (string-contains (plain (stderr-of (word-naming-no-task-run)))
+                                 "names a task of this Maak file")))
+         (test "the hint is printed where a run keeps going as well"
+               (assert-contains
+                #:expect (plain
+                          (stderr-of
+                           (run-cli-fixture several-fixture
+                                            "--keep-going"
+                                            "--tasks" "alpha,echo-args"
+                                            "--" "beta")))
+                #:got "`beta' names a task of this Maak file"))))
+
 (define (spec)
   (veritas-run #:concurrent? #f
                #:shuffle? #f
@@ -406,4 +468,5 @@ unaffected."
                failure-suite
                env-file-suite
                runs-suite
-               directory-suite))
+               directory-suite
+               arguments-suite))

@@ -177,14 +177,50 @@ free of decoration, which is what a script wants, and ~MAAK_NO_BANNER=1~ does
 the same from the environment.  ~--banner~ turns it back on, which is handy
 when the variable lives in a shell profile.
 
-To pass arguments directly to a task, it's recommended to separate options from tasks with a double-dash (~--~):
+A run names the tasks it is to run, and the words that follow a task are passed
+to it as its arguments.  A double-dash decides what the words around it are:
 
 #+begin_src shell
-# Run clean and build in dry-run mode, quietly
-maak -n -q -- clean,build
+# One task, given the arguments it takes
+maak quick-math 23 42
 
-# Run a custom task with arguments
-maak -f ./my-tasks.scm -- deploy production
+# The same run, with -- setting the arguments apart.  This is how an argument
+# that begins with a dash gets through, unread as an option of maak's own
+maak quick-math -- -23 42
+
+# Two tasks, as one comma separated word, dry-run and quiet
+maak -n -q clean,build
+
+# The same two tasks, one word each: a -- before the first task word begins the
+# task list, and every word up to a further -- names a task
+maak -n -q -- clean build
+
+# Tasks named one word each, given arguments of their own after that further --
+maak -- clean build -- -v
+#+end_src
+
+A ~--~ *after* a task word does not change which words are tasks: everything
+that follows the first task word is an argument, whether or not it is set
+apart.  So ~maak deploy production~ and ~maak deploy -- production~ are the same
+run -- the task ~deploy~, given the word ~production~ -- while
+~maak -- deploy production~ names two tasks, ~deploy~ and ~production~.  Name
+the tasks with ~-t LIST~ / ~--tasks LIST~ instead, and every other word of the
+line is an argument.
+
+That is the whole of the grammar, and the two spellings are the only two: a
+word never names a task and an argument at once, and a word that happens to
+name a task is still an argument when it is not the task list or one of the
+words a ~--~ introduces.
+
+When that is what happened, the run says so.  A task handed a word it cannot
+take fails with Guile's complaint about arity, and when one of those words names
+a task of the same Maak file the failure carries a hint naming both spellings of
+the run that was probably meant:
+
+#+begin_src shell
+$ maak alpha beta
+maak: error: Wrong number of arguments to #<procedure alpha ()>
+        hint: `beta' names a task of this Maak file, so alpha received it as an argument.  To run several tasks, name them in one comma separated list (`maak alpha,beta') or one word each after `--' (`maak -- alpha beta'); a task's arguments are the words that follow its name.
 #+end_src
 
 ** Running several tasks, and from another directory
@@ -883,9 +919,9 @@ guix time-machine --channels=channels.scm -- \
 
 ** Tests
 
-The unit tests live under ~test/veritas/unit~ and are written with
-[[https://codeberg.org/jjba23/veritas][Veritas]].  ~maak test~ runs them, auditing the run as it goes, and fails when
-the suite checked less than it says it did; the same run by hand is:
+The tests live under ~test/veritas/unit~ and are written with
+[[https://codeberg.org/jjba23/veritas][Veritas]].  ~maak test~ runs them; the
+same run by hand is:
 
 #+begin_src shell
 VERITAS_TEST_MODULE=veritas VERITAS_TEST_TOP_DIR=test \
@@ -894,19 +930,45 @@ VERITAS_TEST_MODULE=veritas VERITAS_TEST_TOP_DIR=test \
   guile -L ./src -L ./test -c '((@ (veritas runner) run-tests))'
 #+end_src
 
-The fixtures those tests use -- a module with exports and one without -- live
-under ~test/maak/fixtures~ and are deliberately kept out of the directory the
-runner scans.
+That has to be *this* checkout's maak, not the one an installed ~maak~ was built
+with.  The maak file beside it may ask for modules a released library does not
+have, and the mismatch shows up as ~no code for module (maak ...)~, which reads
+like a missing file rather than as a version problem.  The launcher under
+~scripts~ falls back to the sources beside it, so the checkout's own maak is one
+command away, inside the environment ~manifest.scm~ declares:
 
-Three things are worth knowing when adding a test, because breaking any one of
-them fails quietly rather than loudly:
+#+begin_src shell
+guix shell -m manifest.scm -- ./scripts/maak test
+#+end_src
+
+Every other task is reached the same way: ~-- ./scripts/maak --list~ lists them,
+~-- ./scripts/maak man~ previews the manual page.
+
+Two kinds of spec sit in that directory, and the difference is what each one can
+see.  Most of them call ~main~ in process with the output ports captured, which
+is how a test asserts on what a user reads while keeping a run cheap.  What that
+cannot show is anything that belongs to the process rather than to the call: the
+exit status an operating system sees, which of the two streams a line went to,
+and the argument grammar of ~scripts/maak~ itself, which is what turns a command
+line into the Guile invocation ~main~ is handed.  Those are what
+~test/veritas/unit/integration.scm~ is for, running the launcher as a real
+subprocess.  A suite run is the two together; nothing else starts the launcher,
+and nothing else reads the library the way a caller does.
+
+The fixtures those tests use -- a module with exports and one without, a Maak
+file with failing tasks for the keep-going flags, and a directory holding a Maak
+file of its own -- live under ~test/maak/fixtures~ and are deliberately kept out
+of the directory the runner scans.
+
+Three things are worth knowing when adding a test, because two of them fail
+quietly rather than loudly:
 
 - A case has to *evaluate to an assertion*, which is a procedure of one
   validation client.  A bare ~assert-*~ call is one, and so is a ~let~ whose
   last form is one.  A body that ends in ~(delete-file ...)~ is not: the case
   becomes no case at all, and the test passes without checking anything.
-  Cleanup therefore belongs in a ~#:after~ hook, or before the assertion is
-  built.  ~maak test~ fails the run when it finds a test like that.
+  Cleanup therefore belongs in a ~#:after~ hook, or in the ~after~ thunk of a
+  ~dynamic-wind~ around the assertion, or before the assertion is built.
 - One assertion per case.  A case is the value a form evaluates to, so an
   assertion wrapped in a body of several forms -- a ~let~ around five ~assert-*~
   calls, say -- is evaluated while the file loads and then dropped: only the
@@ -914,42 +976,18 @@ them fails quietly rather than loudly:
   it still run, but nothing reads their verdict, so they cannot fail the run.
   Write one assertion per form and give each one the setup it needs; a run of
   the CLI costs milliseconds, which is cheaper than a test that cannot fail.
-  ~maak test~ reads the specs, and fails the run naming every case that leaves
-  an assertion unread.
 - Anything left directly in a ~suite~, outside any ~test~, is treated as a case
   of the suite, and its result is read as though it were an assertion: the run
   then dies with "could not read assertion success from unknown type".  A
   parenthesis that closes a ~test~ a line too early is enough to do it.
 
-*** Auditing the suite for tests that assert nothing
-
-Every ~maak test~ audits the suite it just ran.  The suite runs once, and that
-one run is read twice: through Veritas' own reporter, so the output is the
-report a person expects, and as data, so a test that checks nothing fails the
-run.  Nobody has to remember to audit, because there is no separate step to
-remember.
-
-#+begin_src shell
-maak test          # the suite, audited as it runs
-maak audit-tests   # the same suite and the same audit, as data on its own
-#+end_src
-
-Two things fail the run, and they are caught in different places.
-
-- A *test that asserted nothing*.  It produced no case of its own, so nothing
-  about it was ever reported again, and it passes where a test that checks
-  something passes too.  The report says which tests those are -- a test with a
-  count of zero cases -- so the audit reads the report.
-- An *assertion the run never read*.  The case runs, and an assertion written
-  inside it is evaluated and dropped: only the last form of a case is read.  No
-  report can hold this, because an assertion that is never called logs nothing,
-  so the specs are read instead.  A case is followed to the assertion it
-  evaluates to, or to the one it calls, and every other ~assert-*~ written in it
-  is named as unread.
-
-Both are failures of ~maak test~ itself.  ~maak audit-tests~ is the same audit
-run on its own, leaving the run it read as data in ~reports/veritas-audit.json~
-rather than rendering it for a person, which is what a machine wants.
+The first two fail quietly, and nothing catches them for you: the run exits 0
+and a test that asserted nothing passes exactly where one that asserts does.
+The only sign is in the report, which prints the value of every case under the
+test it belongs to -- a test with no line under it ran no case at all, and a
+case showing one value where two assertions were written means one of them was
+never read.  Read the report, and prefer a test that can fail to a count of
+tests that passed.
 
 -------
 

@@ -12,7 +12,36 @@
     See more at: https://codeberg.org/jjba23/maak
     License: GNU GPL v3 or newer
 
-Usage: maak [OPTIONS] [-- [TASKS]... [TASK_ARGS]...]
+Usage: maak [OPTIONS] [TASKS] [TASK_ARGS]...
+       maak [OPTIONS] -- TASK [TASK...] [-- TASK_ARGS]...
+
+Tasks, and the arguments they are given:
+
+    A run names the tasks it is to run, and passes the words that follow them
+    on as their arguments:
+
+        maak hello                     one task
+        maak quick-math 23 42          a task, then its arguments
+        maak quick-math -- 23 42       the same, with '--' setting the
+                                       arguments apart, which is how an
+                                       argument that begins with a dash gets
+                                       through
+
+    Several tasks are named in one word, separated by commas, or -- when a
+    '--' comes before any task word -- named one word each:
+
+        maak clean,build,test
+        maak -- clean build test
+
+    So a '--' before the first task word ends the options and begins the task
+    list, and a '--' after a task word ends the tasks and begins their
+    arguments.  A run that wants both writes both:
+
+        maak -- clean build -- -v      two tasks, each of them given a '-v'
+
+    Everything after the '--' that begins the arguments is passed on as it
+    stands: maak reads no options there, and a word that names one of its own
+    tasks is an argument like any other.
 
 Options:
     -f, --file FILE
@@ -56,6 +85,12 @@ Options:
     -l, --list
         List all available tasks in the currently loaded Maak file.
 
+    -t, --tasks LIST
+        Run the tasks named in LIST, a comma separated list.  This is the
+        option the tasks named on the command line are turned into; naming
+        them here instead leaves every other word on the line as an argument
+        for them.
+
     -L, --load-path DIR
         Add DIR to Guile's load path, so a Maak file can require modules
         that live outside its own directory.  Repeat the flag, or separate
@@ -87,8 +122,14 @@ Examples:
     # Run the 'test' task
     maak test
 
+    # Run three tasks, named one word each
+    maak -- clean build test
+
     # Run 'test', then 'quick-math', passing arguments to the tasks
     maak quick-math -- 42 42
+
+    # Give one task an argument that starts with a dash
+    maak quick-math -- -42 42
 
     # Run tasks from a specific file
     maak -f ./build/tasks.scm -- fmt,test
