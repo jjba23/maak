@@ -74,28 +74,36 @@
   (suite "File helpers"
          #:concurrent? #f
          #:shuffle? #f
+         ;; A test case has to evaluate to an assertion, which is a procedure
+         ;; of one validation client.  Cleanup is therefore done before the
+         ;; assertion is built, never after it: a trailing `(delete-file ...)'
+         ;; would leave the case with no assertion at all, and the test would
+         ;; pass without checking anything.
          (test "write-file then read-file round-trips"
                (let* ((dir (scratch-directory "files"))
-                      (file (string-append dir "/a.txt")))
-                 (write-file file "hello")
-                 (assert-equal #:expect "hello"
-                               #:got (read-file file))
-                 (delete-file-recursively dir)))
+                      (file (string-append dir "/a.txt"))
+                      (content (begin
+                                 (write-file file "hello")
+                                 (read-file file))))
+                 (delete-file-recursively dir)
+                 (assert-equal #:expect "hello" #:got content)))
          (test "write-file creates parent directories"
                (let* ((dir (scratch-directory "parents"))
-                      (file (string-append dir "/deep/nested/a.txt")))
-                 (write-file file "deep")
-                 (assert-equal #:expect "deep"
-                               #:got (read-file file))
-                 (delete-file-recursively dir)))
+                      (file (string-append dir "/deep/nested/a.txt"))
+                      (content (begin
+                                 (write-file file "deep")
+                                 (read-file file))))
+                 (delete-file-recursively dir)
+                 (assert-equal #:expect "deep" #:got content)))
          (test "write-file appends when asked"
                (let* ((dir (scratch-directory "append"))
-                      (file (string-append dir "/a.txt")))
-                 (write-file file "one")
-                 (write-file file "two" #:append? #t)
-                 (assert-equal #:expect "onetwo"
-                               #:got (read-file file))
-                 (delete-file-recursively dir)))
+                      (file (string-append dir "/a.txt"))
+                      (content (begin
+                                 (write-file file "one")
+                                 (write-file file "two" #:append? #t)
+                                 (read-file file))))
+                 (delete-file-recursively dir)
+                 (assert-equal #:expect "onetwo" #:got content)))
          (test "read-file returns its default for a missing file"
                (let ((missing (string-append (scratch-directory "missing")
                                              "/nope.txt")))
@@ -106,11 +114,13 @@
                                #:got (read-file missing))))
          (test "touch creates a file"
                (let* ((dir (scratch-directory "touch"))
-                      (file (string-append dir "/touched")))
-                 (parameterize ((quiet? #t))
-                   (touch file))
-                 (assert-true (file-exists? file))
-                 (delete-file-recursively dir)))
+                      (file (string-append dir "/touched"))
+                      (created? (begin
+                                  (parameterize ((quiet? #t))
+                                    (touch file))
+                                  (file-exists? file))))
+                 (delete-file-recursively dir)
+                 (assert-true created?)))
          (test "with-directory changes and restores the directory"
                (let* ((start (getcwd))
                       (inside (with-directory (tmp-dir)
@@ -167,9 +177,64 @@
                (env-unset! "MAAK_TEST_A")
                (env-unset! "MAAK_TEST_B"))))
 
+(define env-file-suite
+  (suite "Environment files"
+         #:concurrent? #f
+         #:shuffle? #f
+         (test "the assignments are read in the order they are written"
+               (assert-equal
+                #:expect '(("CI" . "1")
+                          ("MAAK_SMOKE" . "hello")
+                          ("MAAK_SMOKE_QUOTED" . "quoted value")
+                          ("SINGLE" . "single quoted")
+                          ("EMPTY" . "")
+                          ("DATABASE_URL"
+                           . "postgres://localhost/dev?sslmode=disable")
+                          ("INDENTED" . "spaced"))
+                #:got (env-file-entries "test/maak/fixtures/demo.env")))
+         (test "comments, blank lines and lines without an = are skipped"
+               (let ((entries (env-file-entries
+                               "test/maak/fixtures/demo.env")))
+                 (assert-false (assoc "NO_EQUALS_LINE" entries))
+                 (assert-false (assoc "#" entries))))
+         (test "a file that does not exist has no assignments"
+               (assert-equal #:expect '()
+                             #:got (env-file-entries "no/such/file.env")))
+         (test "loading sets the names and reports them"
+               (env-unset! "MAAK_SMOKE")
+               (assert-equal #:expect '("CI" "MAAK_SMOKE" "MAAK_SMOKE_QUOTED"
+                                        "SINGLE" "EMPTY" "DATABASE_URL"
+                                        "INDENTED")
+                             #:got (parameterize ((quiet? #t))
+                                     (load-env-file
+                                      "test/maak/fixtures/demo.env")))
+               (assert-equal #:expect "hello"
+                             #:got (env-get "MAAK_SMOKE"))
+               (assert-equal #:expect "quoted value"
+                             #:got (env-get "MAAK_SMOKE_QUOTED")))
+         (test "the environment keeps a name it already has"
+               (env-set! "MAAK_SMOKE" "from-the-environment")
+               (parameterize ((quiet? #t))
+                 (load-env-file "test/maak/fixtures/demo.env"))
+               (assert-equal #:expect "from-the-environment"
+                             #:got (env-get "MAAK_SMOKE"))
+               (env-unset! "MAAK_SMOKE"))
+         (test "overriding is possible when asked for"
+               (env-set! "MAAK_SMOKE" "from-the-environment")
+               (parameterize ((quiet? #t))
+                 (load-env-file "test/maak/fixtures/demo.env"
+                                #:override? #t))
+               (assert-equal #:expect "hello"
+                             #:got (env-get "MAAK_SMOKE"))
+               (env-unset! "MAAK_SMOKE"))
+         (test "loading a file that is not there changes nothing"
+               (assert-equal #:expect '()
+                             #:got (load-env-file "no/such/file.env")))))
+
 (define (spec)
   (veritas-run #:concurrent? #f
                #:shuffle? #f
                quoting-suite
                file-suite
-               environment-suite))
+               environment-suite
+               env-file-suite))

@@ -75,13 +75,15 @@ show_help() {
   cat "$resources_dir/help.txt"
 }
 
-parsed_options=$(getopt -n "maak" -o lf:hL:nqv --longoptions list,file:,help,dry-run,quiet,load-path:,version,debug -- "$@")
+parsed_options=$(getopt -n "maak" -o e:lf:hL:nqv --longoptions list,file:,help,dry-run,quiet,load-path:,env-file:,no-env-file,banner,no-banner,version,debug -- "$@")
 eval set -- "$parsed_options"
 
 file_arg=""
 # Repeated -L flags are collected and handed to Guile as one colon separated
 # list, the same shape as PATH and GUILE_LOAD_PATH.
 load_paths=()
+# Repeated -e flags are collected the same way.
+env_files=()
 
 guile_cmd_args=(
   "-L" "${scheme_sources_dir}"
@@ -128,6 +130,26 @@ while true; do
     guile_cmd_args+=("--quiet")
     shift
     ;;
+  -e | --env-file)
+    if [ -z "${2:-}" ]; then
+      log_error "The --env-file option needs a path."
+      exit 1
+    fi
+    env_files+=("${2}")
+    shift 2
+    ;;
+  --no-env-file)
+    guile_cmd_args+=("--no-env-file")
+    shift
+    ;;
+  --banner)
+    guile_cmd_args+=("--banner")
+    shift
+    ;;
+  --no-banner)
+    guile_cmd_args+=("--no-banner")
+    shift
+    ;;
   -v | --version)
     guile_cmd_args+=("--version")
     shift
@@ -152,6 +174,11 @@ done
 if [ "${#load_paths[@]}" -gt 0 ]; then
   joined_load_paths=$(IFS=:; echo "${load_paths[*]}")
   guile_cmd_args+=("--load-path" "${joined_load_paths}")
+fi
+
+if [ "${#env_files[@]}" -gt 0 ]; then
+  joined_env_files=$(IFS=:; echo "${env_files[*]}")
+  guile_cmd_args+=("--env-file" "${joined_env_files}")
 fi
 
 if [[ -z "${file_arg}" ]]; then

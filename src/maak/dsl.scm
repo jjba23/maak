@@ -42,11 +42,13 @@
                         mv
                         quiet?
                         dry-run?
+                        banner?
                         remkdir-p
                         maak-proc?
-                        maak-task?
-                        $
+                        maak-task?                        $
                         ~
+                        environment-assignments
+                        decorate-command
                         time-machine
                         time-machine-manifest-shell
                         time-machine-program-shell
@@ -60,6 +62,7 @@
                         maak-error-hint
                         raise-maak-error
                         find-maak-error
+                        task-error
                         ;; ====== Load paths ======
                         maak-load-path
                         add-load-path!
@@ -134,13 +137,97 @@ errors."
       ((maak-error? (car objs)) (car objs))
       (else (loop (cdr objs))))))
 
+(define* (task-error message #:key (hint #f) (args '()))
+  "Raise a user-facing error from a task.
+
+This is what a task calls when it cannot do its job: the message is printed as
+one line, the hint (when given) underneath it, and no Guile backtrace follows.
+ARGS, when given, are handed to `format' to build the message, so a task can
+report the value that made it give up.
+
+@example
+(task-error \"no compiled artefact for ~a\" #:args (list host))
+(task-error \"the deploy key is missing\"
+            #:hint \"Set DEPLOY_KEY, or run maak deploy --dry-run.\")
+@end example"
+  (raise-maak-error (if (null? args)
+                        (format #f "~a" message)
+                        (apply format #f message args))
+                    #:hint hint))
+
 (define dry-run?
   (make-parameter #f))
 
 (define quiet?
   (make-parameter #f))
 
-(define* (syscall cmd)
+;; Whether the greeting banner and the "loading tasks from" line are printed.
+;; It is a parameter rather than a plain flag so a task can turn it off for a
+;; run it starts itself, and on again afterwards.
+(define banner?
+  (make-parameter #t))
+
+;; ====== Command decorations ======
+;;
+;; `$' builds one shell command line, and the things a task often needs around
+;; a command -- running it as root, in a modified environment, without output,
+;; in the background, or without minding whether it fails -- are all
+;; decorations of that line.  They are applied in one place and in one order,
+;; the order someone would write by hand, so a command printed by `--dry-run'
+;; can be pasted straight into a shell:
+;;
+;;   [sudo] [env A=1 B=2] COMMAND [>/dev/null 2>&1] [&]
+;;
+;; Mindering whether a command fails is deliberately *not* one of them: `cmd ||
+;; true' would tell the shell to report success, and maak would then have no
+;; way to tell a task whether its command actually worked.  `#:allow-failure?'
+;; instead reads the real exit code and returns it, so the task keeps the
+;; decision and the printed command stays the one that runs.
+
+(define (environment-assignments env)
+  "Return ENV as a list of `KEY=VALUE' strings.
+
+ENV may be #f, a single string, a list of strings, or an alist of pairs, so a
+caller can pass whatever shape it already has.  An entry that is not a pair is
+used as it stands, which is what makes the plain string list useful when a
+value cannot be written as a literal."
+  (cond
+    ((not env) '())
+    ((string? env) (list env))
+    ((list? env)
+     (map (lambda (entry)
+            (if (pair? entry)
+                (format #f "~a=~a" (car entry) (cdr entry))
+                (format #f "~a" entry)))
+          env))
+    (else '())))
+
+(define* (decorate-command cmd
+                           #:key (env '()) (sudo? #f) (dev-null? #f)
+                           (async? #f))
+  "Return CMD with the decorations a task asked for, applied in a fixed order.
+
+The environment comes first and goes through `env' rather than as a `KEY=VALUE'
+prefix, because everything after a `guix shell --' is executed directly: a
+prefix there would be looked up as a program name and fail with 127.
+
+A backgrounded command is never waited for, so it never reports a status: the
+command counts as started rather than as succeeded.  Whether a failure is
+allowed is not a decoration of the command line at all; `syscall' reads the
+exit code, which a `|| true' in the line would have hidden."
+  (let* ((assignments (environment-assignments env))
+         (with-env (if (null? assignments)
+                       cmd
+                       (format #f "env ~a ~a"
+                               (string-join assignments " ") cmd)))
+         (with-sudo (if sudo? (format #f "sudo ~a" with-env) with-env))
+         (with-output (if dev-null?
+                          (format #f "~a >/dev/null 2>&1" with-sudo)
+                          with-sudo)))
+    (if async? (format #f "~a &" with-output) with-output)))
+
+(define* (syscall cmd
+                  #:key (allow-failure? #f) (async? #f))
   "Executes a shell command and checks its exit code.
 
 @sc{arguments}:
@@ -149,10 +236,19 @@ errors."
 @item @strong{cmd} (string):
 The shell command to be executed.
 
+@item @strong{#:allow-failure?} (boolean, default #f):
+If #t, a non-zero exit code does not raise: it comes back as @code{#f}, the way
+`cmd || true' would keep a shell going, except that the task also learns that
+the command failed.
+
+@item @strong{#:async?} (boolean, default #f):
+If #t, the command is not waited for and its status is not checked.
+
 @end itemize
 
 @sc{returns}:
-@code{#t} if the command completes with an exit code of 0.
+@code{#t} if the command completes with an exit code of 0, @code{#f} if it
+failed and failures are allowed.
 
 @sc{errors}:
   Signals an error if the command returns a non-zero exit code,
@@ -170,23 +266,36 @@ The shell command to be executed.
               ;; A signalled command (segfault, SIGTERM) has no exit code; say
               ;; so rather than reporting a misleading number.
               ((not exit-code)
-               (raise-maak-error
-                (~ "command was terminated by a signal: ~a" cmd)
-                #:hint
-                "The command above did not exit normally.  Re-run it by hand to see why."))
+               (if allow-failure?
+                   #f
+                   (raise-maak-error
+                    (~ "command was terminated by a signal: ~a" cmd)
+                    #:hint
+                    "The command above did not exit normally.  Re-run it by hand to see why.")))
               (else
-               (raise-maak-error
-                (~ "command failed (exit code ~a): ~a" exit-code cmd)
-                #:hint
-                "Fix the command above, or run `maak --dry-run' to inspect it first.")))))))
+               (if allow-failure?
+                   #f
+                   (raise-maak-error
+                    (~ "command failed (exit code ~a): ~a" exit-code cmd)
+                    #:hint
+                    "Fix the command above, or run `maak --dry-run' to inspect it first."))))))))
 
 (define* ($ cmd-parts
             #:key (verbose? #f)
-            (join " "))
+            (join " ")
+            (env '())
+            (sudo? #f)
+            (dev-null? #f)
+            (allow-failure? #f)
+            (async? #f))
   "Executes a shell command constructed from a list of strings.
 
 @example
 ($ '(\"echo -n\" \"hello-world\"))
+
+;; as root, in the background, quietly, and without caring whether it fails
+($ '(\"systemctl daemon-reload\")
+   #:sudo? #t #:async? #t #:dev-null? #t #:allow-failure? #t)
 @end example
 
 @sc{arguments}:
@@ -198,14 +307,40 @@ A list of strings that will be joined to form the command.
 @item @strong{#:verbose?} (boolean, default #f):
 If #t, logs the generated command before executing it.
 
-@item @strong{#:join} (boolean, default \" \"):
+@item @strong{#:join} (string, default \" \"):
 A string to use as a separator when joining the command parts.
+
+@item @strong{#:env} (alist, list of strings, or string, default '()):
+Environment variables to set for this command only, given as an alist
+(@code{((\"CI\" . \"1\"))}), as @code{\"KEY=VALUE\"} strings, or as one such
+string.  They are passed through @code{env} and reach the command itself.
+
+@item @strong{#:sudo?} (boolean, default #f):
+If #t, the command runs through @code{sudo}.
+
+@item @strong{#:dev-null?} (boolean, default #f):
+If #t, both standard output and standard error are discarded to
+@code{/dev/null}.
+
+@item @strong{#:allow-failure?} (boolean, default #f):
+If #t, a non-zero exit code does not raise: @code{#f} is returned instead, so a
+task can decide what a failure means.  The command line itself is left alone,
+which is what lets the task be told the command failed.
+
+@item @strong{#:async?} (boolean, default #f):
+If #t, the command is started with a trailing @code{&} and not waited for.
 
 @end itemize
 
 @sc{returns}:
-The result of the @code{syscall} function, which is @code{#t} if the command completes with an exit code of 0."
-  (let ((cmd (string-join cmd-parts join)))
+The result of the @code{syscall} function: @code{#t} if the command completes
+with an exit code of 0, @code{#f} if it failed and @code{#:allow-failure?} was
+given."
+  (let ((cmd (decorate-command (string-join cmd-parts join)
+                               #:env env
+                               #:sudo? sudo?
+                               #:dev-null? dev-null?
+                               #:async? async?)))
     (cond
       ((dry-run?)
        (unless (quiet?)
@@ -214,7 +349,9 @@ The result of the @code{syscall} function, which is @code{#t} if the command com
               (when (and verbose?
                          (not (quiet?)))
                 (log-info "  Execute command:\n~a\n" cmd))
-              (syscall cmd))))))
+              (syscall cmd
+                      #:allow-failure? allow-failure?
+                      #:async? async?))))))
 
 (define-syntax-rule (get-module-var setting)
   "Get a variable from the currently loaded maak file module."
@@ -403,7 +540,12 @@ and the subsequent elements are the values to be substituted.
 (define* (time-machine cmd-parts
                        #:key (verbose? #f)
                        (join " ")
-                       (channels "channels.scm"))
+                       (channels "channels.scm")
+                       (env '())
+                       (sudo? #f)
+                       (dev-null? #f)
+                       (allow-failure? #f)
+                       (async? #f))
   "Execute a command using a pinned Guix revision via `guix time-machine`.
 
 @sc{arguments}:
@@ -430,13 +572,24 @@ and the subsequent elements are the values to be substituted.
   Signals an error if the underlying command exits with a non-zero status."
   ($ (append (list (~ "guix time-machine --channels=~a" channels) "--")
              cmd-parts)
-     #:verbose? verbose?))
+     #:verbose? verbose?
+     #:join join
+     #:env env
+     #:sudo? sudo?
+     #:dev-null? dev-null?
+     #:allow-failure? allow-failure?
+     #:async? async?))
 
 (define* (manifest-shell cmd-parts
                          #:key (verbose? #f)
                          (pure? #f)
                          (join " ")
-                         (manifest "manifest.scm"))
+                         (manifest "manifest.scm")
+                         (env '())
+                         (sudo? #f)
+                         (dev-null? #f)
+                         (allow-failure? #f)
+                         (async? #f))
   "Execute a command inside a Guix shell defined by a manifest file.
 
 @sc{arguments}:
@@ -465,16 +618,30 @@ and the subsequent elements are the values to be substituted.
 
 @sc{errors}:
   Signals an error if the underlying shell command exits with a non-zero status."
-  ($ (append (list (~ "guix shell -m ~a" manifest)
-                   (if pure? "--pure" "") "--") cmd-parts)
-     #:verbose? verbose?))
+  ($ (append (list (~ "guix shell -m ~a" manifest))
+             ;; An empty segment would leave a double space in the printed
+             ;; command, which `--dry-run' shows and a user copies.
+             (if pure? (list "--pure") '())
+             (list "--") cmd-parts)
+     #:verbose? verbose?
+     #:join join
+     #:env env
+     #:sudo? sudo?
+     #:dev-null? dev-null?
+     #:allow-failure? allow-failure?
+     #:async? async?))
 
 (define* (time-machine-manifest-shell cmd-parts
                                       #:key (verbose? #f)
                                       (pure? #f)
                                       (join " ")
                                       (channels "channels.scm")
-                                      (manifest "manifest.scm"))
+                                      (manifest "manifest.scm")
+                                      (env '())
+                                      (sudo? #f)
+                                      (dev-null? #f)
+                                      (allow-failure? #f)
+                                      (async? #f))
   "Execute a command inside a Guix shell defined by a manifest file,
 using a pinned Guix revision via `guix time-machine`.
 
@@ -505,15 +672,27 @@ using a pinned Guix revision via `guix time-machine`.
 @sc{errors}:
   Signals an error if any underlying shell command exits with a non-zero status."
   ($ (append (list (~ "guix time-machine --channels=~a" channels) "--"
-                   (~ "shell -m ~a" manifest)
-                   (if pure? "--pure" "") "--") cmd-parts)
-     #:verbose? verbose?))
+                   (~ "shell -m ~a" manifest))
+             (if pure? (list "--pure") '())
+             (list "--") cmd-parts)
+     #:verbose? verbose?
+     #:join join
+     #:env env
+     #:sudo? sudo?
+     #:dev-null? dev-null?
+     #:allow-failure? allow-failure?
+     #:async? async?))
 
 (define* (program-shell cmd-parts
                         #:key (verbose? #f)
                         (pure? #f)
                         (join " ")
-                        (file "guix.scm"))
+                        (file "guix.scm")
+                        (env '())
+                        (sudo? #f)
+                        (dev-null? #f)
+                        (allow-failure? #f)
+                        (async? #f))
   "Execute a command inside a Guix shell defined by a program file.
 
 @sc{arguments}:
@@ -539,16 +718,28 @@ using a pinned Guix revision via `guix time-machine`.
 
 @sc{errors}:
   Signals an error if the underlying shell command exits with a non-zero status."
-  ($ (append (list (~ "guix shell -f ~a" file)
-                   (if pure? "--pure" "") "--") cmd-parts)
-     #:verbose? verbose?))
+  ($ (append (list (~ "guix shell -f ~a" file))
+             (if pure? (list "--pure") '())
+             (list "--") cmd-parts)
+     #:verbose? verbose?
+     #:join join
+     #:env env
+     #:sudo? sudo?
+     #:dev-null? dev-null?
+     #:allow-failure? allow-failure?
+     #:async? async?))
 
 (define* (time-machine-program-shell cmd-parts
                                      #:key (verbose? #f)
                                      (pure? #f)
                                      (join " ")
                                      (channels "channels.scm")
-                                     (file "guix.scm"))
+                                     (file "guix.scm")
+                                     (env '())
+                                     (sudo? #f)
+                                     (dev-null? #f)
+                                     (allow-failure? #f)
+                                     (async? #f))
   "Execute a command inside a Guix shell defined by a program file,
 using a pinned Guix revision via `guix time-machine`.
 
@@ -580,9 +771,16 @@ file and pinned to the Guix revision specified in the channels file.
 @sc{errors}:
   Signals an error if any underlying shell command exits with a non-zero status."
   ($ (append (list (~ "guix time-machine --channels=~a" channels) "--"
-                   (~ "shell -f ~a" file)
-                   (if pure? "--pure" "") "--") cmd-parts)
-     #:verbose? verbose?))
+                   (~ "shell -f ~a" file))
+             (if pure? (list "--pure") '())
+             (list "--") cmd-parts)
+     #:verbose? verbose?
+     #:join join
+     #:env env
+     #:sudo? sudo?
+     #:dev-null? dev-null?
+     #:allow-failure? allow-failure?
+     #:async? async?))
 
 ;; ====== GUILE_LOAD_PATH facilities ======
 ;;
@@ -756,7 +954,12 @@ continuation underneath an existing prefix needs."
                      (manifest #f)
                      (file #f)
                      (join " ")
-                     (verbose? #f))
+                     (verbose? #f)
+                     (env '())
+                     (sudo? #f)
+                     (dev-null? #f)
+                     (allow-failure? #f)
+                     (async? #f))
   "Run CMD-PARTS inside a Guix shell made of PACKAGES.
 
 This is the package-list sibling of `manifest-shell' and `program-shell': the
@@ -775,7 +978,12 @@ string, which is used as-is.
                pkgs
                (list "--") cmd-parts)
        #:join join
-       #:verbose? verbose?)))
+       #:verbose? verbose?
+       #:env env
+       #:sudo? sudo?
+       #:dev-null? dev-null?
+       #:allow-failure? allow-failure?
+       #:async? async?)))
 
 (define* (guix-container cmd-parts
                          #:key (manifest "manifest.scm")
@@ -784,7 +992,12 @@ string, which is used as-is.
                          (share '())
                          (expose '())
                          (join " ")
-                         (verbose? #f))
+                         (verbose? #f)
+                         (env '())
+                         (sudo? #f)
+                         (dev-null? #f)
+                         (allow-failure? #f)
+                         (async? #f))
   "Run CMD-PARTS in a Guix container defined by MANIFEST.
 
 A container isolates the process from the host: no network unless NETWORK? is
@@ -805,7 +1018,12 @@ are lists of `HOST=DEST' (or `HOST') strings passed through as `-S' and `-E'.
                     (~ "-E ~a" s)) expose)
              (list "--") cmd-parts)
      #:join join
-     #:verbose? verbose?))
+     #:verbose? verbose?
+     #:env env
+     #:sudo? sudo?
+     #:dev-null? dev-null?
+     #:allow-failure? allow-failure?
+     #:async? async?))
 
 (define* (guix-pack cmd-parts
                     #:key (file "guix.scm")
@@ -814,7 +1032,12 @@ are lists of `HOST=DEST' (or `HOST') strings passed through as `-S' and `-E'.
                     (symlinks '())
                     (extra-packages '())
                     (join " ")
-                    (verbose? #f))
+                    (verbose? #f)
+                    (env '())
+                    (sudo? #f)
+                    (dev-null? #f)
+                    (allow-failure? #f)
+                    (async? #f))
   "Build a `guix pack' of the program in FILE.
 
 FORMAT is any `guix pack --format' value (\"docker\", \"squashfs\",
@@ -832,7 +1055,12 @@ entries for `-S', and EXTRA-PACKAGES are appended to the pack.
                     (~ "-S ~a" s)) symlinks)
              extra-packages)
      #:join join
-     #:verbose? verbose?))
+     #:verbose? verbose?
+     #:env env
+     #:sudo? sudo?
+     #:dev-null? dev-null?
+     #:allow-failure? allow-failure?
+     #:async? async?))
 
 (define (bold-output x)
   (format #f "\x1b[1m~a\x1b[0m" x))

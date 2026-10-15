@@ -26,6 +26,12 @@
 ;; `nix-develop', `nix-flake-build' and `nix-run' are the flake based ones.
 ;; `nix-flake-check' validates a flake the way `guix build' would validate a
 ;; package.
+;;
+;; Every helper here builds one command line and hands it to `$', so all of
+;; them take the same five decorations: `#:env', `#:sudo?', `#:dev-null?',
+;; `#:allow-failure?' and `#:async?'.  See `$' in `(maak dsl)' for what each
+;; does, and note that `#:env' is what makes `nix-shell --run' or
+;; `nix develop --command' see the variables a build needs.
 
 ;;; Code:
 
@@ -48,7 +54,12 @@
                     (pure? #f)
                     (packages '())
                     (join " ")
-                    (verbose? #f))
+                    (verbose? #f)
+                    (env '())
+                    (sudo? #f)
+                    (dev-null? #f)
+                    (allow-failure? #f)
+                    (async? #f))
   "Run CMD-PARTS inside a Nix shell.
 
 With FILE the shell is described by that file (typically `shell.nix'); without
@@ -68,13 +79,23 @@ rather than after it.
                       (format #f "--packages ~a" pkg)) packages)
                (list (format #f "--run ~a" (shell-quote command))))
        #:join " "
-       #:verbose? verbose?)))
+       #:verbose? verbose?
+       #:env env
+       #:sudo? sudo?
+       #:dev-null? dev-null?
+       #:allow-failure? allow-failure?
+       #:async? async?)))
 
 (define* (nix-develop cmd-parts
                       #:key (flake ".")
                       (impure? #f)
                       (join " ")
-                      (verbose? #f))
+                      (verbose? #f)
+                      (env '())
+                      (sudo? #f)
+                      (dev-null? #f)
+                      (allow-failure? #f)
+                      (async? #f))
   "Run CMD-PARTS inside the development shell of the flake FLAKE.
 
 FLAKE is a path or flake reference such as `.` or `github:owner/repo'.  With
@@ -86,12 +107,22 @@ tools that read environment variables need.
              (if impure? (list "--impure") '())
              (list "--command") cmd-parts)
      #:join " "
-     #:verbose? verbose?))
+     #:verbose? verbose?
+     #:env env
+     #:sudo? sudo?
+     #:dev-null? dev-null?
+     #:allow-failure? allow-failure?
+     #:async? async?))
 
 (define* (nix-build #:key (file "default.nix")
                     (arguments '())
                     (out-link #f)
-                    (verbose? #f))
+                    (verbose? #f)
+                    (env '())
+                    (sudo? #f)
+                    (dev-null? #f)
+                    (allow-failure? #f)
+                    (async? #f))
   "Build the derivation in FILE with the classic `nix-build'.
 
 ARGUMENTS are extra words passed through verbatim, for example
@@ -101,21 +132,41 @@ ARGUMENTS are extra words passed through verbatim, for example
              (if out-link (list (format #f "--out-link ~a" out-link)) '())
              arguments)
      #:join " "
-     #:verbose? verbose?))
+     #:verbose? verbose?
+     #:env env
+     #:sudo? sudo?
+     #:dev-null? dev-null?
+     #:allow-failure? allow-failure?
+     #:async? async?))
 
 (define* (nix-flake-build #:key (flake ".")
                           (attr #f)
-                          (verbose? #f))
+                          (verbose? #f)
+                          (env '())
+                          (sudo? #f)
+                          (dev-null? #f)
+                          (allow-failure? #f)
+                          (async? #f))
   "Build the flake FLAKE, optionally selecting the output ATTR.
 
 @example\n(nix-flake-build #:flake \".\" #:attr \"packages.x86_64-linux.maak\")\n@end example"
   ($ (list (format #f "nix build ~a"
                    (if attr (format #f "~a#~a" flake attr) flake)))
-     #:verbose? verbose?))
+     #:verbose? verbose?
+     #:env env
+     #:sudo? sudo?
+     #:dev-null? dev-null?
+     #:allow-failure? allow-failure?
+     #:async? async?))
 
 (define* (nix-flake-check #:key (flake ".")
                           (all-systems? #f)
-                          (verbose? #f))
+                          (verbose? #f)
+                          (env '())
+                          (sudo? #f)
+                          (dev-null? #f)
+                          (allow-failure? #f)
+                          (async? #f))
   "Check every output of the flake FLAKE, as `nix flake check' does.
 
 With ALL-SYSTEMS? the check runs for all systems the flake declares rather
@@ -124,13 +175,23 @@ than just the current one."
              (if all-systems? (list "--all-systems") '())
              (list flake))
      #:join " "
-     #:verbose? verbose?))
+     #:verbose? verbose?
+     #:env env
+     #:sudo? sudo?
+     #:dev-null? dev-null?
+     #:allow-failure? allow-failure?
+     #:async? async?))
 
 (define* (nix-run cmd-parts
                   #:key (flake ".")
                   (app #f)
                   (join " ")
-                  (verbose? #f))
+                  (verbose? #f)
+                  (env '())
+                  (sudo? #f)
+                  (dev-null? #f)
+                  (allow-failure? #f)
+                  (async? #f))
   "Run the application APP of the flake FLAKE with CMD-PARTS as its arguments.
 
 @example\n(nix-run '(\"--version\") #:flake \".\" #:app \"maak\")\n@end example"
@@ -138,4 +199,9 @@ than just the current one."
                            (if app (format #f "~a#~a" flake app) flake)))
              (list "--") cmd-parts)
      #:join " "
-     #:verbose? verbose?))
+     #:verbose? verbose?
+     #:env env
+     #:sudo? sudo?
+     #:dev-null? dev-null?
+     #:allow-failure? allow-failure?
+     #:async? async?))

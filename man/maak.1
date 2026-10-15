@@ -59,6 +59,33 @@ Load
 instead of
 .BR ./maak.scm .
 .TP
+.BR \-e ", " \-\-env\-file " " FILE
+Read
+.B NAME=VALUE
+assignments from
+.I FILE
+before the Maak file is loaded.  The flag may be repeated, or several files
+given at once separated by colons, as in
+.BR PATH .
+Without it,
+.B MAAK_ENV_FILE
+is read, and failing that a
+.B .env
+file beside the Maak file.
+.TP
+.B \-\-no\-env\-file
+Read no environment file at all, whatever the environment or the checkout
+says.
+.TP
+.B \-\-banner
+Print the greeting banner.  This is the default, and is what turns the banner
+back on after
+.B MAAK_NO_BANNER
+was exported.
+.TP
+.B \-\-no\-banner
+Skip the greeting banner, keeping everything else the run would print.
+.TP
 .BR \-h ", " \-\-help
 Display a help screen and exit.
 .TP
@@ -106,6 +133,16 @@ A colon separated list of extra directories to add to the load path.  Unlike
 .BR GUILE_LOAD_PATH
 it does not replace anything, which makes it convenient to set per project.
 .TP
+.B MAAK_ENV_FILE
+A colon separated list of environment files to read when
+.B \-\-env\-file
+is not given.  A name that is already in the environment is left alone.
+.TP
+.B MAAK_NO_BANNER
+When set to a non\-empty value, skip the greeting banner.
+.B \-\-banner
+overrides it.
+.TP
 .B MAAK_DEBUG
 When set to a non\-empty value, print the Guile backtrace on an error instead
 of the short maak message.
@@ -123,6 +160,27 @@ all of them honour dry\-run and quiet modes.
 Run a shell command built from a list of strings, joined by spaces.  With
 .BR #:verbose? " #t"
 the command is logged first.
+.PP
+The command can be decorated with keyword arguments, applied in the order a
+shell would write them:
+.BR "[sudo] [env A=1] COMMAND [>/dev/null 2>&1] [&]" .
+.BR #:env " '((\"CI\" . \"1\"))"
+sets names for that command alone, given as an alist, as a list of
+.B KEY=VALUE
+strings, or as one such string.
+.BR #:sudo? " #t"
+runs the command as root, and
+.BR #:async? " #t"
+starts it without waiting for it.
+.BR #:dev\-null? " #t"
+discards its output.
+.BR #:allow\-failure? " #t"
+returns
+.B #f
+instead of raising when the command exits non\-zero, so the task is told the
+command failed rather than having the failure hidden from it.  A backgrounded
+command is never waited for, so it reports having been started rather than
+having succeeded.
 .TP
 .B (syscall command)
 Run
@@ -149,12 +207,42 @@ but raise a maak error when the command is missing.
 Quote
 .I string
 so a shell reads it as one literal word.
+.SS Reporting a failure
+.TP
+.B (task\-error message)
+Stop the task with
+.I message
+treated as text with
+.B format
+directives.  The arguments for those directives are passed with
+.BR #:args ,
+and what the user should do about it with
+.BR #:hint :
+.PP
+.RS 4
+.EX
+(task-error "no artefact for ~a" #:args (list "linux-x86_64")
+            #:hint "Run `maak build' first.")
+.EE
+.RE
+.PP
+The message and the hint are printed on stderr without a backtrace, and the
+exit status is 1, so a failure reads like one of maak's own.  With
+.B \-\-debug
+the backtrace is printed as well.
+.TP
+.B (raise\-maak\-error message #:hint HINT)
+The same mechanism for a message that is already formatted.
+.TP
+.B (maak\-error? exception)
+Recognise either of the above once it has been caught.
 .SS Files
 .BR cp ", " mv ", " mkdir\-p ", " remkdir\-p ", " delete\-file\-recursively ", " cat ", "
 .BR touch ", " ln\-s ", " chmod\-file ", " read\-file ", " write\-file
 .SS Directory and environment
 .BR with\-directory ", " cd ", " env\-get ", " env\-set! ", " env\-unset! ", " with\-env ", "
-.BR with\-env\-vars ", " home\-dir ", " tmp\-dir
+.BR with\-env\-vars ", " home\-dir ", " tmp\-dir ", " load\-env\-file ", "
+.BR env\-file\-entries
 .SS Load paths
 .BR add\-load\-path! ", " add\-load\-paths! ", " with\-load\-path ", " split\-load\-path ", "
 .BR environment\-load\-paths ", " maak\-load\-path
@@ -183,6 +271,18 @@ The Maak file was missing, a task failed, or an option was invalid.
 .TP
 .B ./maak.scm
 The default Maak file.
+.TP
+.B ./.env
+Read before the Maak file when no
+.B \-\-env\-file
+is given and
+.B MAAK_ENV_FILE
+is unset.  It holds
+.B NAME=VALUE
+lines; surrounding quotes are removed and comments, blank lines and lines
+without an
+.B =
+are skipped.  A name the environment already has is left alone.
 .TP
 .B ./channels.scm
 The Guix channels file used by the
@@ -233,6 +333,14 @@ and dry\-run the release pipeline:
 .RS 4
 .EX
 maak \-L ./lib \-n \-\- release
+.EE
+.RE
+.PP
+Read credentials from a file and skip the greeting banner:
+.PP
+.RS 4
+.EX
+maak \-\-no\-banner \-e .env.production \-\- deploy
 .EE
 .RE
 .SH SEE ALSO

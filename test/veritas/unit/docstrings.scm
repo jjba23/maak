@@ -65,12 +65,37 @@
                (assert-equal #:expect '("t: first" "   second")
                              #:got (format-task-doc "t"
                                                     "first\nsecond")))
-         (test "three lines become a block under the name"
+         (test "one paragraph keeps every line aligned under the name"
                (assert-equal
-                #:expect '("t:" "   first" "   second" "   third")
+                #:expect '("t: first" "   second" "   third" "   fourth")
+                #:got (format-task-doc
+                       "t"
+                       "first\nsecond\nthird\nfourth")))
+         (test "a paragraph break starts a block under the name"
+               (assert-equal
+                #:expect '("t:" "   first" "   second" "" "   third")
                 #:got (strip-ansi-list (format-task-doc
                                         "t"
-                                        "first\nsecond\nthird"))))
+                                        "first\nsecond\n\nthird"))))
+         (test "a wrapped paragraph aligns with the widest name"
+               (assert-equal
+                #:expect '("collect-artefacts: Gather the build output."
+                          "                   The result is a tarball.")
+                #:got (format-task-doc
+                       "collect-artefacts"
+                       "Gather the build output.\nThe result is a tarball.")))
+         (test "an indented multi-line docstring keeps its alignment"
+               (assert-equal
+                #:expect '("t: first" "   second")
+                #:got (format-task-doc
+                       "t"
+                       "\n     first\n     second\n     ")))
+         (test "a block keeps its blank lines blank"
+               (assert-equal
+                #:expect '("t:" "   a" "" "   b" "" "   c")
+                #:got (strip-ansi-list (format-task-doc
+                                        "t"
+                                        "a\n\nb\n\nc"))))
          (test "a docstring with no documentation prints the name only"
                (assert-equal #:expect '("t:")
                              #:got (strip-ansi-list

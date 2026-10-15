@@ -51,6 +51,8 @@
             env-unset!
             with-env
             with-env-vars
+            env-file-entries
+            load-env-file
             home-dir
             tmp-dir
             read-file
@@ -234,6 +236,97 @@ The previous value, if any, is restored afterwards."
                   (cdar vars)
                   (lambda ()
                     (loop (cdr vars)))))))
+
+;; ====== Environment files ======
+;;
+;; A `.env' file is a list of `NAME=VALUE' lines, and loading one is the
+;; smallest possible way to hand a task the configuration it needs without the
+;; user having to export anything.  The parser is deliberately small: it reads
+;; the assignments and nothing else.  No expansion of `$OTHER', no command
+;; substitution, no `source' -- a configuration file that can run code is a
+;; different and much larger promise.
+
+(define (env-file-entries path)
+  "Return the `(NAME . VALUE)' assignments in the environment file PATH.
+
+Blank lines and lines whose first non-blank character is `#' are skipped, as
+are lines without an `='.  A leading `export ' is accepted so a file that is
+valid for a POSIX shell is valid here too.  The name and the value are trimmed,
+and a value wrapped in matching single or double quotes is unwrapped.
+
+@example
+(env-file-entries \".env\")
+@result{} ((\"CI\" . \"1\") (\"DATABASE_URL\" . \"postgres://localhost/dev\"))
+@end example"
+  (if (not (file-exists? path))
+      '()
+      (let loop ((lines (string-split (call-with-input-file path
+                                        get-string-all)
+                                      #\newline))
+                 (entries '()))
+        (if (null? lines)
+            (reverse entries)
+            (let* ((line (string-trim-both (car lines)))
+                   (stripped (if (string-prefix? "export " line)
+                                 (string-trim (string-drop line
+                                                           (string-length "export ")))
+                                 line))
+                   (separator (and (not (string=? stripped ""))
+                                   (not (string-prefix? "#" stripped))
+                                   (string-index stripped #\=))))
+              (if (not separator)
+                  (loop (cdr lines) entries)
+                  (let* ((name (string-trim-both (substring stripped 0 separator)))
+                         (raw (string-trim-both (substring stripped
+                                                           (+ separator 1))))
+                         (value (if (and (> (string-length raw) 1)
+                                         (or (and (string-prefix? "\"" raw)
+                                                  (string-suffix? "\"" raw))
+                                             (and (string-prefix? "'" raw)
+                                                  (string-suffix? "'" raw))))
+                                    (substring raw 1 (- (string-length raw) 1))
+                                    raw)))
+                    (if (string=? name "")
+                        (loop (cdr lines) entries)
+                        (loop (cdr lines)
+                              (cons (cons name value) entries))))))))))
+
+(define* (load-env-file path #:key (override? #f))
+  "Read the `NAME=VALUE' assignments of PATH into the environment.
+
+Returns the list of variables that were actually set.  A name that is already
+in the environment keeps its value unless OVERRIDE? is #t: the environment a
+process was started with has the last word over a file next to the code, which
+is the precedence `dotenv' established and the one that makes
+`CI=1 maak test' behave as asked.  Pass `#:override? #t' when the file is meant
+to win.
+
+A missing PATH is not an error -- the file is optional by definition -- and
+returns the empty list.
+
+@example
+(load-env-file \".env\")
+(load-env-file \".env.local\" #:override? #t)
+@end example"
+  (let loop ((entries (env-file-entries path))
+             (loaded '()))
+    (if (null? entries)
+        (reverse loaded)
+        (let* ((name (caar entries))
+               (value (cdar entries))
+               (already (getenv name)))
+          (if (and already (not override?))
+              (loop (cdr entries) loaded)
+              (begin
+                (setenv name value)
+                (log-info "  Environment: ~a~a\n"
+                          name
+                          (if already
+                              (format #f " (was ~a)" already)
+                              ""))
+                (loop (cdr entries)
+                      (cons name loaded))))))))
+
 
 (define (home-dir)
   "Return the current user's home directory, or the empty string when unset."

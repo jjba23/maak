@@ -226,9 +226,187 @@
                  (assert-false (string-contains language "."))
                  (assert-false (string-contains language "@"))))))
 
+(define decoration-suite
+  (suite "Command decorations"
+         #:concurrent? #f
+         #:shuffle? #f
+         (test "an environment is handed over through env"
+               (assert-contains
+                #:expect (dry-run-command
+                          (lambda ()
+                            ($ '("make") #:env '(("CI" . "1")))))
+                #:got "env CI=1 make")
+               (assert-contains
+                #:expect (dry-run-command
+                          (lambda ()
+                            ($ '("make") #:env '("A=1" "B=2"))))
+                #:got "env A=1 B=2 make")
+               (assert-contains
+                #:expect (dry-run-command
+                          (lambda ()
+                            ($ '("make") #:env "ONLY=1")))
+                #:got "env ONLY=1 make"))
+         (test "the decorations come in the order a shell would want"
+               (assert-contains
+                #:expect (dry-run-command
+                          (lambda ()
+                            ($ '("systemctl daemon-reload")
+                               #:env '("CI=1")
+                               #:sudo? #t
+                               #:dev-null? #t)))
+                #:got "sudo env CI=1 systemctl daemon-reload >/dev/null 2>&1"))
+         (test "a backgrounded command is started, not waited for"
+               (let ((command (dry-run-command
+                               (lambda ()
+                                 ($ '("make -j") #:async? #t)))))
+                 (assert-contains #:expect command #:got "make -j &")))
+         (test "an allowed failure is not turned into a `|| true' shell"
+               ;; The command line is left exactly as the task wrote it: the
+               ;; exit code is read instead, so that the task is still told
+               ;; whether the command worked.
+               (let ((command (dry-run-command
+                               (lambda ()
+                                 ($ '("make failing-target")
+                                    #:allow-failure? #t)))))
+                 (assert-contains #:expect command #:got "make failing-target")
+                 (assert-false (string-contains command "|| true"))))
+         (test "the Guix shells forward the decorations"
+               (assert-contains
+                #:expect (dry-run-command
+                          (lambda ()
+                            (manifest-shell '("maak test")
+                                            #:env '("CI=1")
+                                            #:allow-failure? #t)))
+                #:got "env CI=1 guix shell -m manifest.scm -- maak test")
+               (assert-contains
+                #:expect (dry-run-command
+                          (lambda ()
+                            (time-machine '("guix build hello")
+                                          #:env '("A=1"))))
+                #:got "env A=1 guix time-machine --channels=channels.scm -- guix build hello")
+               (assert-contains
+                #:expect (dry-run-command
+                          (lambda ()
+                            (program-shell '("x") #:env '("A=1"))))
+                #:got "env A=1 guix shell -f guix.scm -- x")
+               (assert-contains
+                #:expect (dry-run-command
+                          (lambda ()
+                            (time-machine-manifest-shell '("x")
+                                                        #:env '("A=1"))))
+                #:got "env A=1 guix time-machine --channels=channels.scm -- shell -m manifest.scm")
+               (assert-contains
+                #:expect (dry-run-command
+                          (lambda ()
+                            (time-machine-program-shell '("x")
+                                                       #:env '("A=1"))))
+                #:got "env A=1 guix time-machine --channels=channels.scm -- shell -f guix.scm"))
+
+         (test "a container and a pack forward the decorations"
+               (assert-contains
+                #:expect (dry-run-command
+                          (lambda ()
+                            (guix-container '("maak test")
+                                            #:env '("CI=1")
+                                            #:dev-null? #t)))
+                #:got "env CI=1 guix shell --container -m manifest.scm -- maak test >/dev/null 2>&1")
+               (assert-contains
+                #:expect (dry-run-command
+                          (lambda ()
+                            (guix-pack '() #:env '("A=1"))))
+                #:got "env A=1 guix pack --file=guix.scm"))
+         (test "the Nix helpers forward the decorations"
+               (assert-contains
+                #:expect (dry-run-command
+                          (lambda ()
+                            (nix-shell '("make test")
+                                       #:packages '("gcc")
+                                       #:env '("NIX=1")
+                                       #:allow-failure? #t)))
+                #:got "env NIX=1 nix-shell --packages gcc --run 'make test'")
+               (assert-contains
+                #:expect (dry-run-command
+                          (lambda ()
+                            (nix-develop '("make") #:env '("A=1"))))
+                #:got "env A=1 nix develop . --command make")
+               (assert-contains
+                #:expect (dry-run-command
+                          (lambda ()
+                            (nix-flake-check #:env '("A=1"))))
+                #:got "env A=1 nix flake check ."))
+         (test "the shells honour the join separator they are given"
+               (assert-contains
+                #:expect (dry-run-command
+                          (lambda ()
+                            (manifest-shell '("a" "b") #:join " && ")))
+                #:got "a && b"))))
+
+(define execution-suite
+  (suite "Running decorated commands"
+         #:concurrent? #f
+         #:shuffle? #f
+         (test "a failing command stops a task"
+               (assert-error (lambda ()
+                               (parameterize ((quiet? #t))
+                                 ($ '("false")))))
+               (assert-error (lambda ()
+                               (parameterize ((quiet? #t))
+                                 ($ '("exit 3"))))))
+         (test "a failure that is allowed is reported, not raised"
+               (parameterize ((quiet? #t))
+                 (assert-equal #:expect #f
+                               #:got ($ '("false") #:allow-failure? #t)))
+               ;; The task is told the command failed, which a `|| true' in the
+               ;; line would have hidden.
+               (parameterize ((quiet? #t))
+                 (assert-equal #:expect #f
+                               #:got ($ '("sh -c 'exit 4'")
+                                        #:allow-failure? #t)))
+               (parameterize ((quiet? #t))
+                 (assert-equal #:expect #t
+                               #:got ($ '("true") #:allow-failure? #t))))
+         (test "a backgrounded command is started, not waited for"
+               (let* ((start (get-internal-real-time))
+                      (result ($ '("sleep 3") #:async? #t))
+                      (elapsed (/ (- (get-internal-real-time) start)
+                                  (exact->inexact
+                                   internal-time-units-per-second))))
+                 (assert-equal #:expect #t #:got result)
+                 ;; Back in under the time the command needs: it was started,
+                 ;; not waited for.
+                 (assert-true (< elapsed 1.0))))
+         (test "a discarded command still runs"
+               (parameterize ((quiet? #t))
+                 (assert-equal #:expect #t
+                               #:got ($ '("echo ignored") #:dev-null? #t))))
+         ;; A case has to evaluate to an assertion (a procedure of one
+         ;; validation client), so the setup a case needs is done in the `let'
+         ;; that wraps it and only the assertion is left as the last form.
+         (test "#:env reaches the command itself"
+               (let* ((path (format #f "~a/maak-env-~a"
+                                    (tmp-dir) (getpid)))
+                      (value (begin
+                               (env-unset! "MAAK_TEST_ENV")
+                               (parameterize ((quiet? #t))
+                                 ($ (list (format #f
+                                                  "sh -c 'printf %s \"$MAAK_TEST_ENV\" > ~a'"
+                                                  path))
+                                    ;; Reaches the command, not the shell that
+                                    ;; expands the redirection: it is `env'
+                                    ;; that sets the name for it.
+                                    #:env '("MAAK_TEST_ENV=from-dollar")))
+                               (read-file path))))
+                 (delete-file path)
+                 (assert-equal #:expect "from-dollar" #:got value)
+                 ;; The parent environment is left alone: the name was set for
+                 ;; the one command, not for the whole task.
+                 (assert-false (env-get "MAAK_TEST_ENV"))))))
+
 (define (spec)
   (veritas-run #:concurrent? #f
                #:shuffle? #f
                guix-suite
                nix-suite
-               i18n-suite))
+               i18n-suite
+               decoration-suite
+               execution-suite))

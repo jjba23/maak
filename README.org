@@ -159,10 +159,19 @@ Maak provides standard CLI options to manage your execution pipeline:
 | ~-n~         | ~--dry-run~    | None     | Dry-run mode. Print shell commands instead of executing them.        |
 | ~-q~         | ~--quiet~      | None     | Quiet mode. Suppress standard logging, banners, and header outputs.  |
 | ~-v~         | ~--version~    | None     | Display the Maak version and exit.                                   |
+| ~-e~         | ~--env-file~   | ~FILE~     | Read ~NAME=VALUE~ assignments from ~FILE~ (repeatable; ~:~-separated allowed). |
+|              | ~--no-env-file~ | None     | Read no environment file at all, whatever the environment says.      |
+|              | ~--banner~     | None     | Print the greeting banner (the default; overrides ~MAAK_NO_BANNER~).  |
+|              | ~--no-banner~  | None     | Skip the greeting banner, keeping everything else.                   |
 |              | ~--debug~      | None     | Print the Guile backtrace on error (same as ~MAAK_DEBUG=1~).           |
 
 A manual page is installed with the program; ~man maak~ shows the same options
 without leaving the terminal.
+
+The greeting banner is printed by default.  ~--no-banner~ keeps a run's output
+free of decoration, which is what a script wants, and ~MAAK_NO_BANNER=1~ does
+the same from the environment.  ~--banner~ turns it back on, which is handy
+when the variable lives in a shell profile.
 
 To pass arguments directly to a task, it's recommended to separate options from tasks with a double-dash (~--~):
 
@@ -173,6 +182,49 @@ maak -n -q -- clean,build
 # Run a custom task with arguments
 maak -f ./my-tasks.scm -- deploy production
 #+end_src
+
+--------
+
+* Environment files
+
+Settings and credentials often live in a file rather than in the environment.
+Maak reads one before it loads the Maak file, so the names are already in place
+for every task:
+
+1. ~-e FILE~ / ~--env-file FILE~ names a file.  Repeat the flag, or separate
+   several files with ~:~, to read more than one:
+   #+begin_src shell
+   maak -e .env -e .env.local -- deploy
+   #+end_src
+2. ~MAAK_ENV_FILE~ is read when no flag is given, with the same
+   ~:~-separated shape:
+   #+begin_src shell
+   MAAK_ENV_FILE=".env:.env.local" maak deploy
+   #+end_src
+3. failing both, the ~.env~ file beside the Maak file is read when it exists.
+4. ~--no-env-file~ reads none of them.
+
+The file is a list of ~NAME=VALUE~ lines:
+
+#+begin_src shell
+# Comments and blank lines are skipped, and a line without an = is ignored.
+DATABASE_URL=postgres://localhost/dev
+QUOTED="a value with spaces"
+SINGLE='single quoted'
+#+end_src
+
+Surrounding quotes are removed, so ~QUOTED~ above holds ~a value with spaces~,
+and the rest of the line is taken as it stands: a value keeps its ~=~, its ~#~
+and its inner spaces.
+
+A name the environment already has wins, so a file can hold a sensible default
+and a one-off ~DATABASE_URL=... maak deploy~ can still point a single run
+somewhere else.  Every file that is read is reported, so a run says where its
+values came from.
+
+From Scheme, ~load-env-file~ reads one itself and returns the names it set
+(~#:override? #t~ when the file should win over the environment), and
+~env-file-entries~ reads one without touching the environment at all.
 
 --------
 
@@ -257,12 +309,63 @@ They all honour the ~dry-run?~ and ~quiet?~ parameters.
 ** Shell
 
 - ~($ parts ...)~ -- run a shell command built from strings, joined by spaces.
+  The command can be decorated with keyword arguments, which are applied in the
+  order a shell would write them: ~[sudo] [env A=1] COMMAND [>/dev/null 2>&1] [&]~.
+
+  #+begin_src scheme
+  ($ '("systemctl daemon-reload") #:sudo? #t)
+  ($ '("make" "-j4") #:env '("CI=1" "V=1"))     ;; env CI=1 V=1 make -j4
+  ($ '("tsc --watch") #:async? #t)                 ;; tsc --watch &
+  ($ '("npm ci") #:dev-null? #t)                   ;; npm ci >/dev/null 2>&1
+
+  (unless ($ '("git diff --quiet") #:allow-failure? #t)
+    (log-info "the tree is dirty\n"))
+  #+end_src
+
+  ~#:env~ takes an alist (~(("CI" . "1"))~), a list of ~KEY=VALUE~ strings or
+  one such string, and the names are set for that command alone.  They go
+  through ~env~ rather than as a ~KEY=VALUE~ prefix, which is what lets them
+  reach a command running inside a ~guix shell~.
+
+  ~#:allow-failure?~ returns ~#f~ instead of raising when the command exits
+  non-zero, so the task is told the command failed and can decide what that
+  means; it is the ~cmd || true~ idiom, except that the failure is not hidden
+  from the task.  ~#:async?~ starts the command and does not wait for it, and
+  ~#:sudo?~ runs it as root -- both are printed by ~--dry-run~ like anything
+  else, so they can be checked before they are really run.
+
 - ~syscall~, ~capture~, ~which~, ~command-exists?~, ~require-command~.
 - ~shell-quote~ -- quote a value so a shell reads it as one word.
 - ~touch~, ~ln-s~, ~chmod-file~, ~read-file~, ~write-file~, ~cp~, ~mv~,
   ~mkdir-p~, ~remkdir-p~, ~delete-file-recursively~, ~cat~.
 - ~with-directory~, ~cd~, ~env-get~, ~env-set!~, ~env-unset!~, ~with-env~,
-  ~with-env-vars~, ~home-dir~, ~tmp-dir~.
+  ~with-env-vars~, ~home-dir~, ~tmp-dir~, ~load-env-file~, ~env-file-entries~.
+
+** Reporting a failure from a task
+
+A task that fails should read like maak's own errors: one line saying what went
+wrong, and a hint saying what to do about it.  ~task-error~ is that, with an
+optional format string and its arguments:
+
+#+begin_src scheme
+(define (deploy)
+  "Deploy the artefact built earlier."
+  (task-error "no artefact for ~a" #:args (list "linux-x86_64")
+              #:hint "Run `maak build' first."))
+#+end_src
+
+~maak deploy~ then prints
+
+#+begin_src
+maak: error: no artefact for linux-x86_64
+        hint: Run `maak build' first.
+#+end_src
+
+and exits non-zero without a backtrace, so a user reads a sentence instead of a
+trace.  ~--debug~ (or ~MAAK_DEBUG=1~) brings the backtrace back when the
+failure is the program's own fault rather than the project's.  ~raise-maak-error~
+is the same mechanism for a message that is already formatted, and
+~maak-error?~ recognises either one.
 
 ** Pretty multiline strings
 
@@ -285,12 +388,18 @@ lines with the source indentation baked in.  These helpers take it back out:
   ~-S~ shares and ~-E~ exposures.
 - ~guix-pack~ -- build a ~guix pack~ (docker, squashfs, tarball).
 
+Every one of them takes the same ~#:env~, ~#:sudo?~, ~#:dev-null?~,
+~#:allow-failure?~ and ~#:async?~ keywords as ~$~, and passes them to the
+command it builds.
+
 ** Nix
 
 Mirroring the Guix helpers, for machines that use Nix:
 
 - ~nix-shell~ (classic, ~shell.nix~), ~nix-develop~ (flakes), ~nix-build~,
   ~nix-flake-build~, ~nix-flake-check~, ~nix-run~.
+
+They take the same decorations as the Guix helpers and as ~$~.
 
 ** Internationalisation
 
@@ -702,6 +811,20 @@ VERITAS_TEST_MODULE=veritas VERITAS_TEST_TOP_DIR=test \
 The fixtures those tests use -- a module with exports and one without -- live
 under ~test/maak/fixtures~ and are deliberately kept out of the directory the
 runner scans.
+
+Two things are worth knowing when adding a test, because breaking either one
+fails quietly rather than loudly:
+
+- A case has to *evaluate to an assertion*, which is a procedure of one
+  validation client.  A bare ~assert-*~ call is one, and so is a ~let~ whose
+  last form is one.  A body that ends in ~(delete-file ...)~ is not: the case
+  becomes no case at all, and the test passes without checking anything.
+  Cleanup therefore belongs in a ~#:after~ hook, or before the assertion is
+  built.
+- Anything left directly in a ~suite~, outside any ~test~, is treated as a case
+  of the suite, and its result is read as though it were an assertion: the run
+  then dies with "could not read assertion success from unknown type".  A
+  parenthesis that closes a ~test~ a line too early is enough to do it.
 
 -------
 

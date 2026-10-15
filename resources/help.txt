@@ -18,6 +18,24 @@ Options:
     -f, --file FILE
         Specify the path to the Maak file (defaults to ./maak.scm).
 
+    -e, --env-file FILE
+        Read NAME=VALUE assignments from FILE before loading the Maak file.
+        Repeat the flag, or separate several files with ':', to read more
+        than one.  Without this flag MAAK_ENV_FILE is read, and failing that
+        a .env file next to the Maak file.
+
+    --no-env-file
+        Read no environment file at all, whatever the environment or the
+        checkout says.
+
+    --banner
+        Print the greeting banner.  This is the default, and is what turns
+        the banner back on after MAAK_NO_BANNER was exported.
+
+    --no-banner
+        Skip the greeting banner, keeping everything else the banner-free
+        run would print.
+
     -h, --help
         Display this help message and exit.
 
@@ -62,5 +80,11 @@ Examples:
 
     # Let the Maak file require modules from ./lib
     maak -L ./lib -- build
+
+    # Read credentials from a file, without exporting anything
+    maak -e .env.production -- deploy
+
+    # A quiet run with no greeting banner
+    maak --no-banner -- test
 
 +----------------------------------------------------------------------------+

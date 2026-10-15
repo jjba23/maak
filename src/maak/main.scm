@@ -48,6 +48,7 @@
   ;; The error reporting helpers are exported so the test suite can exercise
   ;; the messages a user actually sees, without starting a whole process.
   #:export (main maak-option-spec maak-default-file resolve-maak-file
+                 resolve-banner? resolve-env-files truthy-string?
                  exception->message error-message-string
                  report-maak-error report-generic-error))
 
@@ -81,6 +82,17 @@
     ;; exactly like PATH.  The wrapper script joins repeated -L flags that way.
     (load-path (single-char #\L)
                (value #t)
+               (required? #f))
+    ;; Environment files are named one per flag by the wrapper, which joins
+    ;; them with ':' the way `-L' does.
+    (env-file (single-char #\e)
+              (value #t)
+              (required? #f))
+    (no-env-file (value #f)
+                 (required? #f))
+    (banner (value #f)
+            (required? #f))
+    (no-banner (value #f)
                (required? #f))
     (version (single-char #\v)
              (value #f)
@@ -201,6 +213,50 @@ put it on the load path."
     (format (current-error-port)
             "        hint: rerun with MAAK_DEBUG=1 (or --debug) for the full backtrace.\n")))
 
+;; ====== Environment files ======
+
+(define (truthy-string? str)
+  "Return #t when STR is set to something other than 0, false or no.
+
+A switch that lives in the environment has to be given a value, and every
+convention for `off' is accepted rather than only the empty string."
+  (and str
+       (not (member (string-downcase (string-trim str))
+                    '("" "0" "false" "no")))
+       #t))
+
+(define (resolve-banner? options)
+  "Return whether the greeting banner should be printed for OPTIONS.
+
+The `--no-banner' flag wins over `--banner', which wins over the environment:
+an explicit `--banner' is how a reader of a script asks for the banner back
+after `MAAK_NO_BANNER' was exported for the shell as a whole."
+  (cond
+    ((option-ref options 'no-banner #f) #f)
+    ((option-ref options 'banner #f) #t)
+    ((truthy-string? (getenv "MAAK_NO_BANNER")) #f)
+    (else #t)))
+
+(define (resolve-env-files options file)
+  "Return the environment files to read for OPTIONS and maak file FILE.
+
+`--env-file' names them explicitly and, when given, is the only source;
+otherwise `MAAK_ENV_FILE' is read, and failing that a `.env' beside the maak
+file.  `--no-env-file' turns the whole mechanism off, which is what a
+reproducible run wants -- the same command, no matter what a checkout happens
+to contain."
+  (cond
+    ((option-ref options 'no-env-file #f) '())
+    ((option-ref options 'env-file #f)
+     => (lambda (value)
+          (split-load-path value)))
+    ((truthy-string? (getenv "MAAK_ENV_FILE"))
+     (split-load-path (getenv "MAAK_ENV_FILE")))
+    (else
+     (let ((beside (and file
+                        (format #f "~a/.env" (dirname file)))))
+       (if (and beside (file-exists? beside)) (list beside) '())))))
+
 ;; ====== Load paths ======
 
 (define (apply-load-paths! cli-paths file)
@@ -308,13 +364,22 @@ be searched for as `maak/maak.scm' and could load a completely different file."
                                 '("default") raw-tasks))
               (tasks (map string->symbol string-tasks))
               (task-args (option-ref options
-                                     '() '())))
+                                     '() '()))
+              (env-files (resolve-env-files options file)))
          (apply-load-paths! (split-load-path (option-ref options
                                                            'load-path #f))
                             file)
          (parameterize ((dry-run? should-dry-run)
-                        (quiet? should-quiet))
-           (unless (quiet?)
+                        (quiet? should-quiet)
+                        (banner? (resolve-banner? options)))
+           ;; The environment is read before the maak file is loaded, so a task
+           ;; file can already consult the variables it names.
+           (for-each (lambda (env-file)
+                       (unless (quiet?)
+                         (log-info "  Reading environment from: ~a\n" env-file))
+                       (load-env-file env-file))
+                     env-files)
+           (when (banner?)
              (log-separator)
              (log-info "Maak ~a: the infinitely extensible command runner\n"
                        maak-version)

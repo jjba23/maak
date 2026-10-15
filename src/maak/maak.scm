@@ -50,6 +50,7 @@
                            mv
                            quiet?
                            dry-run?
+                           banner?
                            remkdir-p
                            maak-proc?
                            maak-task?
@@ -59,11 +60,11 @@
                            cat
                            ;; ====== Errors ======
                            &maak-error
-                           make-maak-error
-                           maak-error?
+                           make-maak-error                           maak-error? 
                            maak-error-message
                            maak-error-hint
                            raise-maak-error
+                           task-error
                            ;; ====== Load paths ======
                            maak-load-path
                            add-load-path!
@@ -83,6 +84,8 @@
                            guix-container
                            guix-pack
                            ;; ====== Shell helpers ======
+                           environment-assignments
+                           decorate-command
                            shell-quote
                            which
                            command-exists?
@@ -98,6 +101,8 @@
                            env-unset!
                            with-env
                            with-env-vars
+                           env-file-entries
+                           load-env-file
                            home-dir
                            tmp-dir
                            read-file
@@ -172,11 +177,19 @@ README."
 (define (format-task-doc name doc)
   "Return the lines that describe task NAME, given its docstring DOC.
 
-One line prints inline after the name.  A two line docstring starts inline and
-aligns its continuation under the first word of the documentation.  Anything
-longer prints as a block: the name on its own line, then every line of the
-documentation indented to the same column, which keeps a multi paragraph
-docstring readable instead of letting it fall back to the left margin.
+A docstring that is one paragraph starts inline after the name, and every
+continuation line aligns under the first word of the documentation, so a
+docstring wrapped over several lines reads as one block:
+
+@example
+build: Compile the project.
+       The result lands in ./target.
+@end example
+
+A docstring with a blank line in it is a set of paragraphs, and running text
+would flatten that shape away, so it prints as a block instead: the name on its
+own line and every line indented to the same column, with the blank lines left
+blank.
 
 Common leading indentation is removed first with `dedent-string', so a
 docstring written inside an indented function still reads flush left."
@@ -190,23 +203,20 @@ docstring written inside an indented function still reads flush left."
          (text (and (string? doc) (dedent-string doc)))
          (lines (if (and text (not (string=? text "")))
                     (string-split text #\newline)
-                    '())))
+                    '()))
+         (indented (lambda (line)
+                     ;; A blank line inside the documentation stays blank
+                     ;; rather than being padded out to the margin.
+                     (if (string=? line "") ""
+                         (string-append margin line)))))
     (cond
       ((null? lines)
        (list label))
-      ((= 1 (length lines))
-       (list (string-append prefix (car lines))))
-      ((= 2 (length lines))
-       (list (string-append prefix (car lines))
-             (string-append margin (cadr lines))))
+      ((any blank-line? lines)
+       (cons label (map indented lines)))
       (else
-       (cons label
-             (map (lambda (line)
-                    ;; A blank line inside the documentation stays blank
-                    ;; rather than being padded out to the margin.
-                    (if (string=? line "") ""
-                        (string-append margin line)))
-                  lines))))))
+       (cons (string-append prefix (car lines))
+             (map indented (cdr lines)))))))
 
 (define* (list-tasks #:key (as-is? #f))
   "List documentation for every maak task in the loaded file.
