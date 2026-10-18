@@ -60,6 +60,10 @@
                         run-pipeline
                         stage
                         stage?
+                        pipeline-result?
+                        pipeline-ok?
+                        pipeline-outputs
+                        pipeline-errors
                         shell-quote
                         job?
                         job-pid
@@ -724,13 +728,15 @@ allowed."
                        #:hint
                        "Fix the command above, or run `maak --dry-run' to inspect it first."))))))))))))
 
-(define (pipeline-stage-pid argv input output)
+(define* (pipeline-stage-pid argv input output #:key (dev-null? #f))
   "Start one stage of a pipeline and return its pid.
 
 INPUT is the read side of the pipe from the previous stage, or #f to inherit
 standard input; OUTPUT is the pipe to the next stage, or #f to inherit standard
 output.  A `pipe' is a pair of ports, so the child closes both of them after
-the `dup2' and no stage keeps another stage's end open."
+the `dup2' and no stage keeps another stage's end open.  With DEV-NULL? its
+standard output is connected to @code{/dev/null} instead, which is where the
+copy process of a captured last stage puts what it has already written."
   ;; Flush before forking, so the parent's buffered output is not written a
   ;; second time by the child.
   (force-output (current-output-port))
@@ -741,6 +747,10 @@ the `dup2' and no stage keeps another stage's end open."
           (when input
             (dup2 (port->fdes input) 0)
             (close-port input))
+          (when dev-null?
+            (let ((null (open-file "/dev/null" "w")))
+              (dup2 (port->fdes null) 1)
+              (close-port null)))
           (when output
             (dup2 (port->fdes (cdr output)) 1)
             (close-port (car output))
@@ -757,30 +767,38 @@ the `dup2' and no stage keeps another stage's end open."
 ;; A pipeline is a list of stages, each a program and its arguments.  A stage
 ;; may carry the decorations `run' takes -- its own environment, and `sudo?' --
 ;; because a middle stage is often the one that needs them: `sort' reading a
-;; locale, or `tee' writing where only root may write.  The pipeline takes an
-;; environment of its own for all its stages, and it is the pipeline, not the
-;; stage, that can be started as a background job: a stage cannot finish before
-;; the stage after it has read what it wrote.
+;; locale, or `tee' writing where only root may write.  A stage may also name a
+;; file its output is kept in, and the pipeline as a whole may capture what
+;; every stage wrote, which is how a task reads a result out of a pipeline
+;; instead of running it a second time.  The pipeline takes an environment of
+;; its own for all its stages, and it is the pipeline, not the stage, that can
+;; be started as a background job: a stage cannot finish before the stage after
+;; it has read what it wrote.
 
 (define-record-type <stage>
-  (make-stage argv env sudo?)
+  (make-stage argv env sudo? tee)
   stage?
   (argv stage-argv)
   (env stage-env)
-  (sudo? stage-sudo?))
+  (sudo? stage-sudo?)
+  (tee stage-tee))
 
-(define* (stage argv #:key (env '()) (sudo? #f))
+(define* (stage argv #:key (env '()) (sudo? #f) (tee #f))
   "Describe one stage of a pipeline, with the options `run' takes.
 
 ARGV is a program and its arguments, in the shape `run' takes them.  ENV sets
 names for this stage alone, in the shapes `$' accepts; they are added to the
 pipeline's own environment, later names winning.  With SUDO? the stage runs
-through `sudo'.
+through `sudo'.  TEE names a file that the stage's standard output is also
+written to, the way `tee' does it: the stage after this one reads the same
+bytes, and the file keeps them for the task to look at once the pipeline is
+done.
 
 @example
 (run-pipeline (list (stage (list \"grep\" \"-v\" \"^#\")
-                           #:env '(\"LC_ALL=C\"))
-                    (stage (list \"tee\" log) #:sudo? #t)))
+                           #:env '(\"LC_ALL=C\")
+                           #:tee \"clean.txt\")
+                    (stage (list \"sort\" \"-u\"))))
 @end example
 
 A stage is a description only; `run-pipeline' starts it."
@@ -790,7 +808,11 @@ A stage is a description only; `run-pipeline' starts it."
     (raise-maak-error
      "stage expects a non-empty list of strings, starting with the program"
      #:hint "Write (stage (list \"grep\" pattern) #:env '(\"LC_ALL=C\"))."))
-  (make-stage argv env sudo?))
+  (when (and tee (or (not (string? tee)) (string=? tee "")))
+    (raise-maak-error
+     (format #f "stage expects #:tee to name a file, got ~s" tee)
+     #:hint "Write (stage (list \"grep\" pattern) #:tee \"clean.txt\")."))
+  (make-stage argv env sudo? tee))
 
 (define (pipeline-stage-spec? spec)
   "Return #t when SPEC is something `run-pipeline' can run as a stage."
@@ -815,49 +837,251 @@ it is not there."
                 (append (list "env") assignments))
             argv)))
 
-(define (pipeline-failures argv-stages)
-  "Run ARGV-STAGES connected by pipes and return the failures as sentences.
+(define (pipeline-record-file index)
+  "Return a temporary file of this run's own for the output of stage INDEX.
+
+It is only ever used for the span of one pipeline: the bytes are read back when
+every stage has finished and the file is removed then, so the name does not
+have to be unique beyond the process that made it."
+  (format #f "~a/maak-pipeline-~a-~a.log"
+          (or (getenv "TMPDIR") "/tmp") (getpid) index))
+
+;; A step is a stage after the environment has been folded into its command
+;; line, together with the file its output is recorded in, if any.  Recording
+;; is what makes the stage worth a copy process: its output has to reach the
+;; next stage and the file at the same time, from a process the task itself
+;; never waits on by name.
+(define-record-type <pipeline-step>
+  (make-pipeline-step argv record-path temporary?)
+  pipeline-step?
+  (argv pipeline-step-argv)
+  (record-path pipeline-step-record-path)
+  ;; #t when RECORD-PATH is a file of ours, made because the pipeline's output
+  ;; is captured, rather than one the task asked for with `#:tee'.
+  (temporary? pipeline-step-temporary?))
+
+(define-record-type <pipeline-result>
+  (make-pipeline-result outputs errors)
+  pipeline-result?
+  (outputs pipeline-outputs)
+  (errors pipeline-errors))
+
+(define (pipeline-ok? result)
+  "Return #t when every stage of the pipeline that produced RESULT succeeded.
+
+RESULT is what `run-pipeline' returns when asked to capture the output, whether
+or not failures were allowed."
+  (null? (pipeline-errors result)))
+
+(define (pipeline-steps stages env capture?)
+  "Return STAGES as the steps to run, with ENV folded in and files to record.
+
+A stage records its standard output when it names a file with `#:tee', and
+every stage records it when CAPTURE? is #t; a captured stage that named no
+file of its own gets a temporary one."
+  (let loop ((remaining stages) (index 0) (steps '()))
+    (if (null? remaining)
+        (reverse steps)
+        (let* ((spec (car remaining))
+               (tee (and (stage? spec) (stage-tee spec)))
+               (record (or tee
+                           (and capture? (pipeline-record-file index)))))
+          (loop (cdr remaining)
+                (+ index 1)
+                (cons (make-pipeline-step (pipeline-stage-argv spec env)
+                                          record
+                                          (and record (not tee)))
+                      steps))))))
+
+(define (pipeline-rendered steps)
+  "Return STEPS as the shell line that would do the same thing.
+
+A stage recorded in a file of the task's own is followed by the `tee' that
+plays the copy process's part, so the line can be pasted into a shell.  A
+captured stage writes to a temporary file the task never sees, which is left
+out: the commands themselves are what the line is for."
+  (string-join
+   (append-map (lambda (step)
+                 (let ((argv (argv->string (pipeline-step-argv step)))
+                       (record (pipeline-step-record-path step)))
+                   (if (and record (not (pipeline-step-temporary? step)))
+                       (list argv (argv->string (list "tee" record)))
+                       (list argv))))
+               steps)
+   " | "))
+
+(define (pipeline-check-records! steps)
+  "Make sure every step can write the file its output is recorded in.
+
+STEPS are the steps of a pipeline that is about to run.  The files are created
+here, before any stage is started, so a path that cannot be written is reported
+against the stage that would have lost its output rather than as a pipeline
+that failed for no stated reason."
+  (let loop ((remaining steps) (position 1))
+    (unless (null? remaining)
+      (let* ((step (car remaining))
+             (path (pipeline-step-record-path step)))
+        (when path
+          (catch #t
+            (lambda ()
+              (close-port (open-file path "w")))
+            (lambda (key . args)
+              (raise-maak-error
+               (format #f "stage ~a (~a) cannot record its output to ~a: ~a"
+                       position
+                       (argv->string (pipeline-step-argv step))
+                       path
+                       (exception->message key args))
+               #:hint
+               "Point #:tee at a file the task may write, or drop it and read the pipeline's output another way."))))
+        (loop (cdr remaining) (+ position 1))))))
+
+;; A stage whose output is recorded cannot write to the next stage and to the
+;; file by itself, so a `tee' process stands between them: what the stage wrote
+;; goes on to the next stage unchanged and into the file as well.  That is the
+;; `tee' from coreutils rather than a copy written here, because the copy has
+;; to outlive the fork that starts it.  A Maak process may have threads of its
+;; own -- the test runner runs its cases in fibers -- and a child forked from
+;; such a process that then uses the Guile runtime can wait forever on a lock
+;; the thread it was forked over still holds.  `exec' starts a program with no
+;; such history, which is also why every stage is a fork and an exec.
+(define (pipeline-tap-pid input next record-path dev-null?)
+  "Start the process that copies INPUT to NEXT and RECORD-PATH.
+
+NEXT is the pipe to the next stage, or #f when nothing follows the tap.  With
+DEV-NULL? the copy's own output goes to @code{/dev/null}: the bytes are wanted
+in the file and nowhere else.  Without it, and with NEXT #f, the copy inherits
+standard output, which is what makes `#:tee' on the last stage print the line
+as well as keep it.  Returns the copy process's pid."
+  (pipeline-stage-pid (list "tee" record-path)
+                      input
+                      next
+                      #:dev-null? dev-null?))
+
+(define (pipeline-stage-failure-lines steps statuses)
+  "Return a sentence for each step in STEPS that did not exit with 0.
+
+STEPS and STATUSES are in the same order.  A stage killed by a signal is
+reported as such, because it has no exit code to name."
+  (let scan ((remaining steps)
+             (status-list statuses)
+             (position 1)
+             (failures '()))
+    (cond
+      ((null? remaining) (reverse failures))
+      (else
+       (let ((code (status:exit-val (car status-list))))
+         (scan (cdr remaining)
+               (cdr status-list)
+               (+ position 1)
+               (if (and code (zero? code))
+                   failures
+                   (cons (format #f "stage ~a (~a) ~a"
+                                 position
+                                 (argv->string (pipeline-step-argv (car remaining)))
+                                 (if code
+                                     (format #f "exited with code ~a" code)
+                                     "was terminated by a signal"))
+                         failures))))))))
+
+(define (pipeline-tap-failure-lines steps taps)
+  "Return a sentence for each copy process that could not write its file.
+
+TAPS holds the index of the step each copy process serves, next to its status.
+A copy killed by a signal is not reported: the stage after it stopped reading,
+as `head' does, and that is the stage's business.  A copy that exited with a
+code could not open or write the file, which the pipeline reports against the
+stage whose output is missing."
+  (let loop ((remaining taps) (failures '()))
+    (if (null? remaining)
+        (reverse failures)
+        (let* ((entry (car remaining))
+               (index (car entry))
+               (code (status:exit-val (cdr entry)))
+               (step (list-ref steps index)))
+          (loop (cdr remaining)
+                (if (or (not code) (zero? code))
+                    failures
+                    (cons (format #f "stage ~a (~a) could not record its output to ~a"
+                                  (+ index 1)
+                                  (argv->string (pipeline-step-argv step))
+                                  (pipeline-step-record-path step))
+                          failures)))))))
+
+(define (pipeline-captured-outputs steps capture?)
+  "Return what each stage wrote, in stage order, reading our own files.
+
+Every recorded step has a file; the ones this pipeline made are removed here,
+after their bytes have been read, whether the pipeline succeeded or not."
+  (if (not capture?)
+      '()
+      (map (lambda (step)
+             (let ((path (pipeline-step-record-path step)))
+               (if (not path)
+                   ""
+                   (let ((text (if (file-exists? path)
+                                   (call-with-input-file path get-string-all)
+                                   "")))
+                     (when (pipeline-step-temporary? step)
+                       (catch #t
+                         (lambda () (delete-file path))
+                         (lambda args #f)))
+                     text))))
+           steps)))
+
+(define (pipeline-run steps capture?)
+  "Run STEPS connected by pipes and return a <pipeline-result>.
 
 Each stage's standard output is the next stage's standard input, and the
-pipeline is done when every stage has finished.  A stage killed by a signal is
-reported as such, because it has no exit code to name.  An empty result means
-every stage exited with 0."
-  (let loop ((remaining argv-stages) (input #f) (pids '()))
+pipeline is done when every stage has finished.  A step that records its output
+has a `tee' process between it and the next stage, so the two run at the same
+time rather than one filling a file the other has to wait for.  With CAPTURE?
+the result holds what every stage wrote, read back from the recorded files."
+  (let loop ((remaining steps) (input #f) (stages '()) (taps '()) (index 0))
     (if (null? remaining)
-        (let ((statuses (map (lambda (pid) (cdr (waitpid pid 0)))
-                             (reverse pids))))
-          (let scan ((stage-list argv-stages)
-                     (status-list statuses)
-                     (position 1)
-                     (failures '()))
-            (cond
-              ((null? stage-list) (reverse failures))
-              (else
-               (let ((code (status:exit-val (car status-list))))
-                 (scan (cdr stage-list)
-                       (cdr status-list)
-                       (+ position 1)
-                       (if (and code (zero? code))
-                           failures
-                           (cons (format #f "stage ~a (~a) ~a"
-                                         position
-                                         (argv->string (car stage-list))
-                                         (if code
-                                             (format #f "exited with code ~a"
-                                                     code)
-                                             "was terminated by a signal"))
-                                 failures))))))))
-        (let* ((last? (null? (cdr remaining)))
-               (out (if last? #f (pipe)))
-               (pid (pipeline-stage-pid (car remaining) input out)))
+        (let ((statuses (map reap-process (reverse stages)))
+              (tap-statuses (map (lambda (entry)
+                                   (cons (car entry) (reap-process (cdr entry))))
+                                 (reverse taps))))
+          (make-pipeline-result
+           (pipeline-captured-outputs steps capture?)
+           (append (pipeline-stage-failure-lines steps statuses)
+                   (pipeline-tap-failure-lines steps tap-statuses))))
+        (let* ((step (car remaining))
+               (last? (null? (cdr remaining)))
+               (record (pipeline-step-record-path step))
+               (stage-out (if (or record (not last?)) (pipe) #f))
+               (pid (pipeline-stage-pid (pipeline-step-argv step)
+                                        input stage-out)))
           (when input (close-port input))
-          (when out (close-port (cdr out)))
-          (loop (cdr remaining)
-                (and out (car out))
-                (cons pid pids))))))
+          ;; The write end has to leave the parent before a copy process is
+          ;; forked, or that process keeps the pipe open and the reader never
+          ;; sees the end of the stage's output.
+          (when stage-out (close-port (cdr stage-out)))
+          (cond
+            ;; Nothing to record: the pipe is simply the next stage's input.
+            ((not record)
+             (loop (cdr remaining)
+                   (and stage-out (car stage-out))
+                   (cons pid stages)
+                   taps
+                   (+ index 1)))
+            (else
+             (let* ((next (and (not last?) (pipe)))
+                    (tap (pipeline-tap-pid (car stage-out)
+                                           next
+                                           record
+                                           (and last? capture?))))
+               (close-port (car stage-out))
+               (when next (close-port (cdr next)))
+               (loop (cdr remaining)
+                     (and next (car next))
+                     (cons pid stages)
+                     (cons (cons index tap) taps)
+                     (+ index 1)))))))))
 
-(define (spawn-pipeline argv-stages)
-  "Run ARGV-STAGES in a background process and return its pid.
+(define (spawn-pipeline steps)
+  "Run STEPS in a background process and return its pid.
 
 The process exits 0 when every stage succeeded and 1 otherwise.  A failure is
 reported by that status rather than by printing, which is what `run' does for a
@@ -871,7 +1095,8 @@ means."
           ;; A raise inside the worker would print a backtrace over whatever
           ;; the terminal is showing, so it becomes the exit status instead.
           (let ((failures (catch #t
-                            (lambda () (pipeline-failures argv-stages))
+                            (lambda ()
+                              (pipeline-errors (pipeline-run steps #f)))
                             (lambda args '("the pipeline could not be started")))))
             (force-output (current-output-port))
             (force-output (current-error-port))
@@ -880,7 +1105,7 @@ means."
 
 (define* (run-pipeline stages
                        #:key (verbose? #f) (allow-failure? #f)
-                       (env '()) (async? #f))
+                       (env '()) (async? #f) (capture? #f))
   "Run a pipeline of programs without a shell.
 
 STAGES is a non-empty list of stages.  A stage is an argument list shaped like
@@ -894,9 +1119,19 @@ whole pipeline is done when every stage has finished.
                     (list \"grep\" \"-v\" \"^#\")
                     (list \"sort\" \"-u\")))
 
-;; a stage with an environment of its own, and one that needs root
-(run-pipeline (list (stage (list \"sort\" \"-u\") #:env '(\"LC_ALL=C\"))
+;; a stage with an environment and a file of its own, and one that needs root
+(run-pipeline (list (stage (list \"sort\" \"-u\")
+                           #:env '(\"LC_ALL=C\")
+                           #:tee \"sorted.txt\")
                     (stage (list \"tee\" log) #:sudo? #t)))
+
+;; keep what every stage wrote for the task to look at
+(define result (run-pipeline (list (list \"git\" \"diff\" \"--cached\")
+                                   (list \"grep\" \"^+\"))
+                             #:capture? #t
+                             #:allow-failure? #t))
+(pipeline-outputs result)   ;; one string per stage, in order
+(pipeline-ok? result)       ;; #f when a stage failed
 @end example
 
 Unlike a shell's `|', which reports the exit status of the last stage alone, a
@@ -904,6 +1139,16 @@ pipeline that fails anywhere reports the stages that failed and raises; pass
 @code{#:allow-failure? #t} to get @code{#f} instead and decide in the task.
 This is the pipefail behaviour, and it is the one that does not let a failing
 producer hide behind a successful consumer.
+
+A pipeline's output can be looked at afterwards in two ways.  A stage with
+@code{#:tee} keeps a copy of what it wrote in a file the task names, and the
+stage after it reads the same bytes while it runs: nothing is held back until
+the pipeline ends.  @code{#:capture? #t} records every stage the same way, in
+temporary files, and hands the bytes back in the result instead of printing
+them; the last stage's output is then the last entry of
+@code{pipeline-outputs}.  Capturing is the way to make a decision from what a
+pipeline produced -- a count of changed files, the list a `grep' matched --
+without running the pipeline twice.
 
 @sc{arguments}:
 @itemize @bullet
@@ -915,28 +1160,40 @@ The stages to run, each an argument list or a @code{stage}.
 If #t, logs the pipeline, decorations included, before running it.
 
 @item @strong{#:allow-failure?} (boolean, default #f):
-If #t, a failing stage does not raise: @code{#f} is returned instead.
+If #t, a failing stage does not raise: @code{#f} is returned instead (or the
+result, when the output was captured), so the task can decide what it means.
 
 @item @strong{#:env} (alist, list of strings, or string, default '()):
 Environment variables for every stage of the pipeline, in the shapes `$'
 accepts.  A stage's own @code{#:env} is added to these, later names winning.
+
+@item @strong{#:capture?} (boolean, default #f):
+If #t, every stage's standard output is recorded and returned in a
+@code{<pipeline-result>}, and the pipeline prints nothing itself.  The result's
+@code{pipeline-outputs} holds one string per stage, in stage order, and
+@code{pipeline-ok?} says whether every stage succeeded.  A stage that also has
+@code{#:tee} records into that file, which is left in place.
 
 @item @strong{#:async?} (boolean, default #f):
 If #t, the whole pipeline is started in the background and a job record is
 returned.  It is the pipeline that becomes a job, not a stage: a stage cannot
 finish before the stage after it has read what it wrote.  The job's exit code
 is 0 when every stage succeeded and 1 otherwise, whatever
-@code{#:allow-failure?} said.
+@code{#:allow-failure?} said.  An asynchronous pipeline cannot capture its
+output, because the bytes would be read in the background process; give the
+stage a @code{#:tee} file instead.
 
 @end itemize
 
 @sc{returns}:
 @code{#t} when every stage exits with code 0, @code{#f} when a stage failed and
-failures were allowed, and a job record when @code{#:async?} was given.
+failures were allowed, a @code{<pipeline-result>} when @code{#:capture?} was
+given, and a job record when @code{#:async?} was given.
 
 @sc{errors}:
 Signals a maak error naming the failing stage or stages when a pipeline fails
-and failures are not allowed."
+and failures are not allowed, and when @code{#:capture?} and @code{#:async?}
+are asked for together."
   (when (or (not (list? stages))
             (null? stages)
             (not (every pipeline-stage-spec? stages)))
@@ -944,30 +1201,38 @@ and failures are not allowed."
      "run-pipeline expects a non-empty list of stages: argument lists or (stage ...) forms"
      #:hint
      "Write (run-pipeline (list (list \"cat\" file) (stage (list \"grep\" pattern) #:env '(\"LC_ALL=C\"))))."))
-  (let* ((argv-stages (map (lambda (spec)
-                             (pipeline-stage-argv spec env))
-                           stages))
-         (rendered (string-join (map argv->string argv-stages) " | ")))
+  (when (and async? capture?)
+    (raise-maak-error
+     "a background pipeline cannot capture its output"
+     #:hint
+     "Wait for the job and capture a foreground pipeline, or give the stage a file with (stage argv #:tee file)."))
+  (let* ((steps (pipeline-steps stages env capture?))
+         (rendered (pipeline-rendered steps)))
     (cond
       ((dry-run?)
        (unless (quiet?)
          (display (bold-output (format #f "\n[DRY-RUN]: ~a~a\n"
                                        rendered
                                        (if async? " &" "")))))
-       #t)
+       ;; Nothing ran, so nothing was written: the result is the shape a task
+       ;; expects, with every stage having said nothing.
+       (if capture?
+           (make-pipeline-result (map (lambda (step) "") steps) '())
+           #t))
       (else
        (when (and verbose? (not (quiet?)))
          (log-info "  Execute pipeline:\n~a\n" rendered))
+       (pipeline-check-records! steps)
        (if async?
-           (make-job (spawn-pipeline argv-stages) rendered)
-           (let ((failures (pipeline-failures argv-stages)))
+           (make-job (spawn-pipeline steps) rendered)
+           (let ((result (pipeline-run steps capture?)))
              (cond
-               ((null? failures) #t)
-               (allow-failure? #f)
+               ((pipeline-ok? result) (if capture? result #t))
+               (allow-failure? (if capture? result #f))
                (else
                 (raise-maak-error
                  (format #f "pipeline failed: ~a"
-                         (string-join failures ", "))
+                         (string-join (pipeline-errors result) ", "))
                  #:hint
                  "Fix the failing stage above, or run `maak --dry-run' to inspect the pipeline first.")))))))))
 

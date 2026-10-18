@@ -46,12 +46,12 @@ That is the whole idea. Everything below is what you get once you take it seriou
 - *The entire language, not a DSL* — define functions, use lists and hash tables, write macros, import libraries. If you can write it in Guile, you can write it in a task.
 - *A real command line, Make-compatible where it counts* — ~-f~, ~-C~, ~-n~, ~-k~, ~-i~, ~-j~, ~--list~ and friends behave the way your fingers expect.
 - *Shell-free by default* — ~run~ takes a program and its arguments as separate strings, so a path with a space in it stays one argument.
-- *Real pipelines* — ~run-pipeline~ connects argv stages with ~pipe~ and ~dup2~, reports *every* failing stage instead of just the last one, gives a stage its own environment or ~sudo~, and can run the whole pipeline as a background job.
+- *Real pipelines* — ~run-pipeline~ connects argv stages with ~pipe~ and ~dup2~, reports *every* failing stage instead of just the last one, gives a stage its own environment or ~sudo~, keeps what each stage wrote with ~#:tee~ or ~#:capture?~ so a task can read it, and can run the whole pipeline as a background job.
 - *Background jobs with a pid* — ~#:async?~ forks a process and hands back a job record you can poll, wait on, and read the exit code of.
 - *Parallel tasks with readable output* — ~maak -j 4 -- fmt,lint,test~ runs tasks in forked workers and prints each one's output as a single block, in the order you named them.
 - *Dry-run and quiet as lexical parameters* — ~(parameterize ((dry-run? #t)) …)~ makes destructive code safe to exercise inside a test, without a command-line flag.
 - *Environment files and load paths* — ~.env~ files, ~-e~, ~MAAK_ENV_FILE~, ~-L~, ~MAAK_LOAD_PATH~, and ~with-load-path~ for Maak files that are a thin front end over your own modules.
-- *Guix and Nix, first class* — ~manifest-shell~, ~program-shell~, time-machine variants, ~guix-container~, ~guix-pack~, and mirror-image Nix helpers.
+- *Guix and Nix, first class* — ~manifest-shell~, ~program-shell~, time-machine variants, ~guix-container~, ~guix-pack~, mirror-image Nix helpers, and ~guix-build~ / ~guix-program~, which read a pinned Guix as *values* instead of running another Guix.
 - *Translation tooling* — the whole GNU gettext workflow (~i18n-extract~, ~i18n-merge~, ~i18n-compile~, ~i18n-refresh~) packaged so you do not rewrite it per project.
 - *Errors that read like sentences* — ~task-error~ prints one line and a hint, exits non-zero, and keeps the backtrace behind ~--debug~.
 - *Self-documenting tasks* — a docstring becomes the entry in ~maak --list~, laid out so long descriptions stay readable.
@@ -592,14 +592,22 @@ Two runners sit at the bottom. ~run~ takes a program and its arguments as separa
   (run-pipeline (list (stage (list "sort" "-u") #:env '("LC_ALL=C"))
                       (stage (list "tee" log)   #:sudo? #t))
                 #:env '("SOURCE=ci"))
+
+  ;; keep what each stage wrote, and read it back in the task
+  (define result
+    (run-pipeline (list (list "git" "diff" "--cached")
+                        (list "grep" "^+"))
+                  #:capture? #t #:allow-failure? #t))
+  (pipeline-outputs result)   ;; one string per stage, in order
+  (pipeline-ok? result)       ;; #f when a stage failed
   #+end_src
 
   Each stage is an argument list shaped like ~run~'s, or a ~stage~ form, which
-  adds the options ~run~ takes for that stage alone: ~#:env~ and ~#:sudo?~. A
-  stage's environment is added to the pipeline's own, later names winning, and
-  the command line is built the way ~run~ builds one (~sudo env A=1 …~), which
-  is what gets an assignment to the program when the shell that usually reads
-  it is not there.
+  adds the options ~run~ takes for that stage alone: ~#:env~, ~#:sudo?~ and
+  ~#:tee~. A stage's environment is added to the pipeline's own, later names
+  winning, and the command line is built the way ~run~ builds one
+  (~sudo env A=1 …~), which is what gets an assignment to the program when the
+  shell that usually reads it is not there.
 
   The pipeline itself takes ~#:env~ for all of its stages, ~#:verbose?~ and
   ~#:allow-failure?~. Unlike a shell's ~|~, which reports only the last stage,
@@ -608,6 +616,20 @@ Two runners sit at the bottom. ~run~ takes a program and its arguments as separa
   returns a job, whose exit code is 0 only when every stage succeeded -- a stage
   is not a job of its own, because it cannot finish before the stage after it
   has read what it wrote.
+
+  A pipeline's output can be looked at afterwards in two ways. ~#:tee FILE~ on
+  a stage keeps a copy of that stage's standard output, while the stage after
+  it reads the same bytes as they are produced, so nothing is held back until
+  the pipeline ends; a ~#:tee~ on the last stage still prints, as ~tee~ does.
+  ~#:capture? #t~ records every stage's standard output that way, in temporary
+  files it removes afterwards, and returns a ~<pipeline-result>~ instead of
+  printing: the last stage's output is the last entry of ~pipeline-outputs~,
+  ~pipeline-ok?~ answers whether every stage succeeded, and ~pipeline-errors~
+  names the ones that did not. That is what lets a task decide from what a
+  pipeline produced -- the number of changed lines, the files a ~grep~ matched
+  -- without running it twice. Capturing and ~#:async?~ are refused together,
+  because the background process would be the one holding the bytes; use
+  ~#:tee~ and read the file.
 
 - ~(run argv #:async? #t)~ — start the program in the background and return a *job* record. Unlike a trailing ~&~, the job has a pid and a status that can be waited for:
 
@@ -680,13 +702,59 @@ Guile has no heredoc, so a long message is a string spanning several source line
 
 ** Guix
 
+The helpers come in two families. The first builds command lines — the
+environment, the container, the pack — and the second asks Guix for values, so
+a task can decide on what a pin actually contains.
+
 - ~manifest-shell~, ~program-shell~ and their ~time-machine-~ variants.
 - ~time-machine~ — any command, run by a Guix pinned to ~channels.scm~.
 - ~guix-shell~ — a shell described by a package list.
 - ~guix-container~ — ~guix shell --container~, optionally with ~--network~, ~-S~ shares and ~-E~ exposures.
 - ~guix-pack~ — build a ~guix pack~ (docker, squashfs, tarball).
+- ~guix-available?~ — whether a ~guix~ program is on ~PATH~.
+- ~guix-channels~ — the pins ~channels.scm~ names, as a ~(name . commit)~ alist.
+- ~guix-derivation~ — the derivation of a package at those pins; nothing is built.
+- ~guix-build~ — the same, built, answered with its store directory.
+- ~guix-program~ — run a program out of that directory, with the decorations ~run~ takes.
+- ~guix-derivation-at~, ~guix-build-at~, ~guix-program-at~ — the same against one Guix revision, without a ~channels.scm~ and without ~guix time-machine~.
 
-Every one of them takes the same ~#:env~, ~#:sudo?~, ~#:dev-null?~, ~#:allow-failure?~ and ~#:async?~ keywords as ~$~, and passes them to the command it builds.
+The command-line helpers take the same ~#:env~, ~#:sudo?~, ~#:dev-null?~,
+~#:allow-failure?~ and ~#:async?~ keywords as ~$~, and pass them to the command
+they build. The value helpers return Scheme data instead:
+
+#+begin_src scheme
+(define (report-pin)
+  "Show what channels.scm pins hello to, then run that hello."
+  (log-info "pinned: ~a\n" (cdr (assoc "guix" (guix-channels))))
+  (log-info "hello at that pin: ~a\n" (guix-build "hello"))
+  (guix-program "hello" '("--version"))
+
+  ;; one old tool, for one step, without touching the project's channels
+  (guix-program-at "0fb918d61609f3aadc2d8ecc212926b3bdfabb4c"
+                   "hello" '("--version")))
+#+end_src
+
+~guix-build~ hands back the store path rather than printing it,
+~guix-derivation~ stops one step earlier and names the recipe,
+~guix-program~ runs the binary that pin produced instead of whatever the
+machine has installed, and ~guix-channels~ reads the pins into a list a task
+can compare against. A package the pin does not have is a sentence about the
+name, not a Guix backtrace: ~no package named foo in that Guix revision~, with
+a hint. ~#:system~ selects a target system for a cross build, and
+~guix-program~ takes ~#:program~ when the binary is not named after the
+package (~~(guix-program "coreutils" '("-l" "/gnu/store") #:program "ls")~~).
+
+The dependency is loose on purpose. Nothing in maak imports a ~(guix ...)~
+module: the asking happens in ~guix repl~, Guix's own Guile, and the answer
+comes back as Scheme data. maak therefore builds and runs on a machine with no
+Guix at all, and only a task that calls one of these helpers gets a one-line
+error with a hint saying so. The price is a process per query — about a third
+of a second, plus the store connection — so ask when the answer matters rather
+than in a loop; ~cached-channel-instance~ makes the second question about the
+same pins cheap, and a channels file that has never been fetched is fetched
+here, with the network and the wait that takes. The query file is removed after
+it runs, except when Guix refuses to answer: then it is kept and the error
+names it, so the program can be run by hand to read what Guix itself said.
 
 ** Nix
 
@@ -969,7 +1037,7 @@ A build should never fail because "it worked on my machine." Reliable software d
 - *Atomic operations.* Upgrade or roll back environments without orphaned dependencies or broken states.
 - *Unified tooling.* One tool manages development shells, isolated containers, package builds and full system configurations.
 
-maak inherits all of that for free, because a Maak file is just another Scheme file that Guix can evaluate — and because the same pin in ~channels.scm~ can drive the shell, the tests and the release.
+maak inherits all of that for free, because a Maak file is just another Scheme file that Guix can evaluate — and because the same pin in ~channels.scm~ can drive the shell, the tests and the release. The pin is also readable from a task: ~guix-build~ and ~guix-program~ turn it into a store path and a program to run, which is what ~guix time-machine~ would otherwise have to be started for.
 
 * Community and support
 

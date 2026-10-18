@@ -326,9 +326,10 @@ or a
 form, which adds the options
 .B run
 takes for that stage alone:
-.B #:env
+.BR #:env ,
+.B #:sudo?
 and
-.BR #:sudo? .
+.BR #:tee .
 The stage's environment is added to the pipeline's own, later names winning,
 and the command line is built the way
 .B run
@@ -341,13 +342,33 @@ starts the whole pipeline in the background and returns a job whose exit code
 is 0 only when every stage succeeded; a stage is not a job of its own, because
 it cannot finish before the stage after it has read what it wrote.
 .PP
+.B #:tee FILE
+keeps a copy of the stage's standard output in FILE while the stage after it
+reads the
+same bytes, so a task can look at what a middle stage produced; a
+.B #:tee
+on the last stage prints as well as keeps, as
+.B tee
+itself does.
+.B #:capture? #t
+records every stage that way, in temporary files of its own, and returns a
+result record instead of printing: one string per stage from
+.BR pipeline\-outputs ,
+.B pipeline\-ok?
+for whether every stage succeeded, and the failures from
+.BR pipeline\-errors .
+A captured pipeline prints nothing itself, and
+.B #:capture? #t
+is refused together with
+.BR #:async? " #t" .
+.PP
 Unlike a shell's
 .BR | ,
 which reports only the last stage, a pipeline reports every stage that failed;
 .B #:allow\-failure? #t
 returns
 .B #f
-instead.
+instead, or the result when the output was captured.
 .TP
 .B ($ parts)
 Run a shell command built from a list of strings, joined by spaces.  This is
@@ -471,6 +492,26 @@ Recognise either of the above once it has been caught.
 .SS Guix
 .BR guix\-shell ", " guix\-container ", " guix\-pack ", " manifest\-shell ", " program\-shell ", "
 .BR time\-machine ", " time\-machine\-manifest\-shell ", " time\-machine\-program\-shell
+.PP
+The first group builds command lines.  The next group asks Guix for values
+instead:
+.BR guix\-available? ", " guix\-channels ", " guix\-derivation ", " guix\-build ", "
+.BR guix\-program ", " guix\-derivation\-at ", " guix\-build\-at ", " guix\-program\-at .
+They read the pins
+.B time\-machine
+would use -- from
+.I channels.scm
+or from a revision given to the
+.B \-at
+forms -- and answer with an alist, a store path or a running program, so a task
+can decide on what a pin contains.  Nothing in maak imports a
+.B (guix ...)
+module: the asking happens in
+.BR "guix repl" ,
+so maak builds and runs on a machine with no Guix, and only a call to one of
+these helpers reports that it is missing, with a hint.  The file a query is
+written to is removed after it runs, unless Guix refuses to answer: it is then
+kept, and the error names it so it can be run by hand.
 .SS Nix
 .BR nix\-shell ", " nix\-develop ", " nix\-build ", " nix\-flake\-build ", " nix\-flake\-check ", "
 .BR nix\-run

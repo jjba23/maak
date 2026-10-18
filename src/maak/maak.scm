@@ -32,6 +32,7 @@
   #:use-module (maak dsl)
   #:use-module (maak shell)
   #:use-module (maak nix)
+  #:use-module (maak guix)
   #:use-module (maak i18n)
   #:use-module (maak version)
   #:re-export (log-message log-info
@@ -63,6 +64,10 @@
                            run-pipeline
                            stage
                            stage?
+                           pipeline-result?
+                           pipeline-ok?
+                           pipeline-outputs
+                           pipeline-errors
                            job?
                            job-pid
                            job-command
@@ -95,6 +100,15 @@
                            guix-shell
                            guix-container
                            guix-pack
+                           ;; ====== Guix values ======
+                           guix-available?
+                           guix-channels
+                           guix-derivation
+                           guix-build
+                           guix-program
+                           guix-derivation-at
+                           guix-build-at
+                           guix-program-at
                            ;; ====== Shell helpers ======
                            environment-assignments
                            decorate-command

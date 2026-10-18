@@ -294,6 +294,24 @@
                                       ($ (list "sh -c 'exit 0'")
                                          #:async? #t)))))))
 
+(define (with-standard-output-file path thunk)
+  "Call THUNK with the process's standard output connected to PATH.
+
+A process that copies a stage's output writes to the file descriptor it was
+forked with rather than to a Scheme port, so redirecting the descriptor is the
+only way for a test to see what such a process printed."
+  (let ((saved (dup 1))
+        (file (open-file path "w")))
+    (force-output (current-output-port))
+    (dynamic-wind
+      (lambda () (dup2 (port->fdes file) 1))
+      thunk
+      (lambda ()
+        (force-output (current-output-port))
+        (dup2 saved 1)
+        (close-fdes saved)
+        (close-port file)))))
+
 (define pipeline-suite
   (suite "Pipelines and shell expansion"
          #:concurrent? #f
@@ -398,6 +416,125 @@
                  (assert-true (and (string-contains printed
                                                    "sudo env A=1 true")
                                    #t))))
+         (test "a captured pipeline returns what every stage wrote"
+               (let ((outputs (pipeline-outputs
+                               (parameterize ((quiet? #t))
+                                 (run-pipeline
+                                  (list (list "printf" "one\ntwo\n")
+                                        (list "tr" "a-z" "A-Z"))
+                                  #:capture? #t)))))
+                 (assert-equal #:expect '("one\ntwo\n" "ONE\nTWO\n")
+                               #:got outputs)))
+         (test "a capture of more than a pipeful loses nothing"
+               (let ((outputs (pipeline-outputs
+                               (parameterize ((quiet? #t))
+                                 (run-pipeline
+                                  (list (list "seq" "20000")
+                                        (list "wc" "-l"))
+                                  #:capture? #t)))))
+                 (assert-equal #:expect "20000\n" #:got (second outputs))))
+         (test "a captured pipeline prints nothing itself"
+               (let* ((dir (process-scratch-directory))
+                      (printed (string-append dir "/printed.txt")))
+                 (parameterize ((quiet? #t))
+                   (with-standard-output-file
+                    printed
+                    (lambda ()
+                      (run-pipeline (list (list "printf" "hello\n"))
+                                    #:capture? #t))))
+                 (let ((text (call-with-input-file printed get-string-all)))
+                   (parameterize ((quiet? #t))
+                     (delete-file-recursively dir))
+                   (assert-equal #:expect "" #:got text))))
+         (test "a capture leaves no temporary file behind"
+               (let* ((path (string-append (or (getenv "TMPDIR") "/tmp")
+                                           "/maak-pipeline-"
+                                           (number->string (getpid))
+                                           "-0.log"))
+                      (left? (begin
+                               (parameterize ((quiet? #t))
+                                 (run-pipeline (list (list "printf" "x\n"))
+                                               #:capture? #t))
+                               (file-exists? path))))
+                 (assert-false left?)))
+         (test "a captured pipeline reports the stages that failed"
+               (let ((result (parameterize ((quiet? #t))
+                               (run-pipeline (list (list "printf" "x\n")
+                                                   (list "false"))
+                                             #:capture? #t
+                                             #:allow-failure? #t))))
+                 (assert-false (pipeline-ok? result))))
+         (test "a stage's tee file keeps what the stage wrote"
+               (let* ((dir (process-scratch-directory))
+                      (path (string-append dir "/teed.txt")))
+                 (parameterize ((quiet? #t))
+                   (run-pipeline (list (stage (list "printf" "one\ntwo\n")
+                                              #:tee path)
+                                       (list "tr" "a-z" "A-Z"))))
+                 (let ((text (call-with-input-file path get-string-all)))
+                   (parameterize ((quiet? #t))
+                     (delete-file-recursively dir))
+                   (assert-equal #:expect "one\ntwo\n" #:got text))))
+         (test "the stage after a tee reads the same bytes"
+               (let* ((dir (process-scratch-directory))
+                      (path (string-append dir "/teed.txt"))
+                      (outputs (pipeline-outputs
+                                (parameterize ((quiet? #t))
+                                  (run-pipeline
+                                   (list (stage (list "printf" "one\n")
+                                                #:tee path)
+                                         (list "cat"))
+                                   #:capture? #t)))))
+                 (parameterize ((quiet? #t))
+                   (delete-file-recursively dir))
+                 (assert-equal #:expect "one\n" #:got (second outputs))))
+         (test "a tee on the last stage prints what it keeps"
+               (let* ((dir (process-scratch-directory))
+                      (printed (string-append dir "/printed.txt"))
+                      (kept (string-append dir "/kept.txt")))
+                 (parameterize ((quiet? #t))
+                   (with-standard-output-file
+                    printed
+                    (lambda ()
+                      (run-pipeline
+                       (list (stage (list "printf" "hello\n")
+                                    #:tee kept))))))
+                 (let ((text (call-with-input-file printed get-string-all)))
+                   (parameterize ((quiet? #t))
+                     (delete-file-recursively dir))
+                   (assert-equal #:expect "hello\n" #:got text))))
+         (test "a tee that cannot be written is refused before the pipeline"
+               (let* ((dir (process-scratch-directory))
+                      (path (string-append dir "/missing/log.txt")))
+                 (assert-error
+                  (lambda ()
+                    (parameterize ((quiet? #t))
+                      (run-pipeline (list (stage (list "printf" "x\n")
+                                                 #:tee path))))))))
+         (test "a stage refuses a tee that is not a file name"
+               (assert-error (lambda () (stage (list "true") #:tee 42))))
+         (test "a background pipeline cannot capture its output"
+               (assert-error
+                (lambda ()
+                  (parameterize ((quiet? #t))
+                    (run-pipeline (list (list "true"))
+                                  #:capture? #t #:async? #t)))))
+         (test "a dry run shows the tee a stage writes to"
+               (let ((printed (parameterize ((dry-run? #t) (quiet? #f))
+                                (with-output-to-string
+                                  (lambda ()
+                                    (run-pipeline
+                                     (list (stage (list "printf" "x\n")
+                                                  #:tee "/tmp/teed.txt"))))))))
+                 (assert-true (and (string-contains printed
+                                                   "| tee /tmp/teed.txt")
+                                   #t))))
+         (test "a dry run of a captured pipeline returns an empty result"
+               (assert-equal #:expect '("")
+                             #:got (pipeline-outputs
+                                    (parameterize ((dry-run? #t))
+                                      (run-pipeline (list (list "printf" "x\n"))
+                                                    #:capture? #t)))))
          (test "a stage refuses an empty argument list"
                (assert-error (lambda () (stage '()))))
          (test "a pipeline refuses a stage that is not an argument list"
