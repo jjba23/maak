@@ -43,6 +43,6 @@
     <text x="522" y="214" font-size="17" fill="#7f8798">tasks, pipelines and build logic in GNU Guile Scheme</text>
     <text x="522" y="256" font-size="19" fill="#8fd0a0" xml:space="preserve">$ maak test</text>
     <rect x="653" y="241" width="10" height="20" rx="2" fill="#8fd0a0"/>
-    <text x="522" y="283" font-size="13" fill="#5f6777">GNU Guix · GPL-3.0-or-later · no DSL to learn</text>
+    <text x="522" y="283" font-size="13" fill="#5f6777">GPL-3.0-or-later · no DSL to learn</text>
   </g>
 </svg>

@@ -21,7 +21,7 @@ Most build tools invent their own limited domain-specific language.  Maak embrac
 
 - *What it is.* A command runner and control plane. You write a file called ~maak.scm~ — a perfectly normal Guile module — and every function in it becomes a runnable task.
 - *Who it is for.* Lispers who want their automation to be as powerful as their editor, and everyone who is tired of Make's runes, shell-script glue, and YAML pipelines that cannot loop.
-- *Why it matters.* Tasks are real Scheme functions: composable, testable, dry-runnable, parallelisable, and reproducible under GNU Guix when you want bit-for-bit builds.
+- *Why it matters.* Tasks are real Scheme functions: composable, testable, declarative, dry-runnable, parallelisable, and reproducible.
 
 #+begin_src scheme
 (define-module (maak)
@@ -63,8 +63,8 @@ That is the whole idea. Everything below is what you get once you take it seriou
 ** Requirements
 
 - *GNU Guile 3.0 or newer* — maak is written in Guile Scheme and runs wherever Guile 3.0 runs.
-- *~bash~, ~coreutils~ and ~util-linux~* — for the ~scripts/maak~ launcher; the Guix package brings them along.
-- *Tested on GNU/Linux* — the library itself is portable Scheme, but GNU/Linux is where it is built, packaged and exercised.
+- *~bash~, ~coreutils~ and ~util-linux~* — for the ~scripts/maak~ launcher
+- *Tested on GNU/Linux but works anywhere Guile works* — the library itself is portable Scheme, but GNU/Linux is where it is built, packaged and exercised.
 - *Optional:* [[https://guix.gnu.org/][GNU Guix]] for reproducible environments (heartily recommended), or [[https://nixos.org/][Nix]] if that is your house.
 
 ** On Guix (recommended)
@@ -821,7 +821,7 @@ Dry-run and quietness can be set globally with ~-n~ / ~-q~, but they are also Sc
 
 * Coming from Make
 
-maak shares Make's command line wherever the two answer the same question, so a ~make~ habit usually lands. This is where each of Make's options ends up:
+maak shares Make's command line wherever the two answer the same question, so a ~make~ habit usually lands:
 
 | ~make~                       | maak                                                              |
 |------------------------------+-------------------------------------------------------------------|
