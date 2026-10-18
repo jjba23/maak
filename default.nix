@@ -25,9 +25,26 @@
 , makeWrapper ? pkgs.makeWrapper
 }:
 
+let
+  # The version is written once, in src/maak/version.scm, where the library and
+  # `maak --version' read it.  Reading it here, instead of repeating the
+  # literal, is what keeps a release to one edit: the derivation cannot fall
+  # behind the program.  The newlines become spaces so that a single regular
+  # expression can find the value in a file of several lines.
+  versionText = builtins.readFile ./src/maak/version.scm;
+  versionMatch = builtins.match
+    ".*\\(define maak-version +\"([^\"]+)\".*"
+    (builtins.replaceStrings [ "\n" ] [ " " ] versionText);
+in
 stdenv.mkDerivation {
   pname = "maak";
-  version = "0.9.0";
+  version =
+    if versionMatch == null
+    then throw ''
+      src/maak/version.scm no longer writes the version as
+      (define maak-version "x.y.z"), which is the shape default.nix reads.
+    ''
+    else builtins.head versionMatch;
 
   src = ./.;
 

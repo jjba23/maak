@@ -160,14 +160,14 @@ rpmbuild -ba ~/rpmbuild/SPECS/maak.spec
 You should end up with:
 
 #+begin_src shell
-~/rpmbuild/RPMS/x86_64/maak-0.9.0-0.x86_64.rpm
-~/rpmbuild/SRPMS/maak-0.9.0-0.src.rpm
+~/rpmbuild/RPMS/x86_64/maak-0.9.1-0.x86_64.rpm
+~/rpmbuild/SRPMS/maak-0.9.1-0.src.rpm
 #+end_src
 
 Install and run it:
 
 #+begin_src shell
-sudo zypper install ~/rpmbuild/RPMS/x86_64/maak-0.9.0-0.x86_64.rpm
+sudo zypper install ~/rpmbuild/RPMS/x86_64/maak-0.9.1-0.x86_64.rpm
 maak --help
 #+end_src
 
@@ -194,7 +194,7 @@ maak --version
 #+end_src
 
 #+begin_src
-maak 0.9.0
+maak 0.9.1
 License: GPL-3.0-or-later
 Homepage: https://codeberg.org/jjba23/maak
 #+end_src
@@ -950,6 +950,7 @@ The repository's automation is written in maak itself — read [[file:maak.scm][
 | ~help~                                 | Display the program's help screen.                               |
 | ~man~                                  | Preview ~man/maak.1~ without installing anything.                |
 | ~version~                              | Print the version, license and homepage.                         |
+| ~sync-version~                         | Write the version into the RPM spec, manual page and README.     |
 | ~test~                                 | Run the unit test suite with Veritas.                            |
 | ~container~                            | Run the same suite inside a networkless Guix container.          |
 | ~repl~                                 | Development REPL (Ares nREPL server).                            |
@@ -964,6 +965,24 @@ The repository's automation is written in maak itself — read [[file:maak.scm][
 | ~deb-build~, ~rpm-build~               | Build the Debian and RPM packages.                               |
 | ~test-playground~                      | Play with temporary files and dry-run scopes.                    |
 | ~arithmetics~, ~vars~, ~quick-math~    | Small demonstrations of what a task can be.                      |
+
+** Releasing
+
+The version is written by hand in one place: ~maak-version~ in [[file:src/maak/version.scm][src/maak/version.scm]], which is what ~maak --version~ prints. Everything else follows it.
+
+- ~default.nix~ reads that file while it evaluates the derivation, so a Nix build cannot fall behind the program. There is no second copy there to remember.
+- The RPM spec, the manual page and the README carry copies, because an RPM spec is parsed before its source is unpacked and a manual page is roff. ~maak sync-version~ rewrites those copies from the module.
+- A unit test compares every copy with ~maak-version~, so a bump that skipped the sync fails ~maak test~ instead of shipping a spec that disagrees with the binary.
+
+A release is then one edit, one command, and the tag:
+
+#+begin_src shell
+$EDITOR src/maak/version.scm   # the only place the version is written by hand
+maak sync-version              # rewrite the spec, the manual page and the README
+maak test                      # the copies are checked with the rest of the suite
+git commit -am "chore: Release X.Y.Z"
+git tag vX.Y.Z
+#+end_src
 
 * Hacking on maak
 

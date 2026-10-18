@@ -49,12 +49,17 @@ steps:
       BYGGSTEG_URL: *jointhefreeworld_byggsteg_url
       BYGGSTEG_JOB_CODE: |
         (lambda()
-          `((task . "trivial")
-            (project . "%%CI_REPO_NAME%%")
-            (branch-name . "%%CI_COMMIT_BRANCH%%")
-            (clone-url . "%%CI_REPO_CLONE_URL%%")
-            (trivial-cmds . ("cd /etc/byggsteg/job-clone/%%CI_REPO_NAME%%/%%CI_COMMIT_BRANCH%% &&
-                              sudo guix shell -f guix.scm -- maak deploy"))))
+          (list
+           `((task . "maak-test")
+             (project . "%%CI_REPO_NAME%%")
+             (branch-name . "%%CI_COMMIT_BRANCH%%")
+             (clone-url . "%%CI_REPO_CLONE_URL%%"))
+           `((task . "trivial")
+             (project . "%%CI_REPO_NAME%%")
+             (branch-name . "%%CI_COMMIT_BRANCH%%")
+             (clone-url . "%%CI_REPO_CLONE_URL%%")
+             (trivial-cmds . ("cd /etc/byggsteg/job-clone/%%CI_REPO_NAME%%/%%CI_COMMIT_BRANCH%% &&
+                                      sudo guix shell -f guix.scm -- maak deploy")))))
 
   poll-byggsteg-job:
     name: "🔄 Poll job status @ Byggsteg"

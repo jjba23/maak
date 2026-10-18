@@ -68,7 +68,9 @@
   #:use-module (ice-9 format)
   #:use-module (ice-9 popen)
   #:use-module (ice-9 textual-ports)
+  #:use-module (srfi srfi-1)
   #:use-module (srfi srfi-13)
+  #:use-module (ice-9 string-fun)
   #:use-module (maak dsl)
   #:use-module (maak shell)
   #:use-module (maak version)
@@ -88,6 +90,21 @@
 
 (define no-maak-file-dir (unique-path "empty"))
 
+(define (without-load-notes text)
+  "Return TEXT without the notes Guile prints while it compiles a file.
+
+A launcher started against a cold cache compiles the library and this
+checkout's Maak file before it runs anything, and says so on standard error.
+Those lines are about loading rather than about the run, and the cases that
+ask whether a task wrote to standard error must not see them: without this,
+the first run after any change would fail and the second would pass, which is
+a test of the cache rather than of maak.  Every line that is not such a note
+is kept, so a task that writes to standard error is still caught."
+  (string-join
+   (remove (lambda (line) (string-prefix? ";;; " line))
+           (string-split text #\newline))
+   "\n"))
+
 (define (launcher-run . arguments)
   "Run the launcher with ARGUMENTS and return `(STATUS STDOUT STDERR)'.
 
@@ -103,7 +120,7 @@ own, because a pipe can only be read once and both streams are wanted."
                    (apply open-pipe* OPEN_READ launcher arguments))))
          (stdout (get-string-all port))
          (status (status:exit-val (close-pipe port)))
-         (stderr (read-file err-file #:default "")))
+         (stderr (without-load-notes (read-file err-file #:default ""))))
     (delete-file err-file)
     (list status stdout stderr)))
 

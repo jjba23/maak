@@ -20,6 +20,7 @@
   #:use-module (ice-9 string-fun)
   #:use-module (ice-9 textual-ports)
   #:use-module (ice-9 popen)
+  #:use-module (maak release)
   #:use-module (maak maak))
 
 ;; ====== Maak file constants ======
@@ -62,6 +63,22 @@
 (define (version)
   "Print the maak version."
   (print-version))
+
+(define (sync-version)
+  "Write the version into every file that cannot read it from the module.
+
+The version is written by hand once, in src/maak/version.scm, which is what
+`maak --version' prints and what default.nix reads while it evaluates the
+derivation.  The RPM spec, the manual page and the README cannot read a Scheme
+module, so they carry copies, and this task rewrites them from the module.
+`maak test' fails while one of them is behind."
+  (let ((version maak-version)
+        (changed (sync-version!)))
+    (if (null? changed)
+        (log-info "Every file that names the version already says ~a.\n" version)
+        (for-each (lambda (file)
+                    (log-info "Wrote ~a into ~a.\n" version file))
+                  changed))))
 
 (define (arithmetics)
   "Do some quick math."
