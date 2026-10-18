@@ -20,7 +20,6 @@
   #:use-module (ice-9 string-fun)
   #:use-module (ice-9 textual-ports)
   #:use-module (ice-9 popen)
-  #:use-module (maak release)
   #:use-module (maak maak))
 
 ;; ====== Maak file constants ======
@@ -72,6 +71,7 @@ The version is written by hand once, in src/maak/version.scm, which is what
 derivation.  The RPM spec, the manual page and the README cannot read a Scheme
 module, so they carry copies, and this task rewrites them from the module.
 `maak test' fails while one of them is behind."
+  (use-modules (maak release))
   (let ((version maak-version)
         (changed (sync-version!)))
     (if (null? changed)
