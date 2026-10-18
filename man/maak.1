@@ -320,7 +320,27 @@ the shell then sees words rather than arguments.
 .B (run\-pipeline stages)
 Run programs one after another with each standard output feeding the next
 standard input, without a shell.  Each stage is an argument list shaped like
-.BR run 's.
+.BR run 's ,
+or a
+.B stage
+form, which adds the options
+.B run
+takes for that stage alone:
+.B #:env
+and
+.BR #:sudo? .
+The stage's environment is added to the pipeline's own, later names winning,
+and the command line is built the way
+.B run
+builds one, so an assignment reaches the program in a pipeline where no shell
+reads it.
+.BR #:env
+on the pipeline sets names for every stage of it, and
+.BR #:async? " #t"
+starts the whole pipeline in the background and returns a job whose exit code
+is 0 only when every stage succeeded; a stage is not a job of its own, because
+it cannot finish before the stage after it has read what it wrote.
+.PP
 Unlike a shell's
 .BR | ,
 which reports only the last stage, a pipeline reports every stage that failed;

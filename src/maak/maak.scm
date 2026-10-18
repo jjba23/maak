@@ -61,6 +61,8 @@
                            ;; ====== Programs and background jobs ======
                            run
                            run-pipeline
+                           stage
+                           stage?
                            job?
                            job-pid
                            job-command

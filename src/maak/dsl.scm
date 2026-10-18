@@ -58,6 +58,8 @@
                         ;; ====== Programs and background jobs ======
                         run
                         run-pipeline
+                        stage
+                        stage?
                         shell-quote
                         job?
                         job-pid
@@ -750,19 +752,151 @@ the `dup2' and no stage keeps another stage's end open."
           (primitive-exit 127))
         pid)))
 
+;; ====== Pipelines ======
+;;
+;; A pipeline is a list of stages, each a program and its arguments.  A stage
+;; may carry the decorations `run' takes -- its own environment, and `sudo?' --
+;; because a middle stage is often the one that needs them: `sort' reading a
+;; locale, or `tee' writing where only root may write.  The pipeline takes an
+;; environment of its own for all its stages, and it is the pipeline, not the
+;; stage, that can be started as a background job: a stage cannot finish before
+;; the stage after it has read what it wrote.
+
+(define-record-type <stage>
+  (make-stage argv env sudo?)
+  stage?
+  (argv stage-argv)
+  (env stage-env)
+  (sudo? stage-sudo?))
+
+(define* (stage argv #:key (env '()) (sudo? #f))
+  "Describe one stage of a pipeline, with the options `run' takes.
+
+ARGV is a program and its arguments, in the shape `run' takes them.  ENV sets
+names for this stage alone, in the shapes `$' accepts; they are added to the
+pipeline's own environment, later names winning.  With SUDO? the stage runs
+through `sudo'.
+
+@example
+(run-pipeline (list (stage (list \"grep\" \"-v\" \"^#\")
+                           #:env '(\"LC_ALL=C\"))
+                    (stage (list \"tee\" log) #:sudo? #t)))
+@end example
+
+A stage is a description only; `run-pipeline' starts it."
+  (when (or (not (list? argv))
+            (null? argv)
+            (not (every string? argv)))
+    (raise-maak-error
+     "stage expects a non-empty list of strings, starting with the program"
+     #:hint "Write (stage (list \"grep\" pattern) #:env '(\"LC_ALL=C\"))."))
+  (make-stage argv env sudo?))
+
+(define (pipeline-stage-spec? spec)
+  "Return #t when SPEC is something `run-pipeline' can run as a stage."
+  (or (stage? spec)
+      (and (list? spec) (pair? spec) (every string? spec))))
+
+(define (pipeline-stage-argv spec pipeline-env)
+  "Return SPEC as the argv to exec, with PIPELINE-ENV and its own options.
+
+The command line is built the way `run' builds one: `sudo' first, then `env'
+with the assignments, then the program and its arguments.  That is what lets an
+assignment reach a stage inside a pipeline, where the shell that usually reads
+it is not there."
+  (let* ((argv (if (stage? spec) (stage-argv spec) spec))
+         (assignments (append (environment-assignments pipeline-env)
+                              (environment-assignments
+                               (if (stage? spec) (stage-env spec) '()))))
+         (sudo? (and (stage? spec) (stage-sudo? spec))))
+    (append (if sudo? (list "sudo") '())
+            (if (null? assignments)
+                '()
+                (append (list "env") assignments))
+            argv)))
+
+(define (pipeline-failures argv-stages)
+  "Run ARGV-STAGES connected by pipes and return the failures as sentences.
+
+Each stage's standard output is the next stage's standard input, and the
+pipeline is done when every stage has finished.  A stage killed by a signal is
+reported as such, because it has no exit code to name.  An empty result means
+every stage exited with 0."
+  (let loop ((remaining argv-stages) (input #f) (pids '()))
+    (if (null? remaining)
+        (let ((statuses (map (lambda (pid) (cdr (waitpid pid 0)))
+                             (reverse pids))))
+          (let scan ((stage-list argv-stages)
+                     (status-list statuses)
+                     (position 1)
+                     (failures '()))
+            (cond
+              ((null? stage-list) (reverse failures))
+              (else
+               (let ((code (status:exit-val (car status-list))))
+                 (scan (cdr stage-list)
+                       (cdr status-list)
+                       (+ position 1)
+                       (if (and code (zero? code))
+                           failures
+                           (cons (format #f "stage ~a (~a) ~a"
+                                         position
+                                         (argv->string (car stage-list))
+                                         (if code
+                                             (format #f "exited with code ~a"
+                                                     code)
+                                             "was terminated by a signal"))
+                                 failures))))))))
+        (let* ((last? (null? (cdr remaining)))
+               (out (if last? #f (pipe)))
+               (pid (pipeline-stage-pid (car remaining) input out)))
+          (when input (close-port input))
+          (when out (close-port (cdr out)))
+          (loop (cdr remaining)
+                (and out (car out))
+                (cons pid pids))))))
+
+(define (spawn-pipeline argv-stages)
+  "Run ARGV-STAGES in a background process and return its pid.
+
+The process exits 0 when every stage succeeded and 1 otherwise.  A failure is
+reported by that status rather than by printing, which is what `run' does for a
+background program too: the task that holds the job decides what a failure
+means."
+  (force-output (current-output-port))
+  (force-output (current-error-port))
+  (let ((pid (primitive-fork)))
+    (if (zero? pid)
+        (begin
+          ;; A raise inside the worker would print a backtrace over whatever
+          ;; the terminal is showing, so it becomes the exit status instead.
+          (let ((failures (catch #t
+                            (lambda () (pipeline-failures argv-stages))
+                            (lambda args '("the pipeline could not be started")))))
+            (force-output (current-output-port))
+            (force-output (current-error-port))
+            (primitive-exit (if (null? failures) 0 1))))
+        pid)))
+
 (define* (run-pipeline stages
-                       #:key (verbose? #f) (allow-failure? #f))
+                       #:key (verbose? #f) (allow-failure? #f)
+                       (env '()) (async? #f))
   "Run a pipeline of programs without a shell.
 
-STAGES is a list of argument lists, each of them shaped like the ARGV of
-`run': the program first, then one string per argument.  The standard output of
-each stage is the standard input of the next, and the whole pipeline is done
-when every stage has finished.
+STAGES is a non-empty list of stages.  A stage is an argument list shaped like
+the ARGV of `run' -- the program first, then one string per argument -- or a
+@code{stage} form, which adds the options `run' takes for that stage alone.
+The standard output of each stage is the standard input of the next, and the
+whole pipeline is done when every stage has finished.
 
 @example
 (run-pipeline (list (list \"cat\" file)
-                      (list \"grep\" \"-v\" \"^#\")
-                      (list \"sort\" \"-u\")))
+                    (list \"grep\" \"-v\" \"^#\")
+                    (list \"sort\" \"-u\")))
+
+;; a stage with an environment of its own, and one that needs root
+(run-pipeline (list (stage (list \"sort\" \"-u\") #:env '(\"LC_ALL=C\"))
+                    (stage (list \"tee\" log) #:sudo? #t)))
 @end example
 
 Unlike a shell's `|', which reports the exit status of the last stage alone, a
@@ -771,74 +905,71 @@ pipeline that fails anywhere reports the stages that failed and raises; pass
 This is the pipefail behaviour, and it is the one that does not let a failing
 producer hide behind a successful consumer.
 
+@sc{arguments}:
+@itemize @bullet
+
+@item @strong{stages} (list):
+The stages to run, each an argument list or a @code{stage}.
+
+@item @strong{#:verbose?} (boolean, default #f):
+If #t, logs the pipeline, decorations included, before running it.
+
+@item @strong{#:allow-failure?} (boolean, default #f):
+If #t, a failing stage does not raise: @code{#f} is returned instead.
+
+@item @strong{#:env} (alist, list of strings, or string, default '()):
+Environment variables for every stage of the pipeline, in the shapes `$'
+accepts.  A stage's own @code{#:env} is added to these, later names winning.
+
+@item @strong{#:async?} (boolean, default #f):
+If #t, the whole pipeline is started in the background and a job record is
+returned.  It is the pipeline that becomes a job, not a stage: a stage cannot
+finish before the stage after it has read what it wrote.  The job's exit code
+is 0 when every stage succeeded and 1 otherwise, whatever
+@code{#:allow-failure?} said.
+
+@end itemize
+
 @sc{returns}:
 @code{#t} when every stage exits with code 0, @code{#f} when a stage failed and
-failures were allowed.
+failures were allowed, and a job record when @code{#:async?} was given.
 
 @sc{errors}:
 Signals a maak error naming the failing stage or stages when a pipeline fails
 and failures are not allowed."
   (when (or (not (list? stages))
             (null? stages)
-            (not (every (lambda (stage)
-                          (and (list? stage)
-                               (pair? stage)
-                               (every string? stage)))
-                        stages)))
+            (not (every pipeline-stage-spec? stages)))
     (raise-maak-error
-     "run-pipeline expects a non-empty list of non-empty argument lists"
-     #:hint "Write (run-pipeline (list (list \"cat\" file) (list \"grep\" pattern)))."))
-  (let ((rendered (string-join (map argv->string stages) " | ")))
+     "run-pipeline expects a non-empty list of stages: argument lists or (stage ...) forms"
+     #:hint
+     "Write (run-pipeline (list (list \"cat\" file) (stage (list \"grep\" pattern) #:env '(\"LC_ALL=C\"))))."))
+  (let* ((argv-stages (map (lambda (spec)
+                             (pipeline-stage-argv spec env))
+                           stages))
+         (rendered (string-join (map argv->string argv-stages) " | ")))
     (cond
       ((dry-run?)
        (unless (quiet?)
-         (display (bold-output (format #f "\n[DRY-RUN]: ~a\n" rendered))))
+         (display (bold-output (format #f "\n[DRY-RUN]: ~a~a\n"
+                                       rendered
+                                       (if async? " &" "")))))
        #t)
       (else
        (when (and verbose? (not (quiet?)))
          (log-info "  Execute pipeline:\n~a\n" rendered))
-       (let loop ((remaining stages) (input #f) (pids '()))
-         (if (null? remaining)
-             (let ((statuses (map (lambda (pid) (cdr (waitpid pid 0)))
-                                  (reverse pids))))
-               (let scan ((stage-list stages)
-                          (status-list statuses)
-                          (position 1)
-                          (failures '()))
-                 (cond
-                   ((null? stage-list)
-                    (cond
-                      ((null? failures) #t)
-                      (allow-failure? #f)
-                      (else
-                       (raise-maak-error
-                        (format #f "pipeline failed: ~a"
-                                (string-join (reverse failures) ", "))
-                        #:hint
-                        "Fix the failing stage above, or run `maak --dry-run' to inspect the pipeline first."))))
-                   (else
-                    (let ((code (status:exit-val (car status-list))))
-                      (scan (cdr stage-list)
-                            (cdr status-list)
-                            (+ position 1)
-                            (if (and code (zero? code))
-                                failures
-                                (cons (format #f "stage ~a (~a) ~a"
-                                              position
-                                              (argv->string (car stage-list))
-                                              (if code
-                                                  (format #f "exited with code ~a"
-                                                          code)
-                                                  "was terminated by a signal"))
-                                      failures))))))))
-             (let* ((last? (null? (cdr remaining)))
-                    (out (if last? #f (pipe)))
-                    (pid (pipeline-stage-pid (car remaining) input out)))
-               (when input (close-port input))
-               (when out (close-port (cdr out)))
-               (loop (cdr remaining)
-                     (and out (car out))
-                     (cons pid pids)))))))))
+       (if async?
+           (make-job (spawn-pipeline argv-stages) rendered)
+           (let ((failures (pipeline-failures argv-stages)))
+             (cond
+               ((null? failures) #t)
+               (allow-failure? #f)
+               (else
+                (raise-maak-error
+                 (format #f "pipeline failed: ~a"
+                         (string-join failures ", "))
+                 #:hint
+                 "Fix the failing stage above, or run `maak --dry-run' to inspect the pipeline first.")))))))))
 
 (define-syntax-rule (get-module-var setting)
   "Get a variable from the currently loaded maak file module."

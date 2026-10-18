@@ -339,6 +339,81 @@
                 (parameterize ((quiet? #t))
                   (run-pipeline (list (list "definitely-not-a-program-maak"))
                                 #:allow-failure? #t))))
+         (test "a stage takes environment variables of its own"
+               (let* ((dir (process-scratch-directory))
+                      (path (string-append dir "/stage-env.txt")))
+                 (parameterize ((quiet? #t))
+                   (run-pipeline (list (stage (list "sh" "-c"
+                                                   "printf %s \"$MAAK_STAGE_VALUE\"")
+                                             #:env '("MAAK_STAGE_VALUE=stage"))
+                                       (list "sh" "-c"
+                                             (string-append
+                                              "cat > "
+                                              (shell-quote path))))))
+                 (let ((text (call-with-input-file path get-string-all)))
+                   (parameterize ((quiet? #t))
+                     (delete-file-recursively dir))
+                   (assert-equal #:expect "stage" #:got text))))
+         (test "a pipeline gives its environment to every stage"
+               (let* ((dir (process-scratch-directory))
+                      (path (string-append dir "/pipeline-env.txt")))
+                 (parameterize ((quiet? #t))
+                   (run-pipeline (list (stage (list "sh" "-c"
+                                                   "printf %s \"$MAAK_PIPE_VALUE\""))
+                                       (list "sh" "-c"
+                                             (string-append
+                                              "cat > "
+                                              (shell-quote path))))
+                                 #:env '("MAAK_PIPE_VALUE=shared")))
+                 (let ((text (call-with-input-file path get-string-all)))
+                   (parameterize ((quiet? #t))
+                     (delete-file-recursively dir))
+                   (assert-equal #:expect "shared" #:got text))))
+         (test "a stage's environment wins over the pipeline's"
+               (let* ((dir (process-scratch-directory))
+                      (path (string-append dir "/override.txt")))
+                 (parameterize ((quiet? #t))
+                   (run-pipeline (list (stage (list "sh" "-c"
+                                                   "printf %s \"$MAAK_VALUE\"")
+                                             #:env '("MAAK_VALUE=stage"))
+                                       (list "sh" "-c"
+                                             (string-append
+                                              "cat > "
+                                              (shell-quote path))))
+                                 #:env '("MAAK_VALUE=pipeline")))
+                 (let ((text (call-with-input-file path get-string-all)))
+                   (parameterize ((quiet? #t))
+                     (delete-file-recursively dir))
+                   (assert-equal #:expect "stage" #:got text))))
+         (test "a dry run shows a stage's environment and sudo"
+               (let ((printed (parameterize ((dry-run? #t) (quiet? #f))
+                                (with-output-to-string
+                                  (lambda ()
+                                    (run-pipeline
+                                     (list (stage (list "true")
+                                                  #:env '("A=1")
+                                                  #:sudo? #t))))))))
+                 ;; `string-contains' answers with the position it found, so
+                 ;; the assertion asks a question with one answer.
+                 (assert-true (and (string-contains printed
+                                                   "sudo env A=1 true")
+                                   #t))))
+         (test "a stage refuses an empty argument list"
+               (assert-error (lambda () (stage '()))))
+         (test "a pipeline refuses a stage that is not an argument list"
+               (assert-error (lambda () (run-pipeline (list 42)))))
+         (test "an async pipeline returns a job"
+               (let ((job (parameterize ((quiet? #t))
+                            (run-pipeline (list (list "true"))
+                                          #:async? #t))))
+                 (assert-true (and (job? job)
+                                   (integer? (job-pid job))
+                                   (wait-job job)))))
+         (test "a failing async pipeline fails its job"
+               (assert-false
+                (wait-job (parameterize ((quiet? #t))
+                            (run-pipeline (list (list "false") (list "true"))
+                                          #:async? #t)))))
          (test "run expands a wildcard when asked to"
                (let* ((dir (process-scratch-directory))
                       (file (string-append dir "/a b.txt"))
