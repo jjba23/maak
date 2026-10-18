@@ -160,14 +160,14 @@ rpmbuild -ba ~/rpmbuild/SPECS/maak.spec
 You should end up with:
 
 #+begin_src shell
-~/rpmbuild/RPMS/x86_64/maak-0.8.17-0.x86_64.rpm
-~/rpmbuild/SRPMS/maak-0.8.17-0.src.rpm
+~/rpmbuild/RPMS/x86_64/maak-0.9.0-0.x86_64.rpm
+~/rpmbuild/SRPMS/maak-0.9.0-0.src.rpm
 #+end_src
 
 Install and run it:
 
 #+begin_src shell
-sudo zypper install ~/rpmbuild/RPMS/x86_64/maak-0.8.17-0.x86_64.rpm
+sudo zypper install ~/rpmbuild/RPMS/x86_64/maak-0.9.0-0.x86_64.rpm
 maak --help
 #+end_src
 
@@ -194,7 +194,7 @@ maak --version
 #+end_src
 
 #+begin_src
-maak 0.8.17
+maak 0.9.0
 License: GPL-3.0-or-later
 Homepage: https://codeberg.org/jjba23/maak
 #+end_src
