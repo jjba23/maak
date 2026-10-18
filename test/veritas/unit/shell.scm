@@ -140,6 +140,162 @@
                  (assert-equal #:expect start
                                #:got (getcwd))))))
 
+(define capture-suite
+  (suite "Capturing output"
+         #:concurrent? #f
+         #:shuffle? #f
+         (test "capture returns the output of a successful command"
+               (assert-equal #:expect "fine\n"
+                             #:got (parameterize ((quiet? #t))
+                                     (capture "echo fine"))))
+         (test "capture raises when the command fails"
+               (assert-error
+                (lambda ()
+                  (parameterize ((quiet? #t))
+                    (capture "exit 3")))))
+         (test "capture keeps partial output only when allowed to fail"
+               (assert-equal #:expect "partial\n"
+                             #:got (parameterize ((quiet? #t))
+                                     (capture "echo partial; exit 3"
+                                              #:allow-failure? #t))))
+         (test "capture includes standard error when asked"
+               (assert-equal #:expect "oops\n"
+                             #:got (parameterize ((quiet? #t))
+                                     (capture "sh -c 'echo oops >&2'"
+                                              #:error? #t))))))
+
+(define spacing-suite
+  (suite "File helpers keep paths with spaces whole"
+         #:concurrent? #f
+         #:shuffle? #f
+         (test "mkdir-p creates one directory, not a directory per word"
+               (let* ((root (scratch-directory "spaces"))
+                      (dir (string-append root "/a b"))
+                      (created? (begin
+                                  (parameterize ((quiet? #t)) (mkdir-p dir))
+                                  (file-exists? dir))))
+                 (delete-file-recursively root)
+                 (assert-true created?)))
+         (test "touch creates a file whose name has a space"
+               (let* ((root (scratch-directory "touch-space"))
+                      (file (string-append root "/a b.txt"))
+                      (created? (begin
+                                  (parameterize ((quiet? #t)) (touch file))
+                                  (file-exists? file))))
+                 (delete-file-recursively root)
+                 (assert-true created?)))
+         (test "cp copies paths whose names have spaces"
+               (let* ((root (scratch-directory "cp-space"))
+                      (from (string-append root "/a b.txt"))
+                      (to (string-append root "/c d.txt"))
+                      (copied? (begin
+                                 (write-file from "spaced")
+                                 (parameterize ((quiet? #t))
+                                   (cp from to #:verbose-copy? #f))
+                                 (file-exists? to))))
+                 (delete-file-recursively root)
+                 (assert-true copied?)))
+         (test "mv moves paths whose names have spaces"
+               (let* ((root (scratch-directory "mv-space"))
+                      (from (string-append root "/a b.txt"))
+                      (to (string-append root "/c d.txt"))
+                      (moved? (begin
+                                (write-file from "moved")
+                                (parameterize ((quiet? #t)) (mv from to))
+                                (and (file-exists? to)
+                                     (not (file-exists? from))))))
+                 (delete-file-recursively root)
+                 (assert-true moved?)))
+         (test "ln-s links a path whose name has a space"
+               (let* ((root (scratch-directory "ln-space"))
+                      (target (string-append root "/a b.txt"))
+                      (link (string-append root "/c d.txt"))
+                      (linked? (begin
+                                 (write-file target "linked")
+                                 (parameterize ((quiet? #t))
+                                   (ln-s target link))
+                                 (file-exists? link))))
+                 (delete-file-recursively root)
+                 (assert-true linked?)))
+         (test "chmod-file changes the mode of a path with a space"
+               (let* ((root (scratch-directory "chmod-space"))
+                      (file (string-append root "/a b.sh"))
+                      (perms (begin
+                               (write-file file "#!/bin/sh\n")
+                               (parameterize ((quiet? #t))
+                                 (chmod-file "700" file))
+                               (logand (stat:perms (stat file)) #o777))))
+                 (delete-file-recursively root)
+                 (assert-equal #:expect #o700 #:got perms)))
+         (test "delete-file-recursively removes a directory with a space"
+               (let* ((root (scratch-directory "rm-space"))
+                      (dir (string-append root "/a b"))
+                      (gone? (begin
+                               (parameterize ((quiet? #t)) (mkdir-p dir))
+                               (parameterize ((quiet? #t))
+                                 (delete-file-recursively dir))
+                               (not (file-exists? dir)))))
+                 (delete-file-recursively root)
+                 (assert-true gone?)))))
+
+(define expansion-suite
+  (suite "Shell expansion when asked for"
+         #:concurrent? #f
+         #:shuffle? #f
+         (test "delete-file-recursively expands a wildcard when asked"
+               (let* ((root (scratch-directory "expand-rm"))
+                      (a (string-append root "/a b.txt"))
+                      (b (string-append root "/c.txt"))
+                      (keep (string-append root "/keep.log"))
+                      (gone? (begin
+                               (write-file a "a")
+                               (write-file b "b")
+                               (write-file keep "c")
+                               (parameterize ((quiet? #t))
+                                 (delete-file-recursively
+                                  (string-append root "/*.txt")
+                                  #:expand? #t))
+                               (and (not (file-exists? a))
+                                    (not (file-exists? b))
+                                    (file-exists? keep)))))
+                 (delete-file-recursively root)
+                 (assert-true gone?)))
+         (test "cp expands a wildcard when asked"
+               (let* ((root (scratch-directory "expand-cp"))
+                      (dest (string-append root "/dest"))
+                      (a (string-append root "/a b.txt"))
+                      (b (string-append root "/c.txt"))
+                      (copied? (begin
+                                 (write-file a "a")
+                                 (write-file b "b")
+                                 (parameterize ((quiet? #t))
+                                   (mkdir-p dest)
+                                   (cp (string-append root "/*.txt")
+                                       dest
+                                       #:verbose-copy? #f
+                                       #:expand? #t))
+                                 (and (file-exists? (string-append dest
+                                                                   "/a b.txt"))
+                                      (file-exists? (string-append dest
+                                                                   "/c.txt"))))))
+                 (delete-file-recursively root)
+                 (assert-true copied?)))
+         (test "chmod-file expands a wildcard when asked"
+               (let* ((root (scratch-directory "expand-chmod"))
+                      (a (string-append root "/a.txt"))
+                      (b (string-append root "/b.txt"))
+                      (perms (begin
+                               (write-file a "a")
+                               (write-file b "b")
+                               (parameterize ((quiet? #t))
+                                 (chmod-file "600"
+                                             (string-append root "/*.txt")
+                                             #:expand? #t))
+                               (list (logand (stat:perms (stat a)) #o777)
+                                     (logand (stat:perms (stat b)) #o777)))))
+                 (delete-file-recursively root)
+                 (assert-equal #:expect (list #o600 #o600) #:got perms)))))
+
 (define environment-suite
   (suite "Environment helpers"
          #:concurrent? #f
@@ -248,5 +404,8 @@
                #:shuffle? #f
                quoting-suite
                file-suite
+               capture-suite
+               spacing-suite
+               expansion-suite
                environment-suite
                env-file-suite))

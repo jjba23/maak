@@ -79,6 +79,7 @@
 (define cli-fixture "test/maak/fixtures/cli.scm")
 (define keep-going-fixture "test/maak/fixtures/keep-going.scm")
 (define several-fixture "test/maak/fixtures/several.scm")
+(define parallel-fixture "test/maak/fixtures/parallel.scm")
 (define subdir "test/maak/fixtures/subdir")
 
 (define (unique-path name)
@@ -211,6 +212,55 @@ that a case can ask about it alongside the status of the run."
                  (assert-equal #:expect (list 1 #t)
                                #:got (list (status-of result)
                                            (said? result "stdout" "last-pass-ran")))))
+
+         ;; ---- Several tasks at once --------------------------------------
+         ;;
+         ;; `-j' runs each task in a worker of its own and prints the workers'
+         ;; output as blocks in the order the tasks were named.  The cases
+         ;; below ask for that order, for the exit status of a run with a
+         ;; failure in it, and for the refusal of a job count that means
+         ;; nothing.
+
+         (test "-j runs the tasks named and prints their output in that order"
+               (let* ((result (launcher-run "-f" parallel-fixture
+                                            "--no-banner"
+                                            "-j" "2" "--" "slow,fast"))
+                      (out (stdout-of result))
+                      (slow (string-contains out "slow-ran"))
+                      (fast (string-contains out "fast-ran")))
+                 (assert-equal #:expect (list 0 #t #t #t)
+                               #:got (list (status-of result)
+                                           (said? result "stdout" "slow-ran")
+                                           (said? result "stdout" "fast-ran")
+                                           (and slow fast (< slow fast))))))
+
+         (test "-j with a failing task exits non-zero and says which task failed"
+               (let ((result (launcher-run "-f" parallel-fixture
+                                           "--no-banner"
+                                           "-j" "2" "--" "fast,boom")))
+                 (assert-equal #:expect (list 1 #t #t)
+                               #:got (list (status-of result)
+                                           (said? result "stdout" "parallel boom")
+                                           (said? result "stderr"
+                                                  "1 task failed: boom")))))
+
+         (test "-j 1 runs the tasks one after another and still succeeds"
+               (let ((result (launcher-run "-f" parallel-fixture
+                                           "--no-banner"
+                                           "-j" "1" "--" "fast,slow")))
+                 (assert-equal #:expect (list 0 #t #t)
+                               #:got (list (status-of result)
+                                           (said? result "stdout" "fast-ran")
+                                           (said? result "stdout" "slow-ran")))))
+
+         (test "a job count that is not a positive number is refused"
+               (let ((result (launcher-run "-f" parallel-fixture
+                                           "--no-banner"
+                                           "-j" "0" "--" "fast")))
+                 (assert-equal #:expect (list 1 #t)
+                               #:got (list (status-of result)
+                                           (said? result "stderr"
+                                                  "invalid job count")))))
 
          ;; ---- The task and argument grammar ------------------------------
          ;;

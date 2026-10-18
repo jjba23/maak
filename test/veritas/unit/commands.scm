@@ -90,7 +90,8 @@
      ($ '("make failing-target") #:allow-failure? #t))))
 
 (define (async-command-result)
-  "Return what starting a slow command in the background says, and how long it took."
+  "Return what starting a slow command in the background returns, and how long
+it took."
   (let* ((start (get-internal-real-time))
          (result ($ '("sleep 3") #:async? #t))
          (elapsed (/ (- (get-internal-real-time) start)
@@ -420,9 +421,10 @@
                (parameterize ((quiet? #t))
                  (assert-equal #:expect #t
                                #:got ($ '("true") #:allow-failure? #t))))
-         (test "a backgrounded command reports it was started"
-               (assert-equal #:expect #t
-                             #:got (car (async-command-result))))
+         (test "a backgrounded command reports a job with a pid"
+               (let ((result (car (async-command-result))))
+                 (assert-true (and (job? result)
+                                   (integer? (job-pid result))))))
          (test "a backgrounded command is not waited for"
                ;; Back in under the time the command needs: it was started,
                ;; not waited for.

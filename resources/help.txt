@@ -78,6 +78,12 @@ Options:
         Keep going after a task fails, and let the run succeed anyway.  Every
         failure is reported where it happened, as a warning.
 
+    -j, --jobs N
+        Run up to N tasks at the same time.  Each task runs in a worker of
+        its own, and its output is printed as one block, in the order the
+        tasks were named.  A failure stops nothing -- every named task has
+        already been started -- and the run fails at the end if any failed.
+
     -k, --keep-going
         Keep going after a task fails.  Every failure is reported where it
         happened, and the run fails at the end with the tasks that failed.

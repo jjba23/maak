@@ -29,6 +29,7 @@
 (define-module (veritas unit dsl)
   #:declarative? #t
   #:use-module (veritas veritas)
+  #:use-module (ice-9 textual-ports)
   #:use-module (srfi srfi-1)
   #:use-module (srfi srfi-13)
   #:use-module (maak dsl)
@@ -192,9 +193,187 @@
                (assert-error (lambda ()
                                (raise-maak-error "nope"))))))
 
+(define (process-scratch-directory)
+  "Return a fresh, empty directory under the temporary directory."
+  (let ((dir (string-append (or (getenv "TMPDIR") "/tmp")
+                            "/maak-test-processes-"
+                            (number->string (getpid)))))
+    (parameterize ((quiet? #t))
+      (when (file-exists? dir)
+        (delete-file-recursively dir))
+      (mkdir-p dir))
+    dir))
+
+(define processes-suite
+  (suite "Programs, arguments and jobs"
+         #:concurrent? #f
+         #:shuffle? #f
+         (test "run returns #t when the program exits with 0"
+               (assert-true (parameterize ((quiet? #t))
+                              (run (list "true")))))
+         (test "run keeps a space inside one argument"
+               (assert-true
+                (parameterize ((quiet? #t))
+                  ;; sh counts the arguments after the script: the path is one
+                  ;; word only if the runner never handed it to a shell.
+                  (run (list "sh" "-c" "test \"$#\" -eq 1" "sh" "a b")))))
+         (test "run returns #f when a failure is allowed"
+               (assert-false
+                (parameterize ((quiet? #t))
+                  (run (list "sh" "-c" "exit 3") #:allow-failure? #t))))
+         (test "run raises when a command fails"
+               (assert-error
+                (lambda ()
+                  (parameterize ((quiet? #t))
+                    (run (list "sh" "-c" "exit 3"))))))
+         (test "run refuses an empty argument list"
+               (assert-error (lambda () (run '()))))
+         (test "run refuses an argument that is not a string"
+               (assert-error (lambda () (run (list "true" 3)))))
+         (test "a dry run does not start the program"
+               (let* ((dir (process-scratch-directory))
+                      (path (string-append dir "/not-created"))
+                      (created? (parameterize ((dry-run? #t) (quiet? #t))
+                                  (run (list "mkdir" path))
+                                  (file-exists? path))))
+                 (parameterize ((quiet? #t))
+                   (delete-file-recursively dir))
+                 (assert-false created?)))
+         (test "an async run returns a job with a pid"
+               (let ((job (parameterize ((quiet? #t))
+                            (run (list "sh" "-c" "exit 0")
+                                 #:async? #t))))
+                 (wait-job job)
+                 (assert-true (and (job? job) (integer? (job-pid job))))))
+         (test "wait-job is #t for a successful job"
+               (assert-true
+                (wait-job (parameterize ((quiet? #t))
+                            (run (list "sh" "-c" "exit 0")
+                                 #:async? #t)))))
+         (test "wait-job is #f for a failing job"
+               (assert-false
+                (wait-job (parameterize ((quiet? #t))
+                            (run (list "sh" "-c" "exit 4")
+                                 #:async? #t)))))
+         (test "job-exit-code reports the exit code"
+               (assert-equal #:expect 4
+                             #:got (job-exit-code
+                                    (parameterize ((quiet? #t))
+                                      (run (list "sh" "-c" "exit 4")
+                                           #:async? #t)))))
+         (test "a job can be waited on twice"
+               (let* ((job (parameterize ((quiet? #t))
+                             (run (list "sh" "-c" "exit 0")
+                                  #:async? #t)))
+                      (first (wait-job job)))
+                 (assert-equal #:expect first #:got (wait-job job))))
+         (test "job-done? does not wait for a running job"
+               (let* ((job (parameterize ((quiet? #t))
+                             (run (list "sh" "-c" "sleep 0.2")
+                                  #:async? #t)))
+                      (before (job-done? job)))
+                 (wait-job job)
+                 (assert-false before)))
+         (test "job-done? is true once the job has finished"
+               (let* ((job (parameterize ((quiet? #t))
+                             (run (list "sh" "-c" "exit 0")
+                                  #:async? #t)))
+                      (done? (begin
+                               (usleep 200000)
+                               (job-done? job))))
+                 (assert-true done?)))
+         (test "a background shell command is a job too"
+               (let* ((job (parameterize ((quiet? #t))
+                             ($ (list "sh -c 'exit 0'") #:async? #t)))
+                      (result (wait-job job)))
+                 (assert-true (and (job? job) result))))
+         (test "job-command keeps the command as written"
+               (assert-equal #:expect "sh -c 'exit 0'"
+                             #:got (job-command
+                                    (parameterize ((quiet? #t))
+                                      ($ (list "sh -c 'exit 0'")
+                                         #:async? #t)))))))
+
+(define pipeline-suite
+  (suite "Pipelines and shell expansion"
+         #:concurrent? #f
+         #:shuffle? #f
+         (test "a pipeline feeds each stage into the next"
+               (let* ((dir (process-scratch-directory))
+                      (path (string-append dir "/out.txt")))
+                 (parameterize ((quiet? #t))
+                   (run-pipeline (list (list "printf" "hello\n")
+                                       (list "sh" "-c"
+                                             (string-append
+                                              "cat > "
+                                              (shell-quote path))))))
+                 (let ((text (call-with-input-file path get-string-all)))
+                   (parameterize ((quiet? #t))
+                     (delete-file-recursively dir))
+                   (assert-equal #:expect "hello\n" #:got text))))
+         (test "a failing stage fails the whole pipeline"
+               (assert-false
+                (parameterize ((quiet? #t))
+                  (run-pipeline (list (list "false") (list "true"))
+                                #:allow-failure? #t))))
+         (test "a pipeline raises when a stage fails"
+               (assert-error
+                (lambda ()
+                  (parameterize ((quiet? #t))
+                    (run-pipeline (list (list "false") (list "true")))))) )
+         (test "a pipeline with no stages is refused"
+               (assert-error (lambda () (run-pipeline '()))))
+         (test "a pipeline with an empty stage is refused"
+               (assert-error (lambda () (run-pipeline (list '())))))
+         (test "a dry run does not start the pipeline"
+               (let* ((dir (process-scratch-directory))
+                      (path (string-append dir "/not-created"))
+                      (created? (parameterize ((dry-run? #t) (quiet? #t))
+                                  (run-pipeline (list (list "touch" path)))
+                                  (file-exists? path))))
+                 (parameterize ((quiet? #t))
+                   (delete-file-recursively dir))
+                 (assert-false created?)))
+         (test "a stage whose program is missing fails the pipeline"
+               (assert-false
+                (parameterize ((quiet? #t))
+                  (run-pipeline (list (list "definitely-not-a-program-maak"))
+                                #:allow-failure? #t))))
+         (test "run expands a wildcard when asked to"
+               (let* ((dir (process-scratch-directory))
+                      (file (string-append dir "/a b.txt"))
+                      (keep (string-append dir "/keep.log"))
+                      (removed? (begin
+                                  (parameterize ((quiet? #t))
+                                    (run (list "touch" file))
+                                    (run (list "touch" keep))
+                                    ;; One wildcard covers the name with a
+                                    ;; space in it: only the shell can match
+                                    ;; it, which is what the opt-in asks for.
+                                    (run (list "rm" "-f"
+                                               (string-append dir "/*.txt"))
+                                         #:expand? #t))
+                                  (and (not (file-exists? file))
+                                       (file-exists? keep)))))
+                 (parameterize ((quiet? #t))
+                   (delete-file-recursively dir))
+                 (assert-true removed?)))
+         (test "run takes a wildcard literally without the opt-in"
+               (let* ((dir (process-scratch-directory))
+                      (file (string-append dir "/*.txt"))
+                      (created? (begin
+                                  (parameterize ((quiet? #t))
+                                    (run (list "touch" file)))
+                                  (file-exists? file))))
+                 (parameterize ((quiet? #t))
+                   (delete-file-recursively dir))
+                 (assert-true created?)))))
+
 (define (spec)
   (veritas-run #:concurrent? #f
                #:shuffle? #f
                strings-suite
                load-path-suite
-               error-suite))
+               error-suite
+               processes-suite
+               pipeline-suite))

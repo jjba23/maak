@@ -58,6 +58,16 @@
                            ~
                            syscall
                            cat
+                           ;; ====== Programs and background jobs ======
+                           run
+                           run-pipeline
+                           job?
+                           job-pid
+                           job-command
+                           job-done?
+                           job-exit-code
+                           wait-job
+
                            ;; ====== Errors ======
                            &maak-error
                            make-maak-error                           maak-error? 
@@ -136,7 +146,8 @@
                            maak-homepage
                            maak-license
                            print-version)
-  #:export (resolve-maak-tasks list-tasks run-tasks run-task
+  #:export (resolve-maak-tasks list-tasks run-tasks run-tasks-parallel
+                              run-task
                               format-task-doc available-task-names
                               unknown-task-error))
 
@@ -385,3 +396,154 @@ is not visible as a task (see the export rules in the README)."
        (newline)
        (run-task-procedure task proc task-args valid-tasks))
       (else (unknown-task-error task)))))
+
+;; ====== Several tasks at once ======
+;;
+;; A run is sequential by default, which keeps the output in order and every
+;; failure where it happened.  `run-tasks-parallel' is the opt-in: each task
+;; gets a forked worker of its own and writes to a log file, and the parent
+;; prints the logs in the order the tasks were named.  Forking rather than
+;; threading is what makes the output separable: a worker's Scheme writes and
+;; the output of every command it runs share one file, so no two tasks can
+;; interleave their lines.
+
+(define (parallel-task-log-path index)
+  "Return a log file of this run's own for the task at INDEX."
+  (format #f "~a/maak-task-~a-~a.log" (tmp-dir) (getpid) index))
+
+(define (report-parallel-task-failure task key vals)
+  "Print the failure of TASK from a forked worker, into that worker's log."
+  (let ((error (find-maak-error key vals)))
+    (if error
+        (begin
+          (format (current-error-port)
+                  "\nmaak: error (task ~a): ~a\n"
+                  task
+                  (maak-error-message error))
+          (when (maak-error-hint error)
+            (format (current-error-port)
+                    "        hint: ~a\n"
+                    (maak-error-hint error))))
+        (format (current-error-port)
+                "\nmaak: error (task ~a): ~a\n"
+                task
+                (exception->message key vals)))))
+
+(define* (fork-task-worker task task-args log-path)
+  "Fork a worker that runs TASK, with its output going to LOG-PATH.
+
+Returns the worker's pid in the parent; the child never returns.  Its exit
+status is 0 when the task succeeded and 1 when it raised, so the parent can
+report the failure next to the output that explains it."
+  ;; Flush the parent's buffers first: the child inherits the ports and would
+  ;; otherwise write the same text into its log.
+  (force-output (current-output-port))
+  (force-output (current-error-port))
+  (let ((pid (primitive-fork)))
+    (if (zero? pid)
+        (let ((log (open-file log-path "w")))
+          (dup2 (port->fdes log) 1)
+          (dup2 (port->fdes log) 2)
+          (parameterize ((current-output-port log)
+                         (current-error-port log))
+            (let ((code (catch #t
+                          (lambda ()
+                            (run-task task #:task-args task-args)
+                            0)
+                          (lambda (key . vals)
+                            (report-parallel-task-failure task key vals)
+                            1))))
+              (force-output log)
+              (close-port log)
+              (primitive-exit code))))
+        pid)))
+
+(define (display-task-log path)
+  "Print the captured output of a parallel task and remove its log file."
+  (when (file-exists? path)
+    (let ((text (call-with-input-file path get-string-all)))
+      (unless (string=? text "")
+        (display text)
+        ;; Blocks sit next to each other, so one that does not end in a newline
+        ;; gets one rather than joining the next task's first line.
+        (unless (char=? (string-ref text (- (string-length text) 1))
+                        #\newline)
+          (newline)))
+      (delete-file path))))
+
+(define* (run-tasks-parallel tasks
+                             #:key (task-args '()) (jobs 0))
+  "Run TASKS concurrently and print their output in the order they were given.
+
+TASKS is a list of symbols; TASK-ARGS are passed to each, as `run-tasks' does.
+JOBS limits how many run at once: a positive number runs that many, and 0 (the
+default) starts them all.
+
+Each task runs in a forked worker, so a task sees the Maak file as it was
+loaded and cannot change the environment of the tasks beside it.  A worker's
+standard output and standard error, including the output of every command it
+runs, go to a log of its own; the logs are printed as blocks, in the order the
+tasks were named, as soon as the next task in that order has finished.  That is
+what keeps a parallel run readable: no two tasks interleave their lines.
+
+Returns the names of the tasks that failed, in the order they were given.  A
+task that cannot be found is an error before any worker starts, so a mistyped
+name cannot leave half a run behind."
+  (let* ((valid (resolve-maak-tasks))
+         (pending (let loop ((remaining tasks) (index 0) (acc '()))
+                    (cond
+                      ((null? remaining) (reverse acc))
+                      (else
+                       (unless (assoc (car remaining) valid)
+                         (unknown-task-error (car remaining)))
+                       (loop (cdr remaining)
+                             (+ index 1)
+                             (cons (cons index (car remaining)) acc))))))
+         (count (length pending))
+         (limit (if (and (exact-integer? jobs) (>= jobs 1))
+                    jobs
+                    count))
+         (paths (make-vector count #f))
+         (statuses (make-vector count #f))
+         (running '())
+         (next 0)
+         (failed '())
+         (start! (lambda ()
+                   (let start ()
+                     (when (and (pair? pending)
+                                (< (length running) limit))
+                       (let* ((entry (car pending))
+                              (index (car entry))
+                              (task (cdr entry))
+                              (path (parallel-task-log-path index)))
+                         (vector-set! paths index path)
+                         (set! pending (cdr pending))
+                         (set! running
+                               (cons (cons (fork-task-worker task
+                                                             task-args
+                                                             path)
+                                           index)
+                                     running))
+                         (start)))))))
+    (start!)
+    (let wait ()
+      (when (or (pair? pending) (pair? running))
+        (let* ((result (waitpid -1 0))
+               (pid (car result))
+               (status (cdr result))
+               (entry (assoc pid running)))
+          (when entry
+            (set! running (delete entry running))
+            (vector-set! statuses (cdr entry) status)))
+        ;; Print every block that is next in line and has finished.
+        (let flush ()
+          (when (and (< next count) (vector-ref statuses next))
+            (let ((code (status:exit-val (vector-ref statuses next))))
+              (unless (and code (zero? code))
+                (set! failed (cons (list-ref tasks next) failed))))
+            (display-task-log (vector-ref paths next))
+            (set! next (+ next 1))
+            (flush)))
+        (start!)
+        (wait)))
+    (reverse failed)))

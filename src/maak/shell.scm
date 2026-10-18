@@ -18,13 +18,14 @@
 ;;; Commentary:
 ;;
 ;; The shell helpers that sit on top of `(maak dsl)'.  Where the core module
-;; offers the primitives (`$', `syscall', `cp', a few file moves), this one
-;; collects the everyday conveniences a task reaches for: locating a program
-;; before relying on it, quoting a value safely into a command, changing
-;; directory for the duration of a thunk, and reading environment variables.
+;; offers the primitives (`$', `run', `syscall', `cp', a few file moves), this
+;; one collects the everyday conveniences a task reaches for: locating a
+;; program before relying on it, running a command and reading its output,
+;; changing directory for the duration of a thunk, and reading environment
+;; variables.
 ;;
-;; Every helper here honours `dry-run?' and `quiet?' through the `$'/`syscall'
-;; it is built on, so a dry run prints instead of acting.
+;; Every helper here honours `dry-run?' and `quiet?' through the `run' or
+;; `syscall' it is built on, so a dry run prints instead of acting.
 
 ;;; Code:
 
@@ -36,8 +37,8 @@
   #:use-module (srfi srfi-1)
   #:use-module (srfi srfi-13)
   #:use-module (maak dsl)
-  #:export (shell-quote
-            which
+  #:re-export (shell-quote)
+  #:export (which
             command-exists?
             require-command
             capture
@@ -58,18 +59,7 @@
             read-file
             write-file))
 
-;; ====== Quoting and program lookup ======
-
-(define (shell-quote str)
-  "Return STR quoted so that a shell reads it as one literal word.
-
-The POSIX recipe: wrap the value in single quotes and turn every embedded
-single quote into the four characters backslash-quote-quote-quote.  Unlike
-`~s', this is safe for spaces, tabs, `$', backticks and newlines."
-  (string-append "'"
-                 (string-join (string-split str #\')
-                              "'\\''")
-                 "'"))
+;; ====== Program lookup ======
 
 (define (which command)
   "Return the absolute path of COMMAND on `PATH', or #f when it is missing.
@@ -101,12 +91,20 @@ command.
        #:hint (or hint
                  (format #f "Install `~a', or add it to PATH." command)))))
 
-(define* (capture command #:key (error? #f))
+(define* (capture command #:key (error? #f) (allow-failure? #f))
   "Run COMMAND and return its standard output as a string.
 
-With ERROR? true the command's standard error is captured too.  In dry-run
-mode the command is only printed and the empty string is returned.  The exit
-status is not checked; use `$' when a failing command must stop the task.
+With ERROR? true the command's standard error is captured too.
+
+A command that exits non-zero raises a maak error naming its exit code, rather
+than returning the empty or partial output it managed to produce: a caller
+that reads `\"\"' cannot tell a command that printed nothing from one that
+failed.  With ALLOW-FAILURE? true the output is returned anyway, and the caller
+decides what the failure means.
+
+In dry-run mode the command is only printed and the empty string is returned.
+Use `$' when a failing command must stop the task without its output, and
+`run' when the command takes arguments that a shell must not split.
 
 @example\n(string-trim (capture describe-tags-command))\n@end example"
   (cond
@@ -118,35 +116,53 @@ status is not checked; use `$' when a failing command must stop the task.
      (let* ((process (open-input-pipe (if error?
                                           (format #f "~a 2>&1" command)
                                           command)))
-            (output (get-string-all process)))
-       (close-pipe process)
-       output))))
+            (output (get-string-all process))
+            ;; close-pipe waits for the command, and its value is the wait
+            ;; status -- the same one `system' returns.
+            (status (close-pipe process))
+            (code (status:exit-val status)))
+       (cond
+         ((and code (zero? code)) output)
+         (allow-failure? output)
+         ((not code)
+          (raise-maak-error
+           (format #f "command was terminated by a signal: ~a" command)
+           #:hint
+           "The command above did not exit normally.  Re-run it by hand to see why."))
+         (else
+          (raise-maak-error
+           (format #f "command failed (exit code ~a): ~a" code command)
+           #:hint
+           "Fix the command above, or run `maak --dry-run' to inspect it first.")))))))
 
 ;; ====== File and directory helpers ======
 
-(define* (touch file #:key (verbose? #f))
-  "Create FILE if it does not exist, or update its timestamp."
-  ($ (list (format #f "touch ~a" (shell-quote file)))
-     #:verbose? verbose?))
+(define* (touch file #:key (verbose? #f) (expand? #f))
+  "Create FILE if it does not exist, or update its timestamp.
 
-(define* (ln-s target link-name #:key (force? #t) (verbose? #f))
+With EXPAND? #t the shell expands FILE, so a wildcard touches every name it
+matches; see `run' for what the opt-in does to the other helpers."
+  (run (list "touch" file)
+       #:verbose? verbose? #:expand? expand?))
+
+(define* (ln-s target link-name #:key (force? #t) (verbose? #f) (expand? #f))
   "Create a symbolic link LINK-NAME pointing at TARGET.
 
 With FORCE? (the default) an existing link is replaced, which is what
-`ln -sf' does."
-  ($ (list (format #f "ln -s~a ~a ~a"
-                   (if force? "f" "")
-                   (shell-quote target)
-                   (shell-quote link-name)))
-     #:verbose? verbose?))
+`ln -sf' does.  With EXPAND? #t the shell expands the two paths as words."
+  (run (list "ln" (if force? "-sf" "-s") target link-name)
+       #:verbose? verbose? #:expand? expand?))
 
-(define* (chmod-file mode file #:key (recursive? #f) (verbose? #f))
-  "Change the permissions of FILE to MODE, an octal string such as 755."
-  ($ (list (format #f "chmod ~a~a ~a"
-                   (if recursive? "-R " "")
-                   mode
-                   (shell-quote file)))
-     #:verbose? verbose?))
+(define* (chmod-file mode file
+                      #:key (recursive? #f) (verbose? #f) (expand? #f))
+  "Change the permissions of FILE to MODE, an octal string such as 755.
+
+With EXPAND? #t the shell expands FILE, so a wildcard names every file whose
+permissions are to change."
+  (run (append (list "chmod")
+               (if recursive? (list "-R") '())
+               (list mode file))
+       #:verbose? verbose? #:expand? expand?))
 
 (define* (read-file file #:key (default #f))
   "Return the contents of FILE as a string.

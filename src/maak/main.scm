@@ -95,6 +95,11 @@
     (ignore-errors (single-char #\i)
                    (value #f)
                    (required? #f))
+    ;; make's `-j': run up to N tasks at the same time, each in a forked worker
+    ;; whose output is printed as a block in the order the tasks were named.
+    (jobs (single-char #\j)
+          (value #t)
+          (required? #f))
     ;; make's `--no-print-directory', the switch that turns off the `-w' lines:
     ;; a run that changes directory says so unless it is asked not to.
     (no-print-directory (value #f)
@@ -417,7 +422,13 @@ one line naming the tasks that did not."
               ;; stops the run either way, and only the exit status differs.
               (keep-going? (or (option-ref options 'keep-going #f)
                                (option-ref options 'ignore-errors #f)))
-              (ignore-errors? (option-ref options 'ignore-errors #f)))
+              (ignore-errors? (option-ref options 'ignore-errors #f))
+              (jobs (let ((given (option-ref options 'jobs #f)))
+                      (if given (string->number given) 1))))
+         (unless (and (exact-integer? jobs) (>= jobs 1))
+           (raise-maak-error
+            (format #f "invalid job count: ~a" (option-ref options 'jobs ""))
+            #:hint "`-j/--jobs N' takes a positive whole number."))
          (apply-load-paths! (split-load-path (option-ref options
                                                            'load-path #f))
                             file)
@@ -445,10 +456,14 @@ one line naming the tasks that did not."
                              (string-join (map symbol->string
                                                tasks) " =>")))
                  (report-failed-tasks
-                  (run-tasks tasks
-                             #:task-args task-args
-                             #:keep-going? keep-going?
-                             #:on-failure report-task-failure)
+                  (if (> jobs 1)
+                      (run-tasks-parallel tasks
+                                          #:task-args task-args
+                                          #:jobs jobs)
+                      (run-tasks tasks
+                                 #:task-args task-args
+                                 #:keep-going? keep-going?
+                                 #:on-failure report-task-failure))
                   ignore-errors?)))
            0))))))
 

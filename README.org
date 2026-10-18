@@ -156,6 +156,7 @@ Maak provides standard CLI options to manage your execution pipeline:
 | ~-C~         | ~--directory~  | ~DIR~      | Change to ~DIR~ before the Maak file is read (repeatable; ~:~-separated allowed). |
 | ~-h~         | ~--help~       | None     | Display the help screen and exit.                                    |
 | ~-i~         | ~--ignore-errors~ | None    | Keep going after a failure, and let the run succeed anyway.         |
+| ~-j~         | ~--jobs~       | ~N~        | Run up to ~N~ tasks at the same time, keeping each task's output together. |
 | ~-k~         | ~--keep-going~ | None     | A task that fails does not stop the tasks after it.                  |
 | ~-l~         | ~--list~       | None     | List all available tasks in the currently loaded Maak file.          |
 | ~-L~         | ~--load-path~  | ~DIR~      | Add ~DIR~ to Guile's load path (repeatable; ~:~-separated allowed).    |
@@ -225,9 +226,16 @@ maak: error: Wrong number of arguments to #<procedure alpha ()>
 
 ** Running several tasks, and from another directory
 
-Three of Maak's switches are Make's, because the situations they answer come up
+Four of Maak's switches are Make's, because the situations they answer come up
 in any project and not only in a build:
 
+- ~-j~ / ~--jobs N~ runs up to N tasks at the same time.  Each task gets a
+  worker of its own, and its standard output and standard error are printed as
+  one block, in the order the tasks were named, so a parallel run stays
+  readable.  A task that fails stops nothing -- every named task has already
+  been started, so ~-j~ has ~--keep-going~ for free -- and the run fails at the
+  end with the tasks that did not succeed.  A task that changes the environment
+  or the working directory changes its worker's copy, not its neighbours'.
 - ~-k~ / ~--keep-going~ keeps going after a task fails.  Every failure is
   reported where it happened, naming the task that raised it, and the run fails
   at the end with the list of tasks that did not succeed.  Without it the first
@@ -242,6 +250,9 @@ in any project and not only in a build:
 #+begin_src shell
 # Run every task of the pipeline, and see all of the failures at once
 maak -k -- fmt,lint,test
+
+# Run the independent ones four at a time, each task's output kept in one block
+maak -j 4 -- fmt,lint,test
 
 # Run the tasks of another checkout's Maak file
 maak -C ../other-project -- build
@@ -382,15 +393,81 @@ They all honour the ~dry-run?~ and ~quiet?~ parameters.
 
 ** Shell
 
+Two runners sit at the bottom.  ~run~ takes a program and its arguments as
+separate strings and starts it without a shell; ~$~ takes one shell line for
+the cases that need one.  Prefer ~run~: a path with a space in it stays one
+argument instead of becoming three words.
+
+- ~(run argv)~ -- run a program from a list of strings.  The first string is
+  the program, every other one is an argument exactly as written.
+
+  #+begin_src scheme
+  (run (list "mkdir" "-p" build-dir))
+  (run (list "git" "commit" "-m" message))
+  (run (list "npm" "ci") #:dev-null? #t)
+  (run (list "guix" "shell" "-m" "manifest.scm" "--" "make" "test")
+       #:env '("CI=1"))
+
+  (unless (run (list "git" "diff" "--quiet") #:allow-failure? #t)
+    (log-info "the tree is dirty\n"))
+  #+end_src
+
+  It accepts the same ~#:env~, ~#:sudo?~, ~#:dev-null?~ and
+  ~#:allow-failure?~ keywords as ~$~, and a program that cannot be started
+  exits 127, which is reported like any other non-zero exit.  The helpers
+  below (~mkdir-p~, ~cp~, ~mv~, ~cat~, ~touch~, ~ln-s~, ~chmod-file~ and
+  ~delete-file-recursively~) are built on ~run~, so a path with a space in it
+  reaches the program as one argument.
+
+  ~#:expand? #t~ joins the arguments with spaces and hands them to the shell,
+  so a wildcard, ~$VAR~ or a leading tilde is expanded the way a shell would.
+  It is opt-in because the shell then sees words rather than arguments: a path
+  with a space in it becomes several words again.  The file helpers pass the
+  keyword through, so ~(delete-file-recursively "build/*.o" #:expand? #t)~
+  removes every object file the shell names.
+
+- ~(run-pipeline stages)~ -- run programs one after another with each standard
+  output feeding the next standard input, without a shell:
+
+  #+begin_src scheme
+  (run-pipeline (list (list "cat" file)
+                      (list "grep" "-v" "^#")
+                      (list "sort" "-u")))
+  #+end_src
+
+  Each stage is an argument list shaped like ~run~'s.  Unlike a shell's ~|~,
+  which reports only the last stage, a pipeline reports every stage that
+  failed; ~#:allow-failure? #t~ returns ~#f~ instead of raising.
+
+- ~(run argv #:async? #t)~ -- start the program in the background and return a
+  *job* record.  Unlike a trailing ~&~, the job has a pid and a status that can
+  be waited for:
+
+  #+begin_src scheme
+  (define server (run (list "guix" "shell" "--" "run-server") #:async? #t))
+  (log-info "server started as ~a\n" (job-pid server))
+  ...
+  (unless (wait-job server)
+    (task-error "the server exited with a failure"))
+  #+end_src
+
+  ~job?~, ~job-pid~, ~job-command~, ~job-done?~ (non-blocking), ~wait-job~ (returns
+  ~#t~ when the exit code is 0) and ~job-exit-code~ read the job.  ~$~ and
+  ~syscall~ return the same record for ~#:async?~, so a background shell line
+  can be waited on too; maak forks the process rather than leaving a ~&~ to the
+  shell, which is what makes the pid available.
+
 - ~($ parts ...)~ -- run a shell command built from strings, joined by spaces.
-  The command can be decorated with keyword arguments, which are applied in the
-  order a shell would write them: ~[sudo] [env A=1] COMMAND [>/dev/null 2>&1] [&]~.
+  This is the escape hatch, for pipes, redirections, globs, ~$(...)~ and
+  ~VAR=value~ prefixes.  The command can be decorated with keyword arguments,
+  applied in the order a shell would write them:
+  ~[sudo] [env A=1] COMMAND [>/dev/null 2>&1]~.
 
   #+begin_src scheme
   ($ '("systemctl daemon-reload") #:sudo? #t)
   ($ '("make" "-j4") #:env '("CI=1" "V=1"))     ;; env CI=1 V=1 make -j4
-  ($ '("tsc --watch") #:async? #t)                 ;; tsc --watch &
   ($ '("npm ci") #:dev-null? #t)                   ;; npm ci >/dev/null 2>&1
+  (define watch ($ '("tsc --watch") #:async? #t))   ;; a job, see wait-job
 
   (unless ($ '("git diff --quiet") #:allow-failure? #t)
     (log-info "the tree is dirty\n"))
@@ -404,14 +481,20 @@ They all honour the ~dry-run?~ and ~quiet?~ parameters.
   ~#:allow-failure?~ returns ~#f~ instead of raising when the command exits
   non-zero, so the task is told the command failed and can decide what that
   means; it is the ~cmd || true~ idiom, except that the failure is not hidden
-  from the task.  ~#:async?~ starts the command and does not wait for it, and
-  ~#:sudo?~ runs it as root -- both are printed by ~--dry-run~ like anything
-  else, so they can be checked before they are really run.
+  from the task.  ~#:async?~ starts the command in the background and returns a
+  job, and ~#:sudo?~ runs it as root -- both are printed by ~--dry-run~ like
+  anything else, so they can be checked before they are really run.
 
-- ~syscall~, ~capture~, ~which~, ~command-exists?~, ~require-command~.
+- ~syscall~ -- run one shell line and raise when it exits non-zero; it is ~$~
+  without the list of parts.
+- ~capture~ -- return a command's output.  A command that exits non-zero raises
+  an error naming its exit code instead of returning the empty or partial
+  output it produced; pass ~#:allow-failure? #t~ to read that output anyway.
+- ~which~, ~command-exists?~, ~require-command~ -- find a program on ~PATH~.
 - ~shell-quote~ -- quote a value so a shell reads it as one word.
-- ~touch~, ~ln-s~, ~chmod-file~, ~read-file~, ~write-file~, ~cp~, ~mv~,
-  ~mkdir-p~, ~remkdir-p~, ~delete-file-recursively~, ~cat~.
+- ~read-file~, ~write-file~ -- read and write a file from Scheme.
+- ~mkdir-p~, ~remkdir-p~, ~delete-file-recursively~, ~cp~, ~mv~, ~cat~,
+  ~touch~, ~ln-s~, ~chmod-file~ -- file helpers, all built on ~run~.
 - ~with-directory~, ~cd~, ~env-get~, ~env-set!~, ~env-unset!~, ~with-env~,
   ~with-env-vars~, ~home-dir~, ~tmp-dir~, ~load-env-file~, ~env-file-entries~.
 
@@ -566,7 +649,7 @@ a ~make~ habit usually lands. This is where each of Make's options ends up:
 | ~.DEFAULT_GOAL~                    | the ~default~ task, and a clear error when there is none          |
 | ~.PHONY~                           | nothing: every task runs when it is asked to                     |
 | ~MAKEFLAGS~, ~MFLAGS~              | ~MAAK_ENV_FILE~, ~MAAK_LOAD_PATH~, ~MAAK_NO_BANNER~, ~MAAK_DEBUG~  |
-| ~$(shell ...)~, ~$(wildcard ...)~    | any Scheme: ~capture~, ~syscall~, ~$~, ~file-exists?~              |
+| ~$(shell ...)~, ~$(wildcard ...)~    | any Scheme: ~run~, ~capture~, ~$~, ~file-exists?~                  |
 | ~include other.mk~                 | ~use-modules~, or ~load~ from a Maak file                        |
 
 Three families of Make options have no counterpart, and each is a design
@@ -578,13 +661,13 @@ decision rather than an omission:
   was asked for; a task that wants to skip work says so itself, in Scheme, where
   the condition can be anything -- a hash, a row in a database, a check over the
   network -- and not only the age of a file.
-- *Parallel jobs.*  Make's ~-j~ and the jobserver that coordinates recursive
-  runs exist to keep a build's cores busy.  A run of Maak tasks is sequential,
-  which keeps the output in order and every failure where it happened; a task
-  that wants to do several things at once uses Guile's own concurrency inside
-  the task (the test suite, for instance, is split over worker processes with
-  ~VERITAS_JOBS~).  The refinements of job control (~-l~, ~-S~, ~--output-sync~,
-  ~--trace~) follow it.
+- *Parallel jobs.*  Maak's ~-j/--jobs N~ runs up to N tasks at once, each in a
+  forked worker whose output is printed as one block in the order the tasks
+  were named; a task that wants to do several things inside itself uses
+  Guile's own concurrency, as the test suite does with ~VERITAS_JOBS~.  Make's
+  jobserver machinery and the refinements of job control (~-l~, ~-S~,
+  ~--output-sync~, ~--trace~) have no counterpart: the block is the output
+  synchronisation, and the number of jobs is the only control.
 - *The Makefile language itself.*  Variables, ~$(...)~ expansion and the recipe
   prefixes ~@~, ~-~ and ~+~ have nothing to do here: a Maak file is Scheme, and
   a task's commands are the strings it builds.  ~-r~, ~-R~ and

@@ -181,6 +181,18 @@ reported where it happened, as a warning.  This is
 .B \-\-keep\-going
 with a different verdict.
 .TP
+.BR \-j ", " \-\-jobs " " N
+Run up to
+.I N
+tasks at the same time, each in a worker of its own.  A task's standard output
+and standard error are captured and printed as one block, in the order the
+tasks were named, as soon as the next block in that order is ready.  A task
+that fails stops nothing -- every named task has already been started, so this
+flag has
+.B \-\-keep\-going
+for free -- and the run fails at the end with the tasks that did not succeed.
+Without this flag the tasks run one after another.
+.TP
 .BR \-k ", " \-\-keep\-going
 Carry on after a task fails instead of ending the run there.  Each failure is
 reported where it happened, naming the task that raised it, and the run then
@@ -268,31 +280,102 @@ The following helpers are available from
 all of them honour dry\-run and quiet modes.
 .SS Shell
 .TP
-.B ($ parts)
-Run a shell command built from a list of strings, joined by spaces.  With
+.B (run argv)
+Run a program from a list of strings: the program first, then one string per
+argument.  No shell is involved, so a path containing a space stays one
+argument.  With
 .BR #:verbose? " #t"
-the command is logged first.
+the command is logged first.  It accepts
+.BR #:env ,
+.BR #:sudo? ,
+.B #:dev\-null?
+and
+.B #:allow\-failure?
+with the same meanings as
+.BR $ .
+.TP
+.B (run argv #:async? #t)
+Start the program in the background and return a job record instead of a
+boolean.  Unlike a trailing
+.BR & ,
+the job has a pid and a status:
+.BR job? ,
+.BR job\-pid ,
+.BR job\-command ,
+.BR job\-done? ,
+.B job\-exit\-code
+and
+.BR wait\-job ,
+which returns
+.B #t
+when the exit code is 0.
+.PP
+With
+.BR #:expand? " #t"
+the arguments are joined with spaces and handed to the shell, so wildcards,
+.B $VAR
+and a leading tilde are expanded the way a shell expands them.  This is opt-in:
+the shell then sees words rather than arguments.
+.TP
+.B (run\-pipeline stages)
+Run programs one after another with each standard output feeding the next
+standard input, without a shell.  Each stage is an argument list shaped like
+.BR run 's.
+Unlike a shell's
+.BR | ,
+which reports only the last stage, a pipeline reports every stage that failed;
+.B #:allow\-failure? #t
+returns
+.B #f
+instead.
+.TP
+.B ($ parts)
+Run a shell command built from a list of strings, joined by spaces.  This is
+the escape hatch, for pipes, redirections, globs,
+.B $(...)
+and
+.B VAR=value
+prefixes.
 .PP
 The command can be decorated with keyword arguments, applied in the order a
 shell would write them:
-.BR "[sudo] [env A=1] COMMAND [>/dev/null 2>&1] [&]" .
-.BR #:env " '((\"CI\" . \"1\"))"
+.BR "[sudo] [env A=1] COMMAND [>/dev/null 2>&1]" .
+.BR #:env " '((\(dqCI\(dq . \(dq1\(dq))"
 sets names for that command alone, given as an alist, as a list of
 .B KEY=VALUE
 strings, or as one such string.
 .BR #:sudo? " #t"
 runs the command as root, and
 .BR #:async? " #t"
-starts it without waiting for it.
+starts it in the background and returns a job.
 .BR #:dev\-null? " #t"
 discards its output.
 .BR #:allow\-failure? " #t"
 returns
 .B #f
 instead of raising when the command exits non\-zero, so the task is told the
-command failed rather than having the failure hidden from it.  A backgrounded
-command is never waited for, so it reports having been started rather than
-having succeeded.
+command failed rather than having the failure hidden from it.
+.PP
+The file helpers
+.RB ( mkdir\-p ,
+.BR cp ,
+.BR mv ,
+.BR cat ,
+.BR touch ,
+.B ln\-s ,
+.B chmod\-file
+and
+.BR delete\-file\-recursively )
+accept
+.BR #:expand? " #t"
+too, which is what lets
+.B (delete\-file\-recursively "build/*.o" #:expand? #t)
+name the files to remove.  A backgrounded
+command reports a job rather than having succeeded: wait for it with
+.BR wait\-job .
+.BR #:async? " also"
+works for
+.BR syscall .
 .TP
 .B (syscall command)
 Run
@@ -302,7 +385,11 @@ and raise an error when it exits non\-zero.
 .B (capture command)
 Run
 .I command
-and return its standard output as a string.
+and return its standard output as a string.  A command that exits non\-zero
+raises an error naming its exit code rather than returning the empty or partial
+output it produced; with
+.BR #:allow\-failure? " #t"
+its output is returned anyway.
 .TP
 .B (which command)
 Return the absolute path of

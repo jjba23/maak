@@ -27,6 +27,7 @@
   #:use-module (ice-9 string-fun)
   #:use-module (ice-9 textual-ports)
   #:use-module (srfi srfi-1)
+  #:use-module (srfi srfi-9)
   #:use-module (srfi srfi-13)
   #:use-module (ice-9 getopt-long)
   #:export (log-message log-info
@@ -54,6 +55,16 @@
                         time-machine-program-shell
                         syscall
                         cat
+                        ;; ====== Programs and background jobs ======
+                        run
+                        run-pipeline
+                        shell-quote
+                        job?
+                        job-pid
+                        job-command
+                        job-done?
+                        job-exit-code
+                        wait-job
                         ;; ====== Errors ======
                         &maak-error
                         make-maak-error
@@ -257,13 +268,12 @@ those are filled in here so the user never sees a bare `~S'."
 ;; ====== Command decorations ======
 ;;
 ;; `$' builds one shell command line, and the things a task often needs around
-;; a command -- running it as root, in a modified environment, without output,
-;; in the background, or without minding whether it fails -- are all
-;; decorations of that line.  They are applied in one place and in one order,
-;; the order someone would write by hand, so a command printed by `--dry-run'
-;; can be pasted straight into a shell:
+;; a command -- running it as root, in a modified environment or without its
+;; output -- are all decorations of that line.  They are applied in one place
+;; and in one order, the order someone would write by hand, so a command
+;; printed by `--dry-run' can be pasted straight into a shell:
 ;;
-;;   [sudo] [env A=1 B=2] COMMAND [>/dev/null 2>&1] [&]
+;;   [sudo] [env A=1 B=2] COMMAND [>/dev/null 2>&1]
 ;;
 ;; Mindering whether a command fails is deliberately *not* one of them: `cmd ||
 ;; true' would tell the shell to report success, and maak would then have no
@@ -290,28 +300,153 @@ value cannot be written as a literal."
     (else '())))
 
 (define* (decorate-command cmd
-                           #:key (env '()) (sudo? #f) (dev-null? #f)
-                           (async? #f))
+                           #:key (env '()) (sudo? #f) (dev-null? #f))
   "Return CMD with the decorations a task asked for, applied in a fixed order.
 
 The environment comes first and goes through `env' rather than as a `KEY=VALUE'
 prefix, because everything after a `guix shell --' is executed directly: a
 prefix there would be looked up as a program name and fail with 127.
 
-A backgrounded command is never waited for, so it never reports a status: the
-command counts as started rather than as succeeded.  Whether a failure is
-allowed is not a decoration of the command line at all; `syscall' reads the
-exit code, which a `|| true' in the line would have hidden."
+Whether a failure is allowed is not a decoration of the command line at all;
+`syscall' reads the exit code, which a `|| true' in the line would have hidden.
+Backgrounding is not one either: a trailing `&' leaves nothing to wait on, so
+`#:async?' forks instead and hands back a job (see `run')."
   (let* ((assignments (environment-assignments env))
          (with-env (if (null? assignments)
                        cmd
                        (format #f "env ~a ~a"
                                (string-join assignments " ") cmd)))
-         (with-sudo (if sudo? (format #f "sudo ~a" with-env) with-env))
-         (with-output (if dev-null?
-                          (format #f "~a >/dev/null 2>&1" with-sudo)
-                          with-sudo)))
-    (if async? (format #f "~a &" with-output) with-output)))
+         (with-sudo (if sudo? (format #f "sudo ~a" with-env) with-env)))
+    (if dev-null?
+        (format #f "~a >/dev/null 2>&1" with-sudo)
+        with-sudo)))
+
+;; ====== Quoting and arguments ======
+;;
+;; `$' takes one string and leaves it to the shell; `run' takes the words it
+;; needs as separate strings and starts the program directly.  The boundary
+;; between the two is where a path with a space stops being three arguments.
+
+(define (shell-quote str)
+  "Return STR quoted so that a shell reads it as one literal word.
+
+The POSIX recipe: wrap the value in single quotes and turn every embedded
+single quote into the four characters backslash-quote-quote-quote.  Unlike
+`~s', this is safe for spaces, tabs, `$', backticks and newlines."
+  (string-append "'"
+                 (string-join (string-split str #\')
+                              (string-append "'" (string #\\ #\') "'"))
+                 "'"))
+
+(define (shell-safe-argument? arg)
+  "Return #t when ARG can be printed without quotes and read back unchanged."
+  (and (not (string=? arg ""))
+       (every (lambda (c)
+                (or (char-alphabetic? c)
+                    (char-numeric? c)
+                    (memv c '(#\- #\_ #\. #\/ #\= #\: #\@ #\% #\+ #\,))))
+              (string->list arg))))
+
+(define (argv->string argv)
+  "Return ARGV as a command line a shell would read back as the same words.
+
+Used for the dry-run line and for logging; what actually runs is the ARGV list
+itself, so quoting is only there to make the printed command copyable."
+  (string-join (map (lambda (arg)
+                      (if (shell-safe-argument? arg) arg (shell-quote arg)))
+                    argv)
+               " "))
+
+;; ====== Programs and background jobs ======
+;;
+;; A shell's trailing `&' starts a command and forgets it: there is no pid to
+;; wait on and no status to read, so a task cannot tell a server that started
+;; from one that died at once.  `spawn-process' forks and execs instead, which
+;; is what lets `run' keep the program and its arguments separate and gives
+;; `#:async?' something to hand back.
+
+(define-record-type <job>
+  (make-job pid command)
+  job?
+  (pid job-pid)
+  (command job-command)
+  ;; #f means "not reaped yet".  0 is a real wait status, so it cannot stand
+  ;; for one.
+  (status job-status set-job-status!))
+
+(define* (spawn-process argv #:key (dev-null? #f) (stdin-null? #f))
+  "Start ARGV in a child process and return its pid.
+
+ARGV is a non-empty list of strings whose first element is the program.  The
+child execs it directly, so no shell interprets the arguments.  With DEV-NULL?
+its standard output and standard error are connected to `/dev/null'; with
+STDIN-NULL? its standard input is.  A program that cannot be executed exits
+127, the code a shell uses for a command it cannot find."
+  ;; A child inherits whatever the parent still has buffered in its ports, so
+  ;; that output would be written twice unless it is flushed before the fork.
+  (force-output (current-output-port))
+  (force-output (current-error-port))
+  (let ((pid (primitive-fork)))
+    (if (zero? pid)
+        (begin
+          (when stdin-null?
+            (let ((null (open-file "/dev/null" "r")))
+              (dup2 (port->fdes null) 0)
+              (close-port null)))
+          (when dev-null?
+            (let ((null (open-file "/dev/null" "w")))
+              (dup2 (port->fdes null) 1)
+              (dup2 (port->fdes null) 2)
+              (close-port null)))
+          (catch #t
+            (lambda () (apply execlp (car argv) argv))
+            (lambda (key . args) (primitive-exit 127)))
+          ;; Not reached: `execlp' either replaces the process or raises.
+          (primitive-exit 127))
+        pid)))
+
+(define (reap-process pid)
+  "Wait for PID and return its wait status."
+  (cdr (waitpid pid 0)))
+
+(define (reap-job job)
+  "Wait for JOB when it has not been reaped yet and return its wait status."
+  (or (job-status job)
+      (let ((status (reap-process (job-pid job))))
+        (set-job-status! job status)
+        status)))
+
+(define (job-done? job)
+  "Return #t when JOB has finished, without waiting for it.
+
+A finished job is reaped here, so a background process that a task never waits
+for does not stay a zombie for the rest of the run."
+  (cond
+    ((job-status job) #t)
+    (else
+     (let ((result (waitpid (job-pid job) WNOHANG)))
+       ;; WAITPID reports (0 . _) while the child is still running; that cdr is
+       ;; not a status and must not be read.
+       (if (zero? (car result))
+           #f
+           (begin
+             (set-job-status! job (cdr result))
+             #t))))))
+
+(define (job-exit-code job)
+  "Wait for JOB when needed and return its exit code.
+
+Returns #f when the process was terminated by a signal, which is also what
+`status:exit-val' says about such a status."
+  (status:exit-val (reap-job job)))
+
+(define (wait-job job)
+  "Wait for JOB to finish and return #t when it exited with code 0.
+
+Returns #f for a non-zero exit or a signal.  Waiting twice is fine: the status
+is remembered after the first wait."
+  (let ((code (job-exit-code job)))
+    (and code (zero? code))))
 
 (define* (syscall cmd
                   #:key (allow-failure? #f) (async? #f))
@@ -329,13 +464,17 @@ If #t, a non-zero exit code does not raise: it comes back as @code{#f}, the way
 the command failed.
 
 @item @strong{#:async?} (boolean, default #f):
-If #t, the command is not waited for and its status is not checked.
+If #t, the command is started in the background and a job record is returned
+instead of a boolean.  The command still runs through a shell, so pipes and
+redirections keep working, but the fork is maak's: `job-pid', `job-done?',
+`wait-job' and `job-exit-code' can read the process.
 
 @end itemize
 
 @sc{returns}:
 @code{#t} if the command completes with an exit code of 0, @code{#f} if it
-failed and failures are allowed.
+failed and failures are allowed, and a job record when @code{#:async?} was
+given.
 
 @sc{errors}:
   Signals an error if the command returns a non-zero exit code,
@@ -343,29 +482,38 @@ failed and failures are allowed.
   (cond
     ((dry-run?)
      (unless (quiet?)
-       (display (bold-output (format #f "\n[DRY-RUN]: ~a\n" cmd)))) #t)
+       (display (bold-output (format #f "\n[DRY-RUN]: ~a~a\n"
+                                     cmd
+                                     (if async? " &" "")))))
+     #t)
     (else (unless (quiet?)
             (log-info "Executing: ~a\n" cmd))
-          (let* ((exit-val (system cmd))
-                 (exit-code (status:exit-val exit-val)))
-            (cond
-              ((zero? exit-code) #t)
-              ;; A signalled command (segfault, SIGTERM) has no exit code; say
-              ;; so rather than reporting a misleading number.
-              ((not exit-code)
-               (if allow-failure?
-                   #f
-                   (raise-maak-error
-                    (~ "command was terminated by a signal: ~a" cmd)
-                    #:hint
-                    "The command above did not exit normally.  Re-run it by hand to see why.")))
-              (else
-               (if allow-failure?
-                   #f
-                   (raise-maak-error
-                    (~ "command failed (exit code ~a): ~a" exit-code cmd)
-                    #:hint
-                    "Fix the command above, or run `maak --dry-run' to inspect it first."))))))))
+          (if async?
+              ;; A shell's `&' redirects a background job's stdin from
+              ;; /dev/null; the fork has to do it itself to keep that.
+              (make-job (spawn-process (list "sh" "-c" cmd)
+                                       #:stdin-null? #t)
+                        cmd)
+              (let* ((exit-val (system cmd))
+                     (exit-code (status:exit-val exit-val)))
+                (cond
+                  ((zero? exit-code) #t)
+                  ;; A signalled command (segfault, SIGTERM) has no exit code;
+                  ;; say so rather than reporting a misleading number.
+                  ((not exit-code)
+                   (if allow-failure?
+                       #f
+                       (raise-maak-error
+                        (~ "command was terminated by a signal: ~a" cmd)
+                        #:hint
+                        "The command above did not exit normally.  Re-run it by hand to see why.")))
+                  (else
+                   (if allow-failure?
+                       #f
+                       (raise-maak-error
+                        (~ "command failed (exit code ~a): ~a" exit-code cmd)
+                        #:hint
+                        "Fix the command above, or run `maak --dry-run' to inspect it first.")))))))))
 
 (define* ($ cmd-parts
             #:key (verbose? #f)
@@ -415,23 +563,26 @@ task can decide what a failure means.  The command line itself is left alone,
 which is what lets the task be told the command failed.
 
 @item @strong{#:async?} (boolean, default #f):
-If #t, the command is started with a trailing @code{&} and not waited for.
+If #t, the command is started in the background and a job record is returned
+(see @code{run}), instead of a boolean.
 
 @end itemize
 
 @sc{returns}:
 The result of the @code{syscall} function: @code{#t} if the command completes
 with an exit code of 0, @code{#f} if it failed and @code{#:allow-failure?} was
-given."
+given, and a job record when @code{#:async?} was given."
   (let ((cmd (decorate-command (string-join cmd-parts join)
                                #:env env
                                #:sudo? sudo?
-                               #:dev-null? dev-null?
-                               #:async? async?)))
+                               #:dev-null? dev-null?)))
     (cond
       ((dry-run?)
        (unless (quiet?)
-         (display (bold-output (format #f "\n[DRY-RUN]: ~a\n" cmd)))) #t)
+         (display (bold-output (format #f "\n[DRY-RUN]: ~a~a\n"
+                                       cmd
+                                       (if async? " &" "")))))
+       #t)
       (else (begin
               (when (and verbose?
                          (not (quiet?)))
@@ -439,6 +590,255 @@ given."
               (syscall cmd
                       #:allow-failure? allow-failure?
                       #:async? async?))))))
+
+(define* (run argv
+             #:key (verbose? #f)
+             (env '())
+             (sudo? #f)
+             (dev-null? #f)
+             (allow-failure? #f)
+             (async? #f)
+             (expand? #f))
+  "Run a program and its arguments without a shell.
+
+ARGV is a list of strings: the program to run, followed by one string per
+argument.  Nothing is split or interpolated, so a path with a space in it stays
+one argument.  This is the default way to run a program; `$' is for the lines
+that genuinely need a shell -- pipes, redirections, globs, `$(...)' and
+`VAR=value' prefixes.
+
+With @code{#:expand? #t} the arguments are joined with spaces and handed to
+the shell, so wildcards, `~' and `$VAR' are expanded the way a shell expands
+them.  That is opt-in because the shell sees words rather than arguments: a
+path with a space in it becomes several words again, which is exactly what a
+caller asking for a pattern wants and exactly what the default prevents.
+
+@example
+(run (list \"mkdir\" \"-p\" build-dir))
+(run (list \"git\" \"commit\" \"-m\" message))
+
+;; start a server in the background and wait for it later
+(let ((server (run (list \"guix\" \"shell\" \"--\" \"run-server\")
+                   #:async? #t)))
+  (log-info \"server started as ~a\n\" (job-pid server))
+  (wait-job server))
+@end example
+
+@sc{arguments}:
+@itemize @bullet
+
+@item @strong{argv} (list):
+The program and its arguments, each a string.
+
+@item @strong{#:verbose?} (boolean, default #f):
+If #t, logs the command before running it.
+
+@item @strong{#:env} (alist, list of strings, or string, default '()):
+Environment variables for this program only, in the shapes `$' accepts.
+
+@item @strong{#:sudo?} (boolean, default #f):
+If #t, the program runs through @code{sudo}.
+
+@item @strong{#:dev-null?} (boolean, default #f):
+If #t, standard output and standard error are connected to @code{/dev/null}.
+
+@item @strong{#:allow-failure?} (boolean, default #f):
+If #t, a non-zero exit code does not raise: @code{#f} is returned instead.
+
+@item @strong{#:async?} (boolean, default #f):
+If #t, the program is started in the background and a job record is returned.
+
+@item @strong{#:expand?} (boolean, default #f):
+If #t, ARGV is joined into one shell line and the shell expands wildcards,
+`~' and `$VAR' in it.  The arguments are then words rather than literals.
+
+@end itemize
+
+@sc{returns}:
+@code{#t} if the program exits with code 0, @code{#f} if it failed and
+failures were allowed, and a job record when @code{#:async?} was given.
+
+@sc{errors}:
+Signals a maak error when the program exits non-zero and failures are not
+allowed."
+  (when (or (not (list? argv))
+            (null? argv)
+            (not (every string? argv)))
+    (raise-maak-error
+     "run expects a non-empty list of strings, starting with the program"
+     #:hint "Write (run (list \"mkdir\" \"-p\" dir)) instead of one long command."))
+  (if expand?
+      ;; The words are handed to the shell as written, which is what expands
+      ;; `*', `~' and `$VAR'.  Everything else is the same as `$'.
+      ($ (list (string-join argv " "))
+         #:verbose? verbose?
+         #:env env
+         #:sudo? sudo?
+         #:dev-null? dev-null?
+         #:allow-failure? allow-failure?
+         #:async? async?)
+      (let* ((assignments (environment-assignments env))
+         (parts (append (if sudo? (list "sudo") '())
+                        (if (null? assignments)
+                            '()
+                            (append (list "env") assignments))
+                        argv))
+         (command (argv->string argv)))
+    (cond
+      ((dry-run?)
+       (unless (quiet?)
+         (display (bold-output (format #f "\n[DRY-RUN]: ~a~a\n"
+                                       (argv->string parts)
+                                       (if async? " &" "")))))
+       #t)
+      (else
+       (when (and verbose? (not (quiet?)))
+         (log-info "  Execute command:\n~a\n" command))
+       ;; A shell's `&' redirects a background job's stdin from /dev/null;
+       ;; the fork has to do it itself to keep that.
+       (let ((pid (spawn-process parts
+                                 #:dev-null? dev-null?
+                                 #:stdin-null? async?)))
+         (if async?
+             (make-job pid command)
+             (let* ((status (reap-process pid))
+                    (code (status:exit-val status)))
+               (cond
+                 ((and code (zero? code)) #t)
+                 ;; A signalled program has no exit code; say so rather than
+                 ;; reporting a misleading number.
+                 ((not code)
+                  (if allow-failure?
+                      #f
+                      (raise-maak-error
+                       (~ "command was terminated by a signal: ~a" command)
+                       #:hint
+                       "The program above did not exit normally.  Re-run it by hand to see why.")))
+                 (else
+                  (if allow-failure?
+                      #f
+                      (raise-maak-error
+                       (~ "command failed (exit code ~a): ~a" code command)
+                       #:hint
+                       "Fix the command above, or run `maak --dry-run' to inspect it first."))))))))))))
+
+(define (pipeline-stage-pid argv input output)
+  "Start one stage of a pipeline and return its pid.
+
+INPUT is the read side of the pipe from the previous stage, or #f to inherit
+standard input; OUTPUT is the pipe to the next stage, or #f to inherit standard
+output.  A `pipe' is a pair of ports, so the child closes both of them after
+the `dup2' and no stage keeps another stage's end open."
+  ;; Flush before forking, so the parent's buffered output is not written a
+  ;; second time by the child.
+  (force-output (current-output-port))
+  (force-output (current-error-port))
+  (let ((pid (primitive-fork)))
+    (if (zero? pid)
+        (begin
+          (when input
+            (dup2 (port->fdes input) 0)
+            (close-port input))
+          (when output
+            (dup2 (port->fdes (cdr output)) 1)
+            (close-port (car output))
+            (close-port (cdr output)))
+          (catch #t
+            (lambda () (apply execlp (car argv) argv))
+            (lambda (key . args) (primitive-exit 127)))
+          ;; Not reached: `execlp' either replaces the process or raises.
+          (primitive-exit 127))
+        pid)))
+
+(define* (run-pipeline stages
+                       #:key (verbose? #f) (allow-failure? #f))
+  "Run a pipeline of programs without a shell.
+
+STAGES is a list of argument lists, each of them shaped like the ARGV of
+`run': the program first, then one string per argument.  The standard output of
+each stage is the standard input of the next, and the whole pipeline is done
+when every stage has finished.
+
+@example
+(run-pipeline (list (list \"cat\" file)
+                      (list \"grep\" \"-v\" \"^#\")
+                      (list \"sort\" \"-u\")))
+@end example
+
+Unlike a shell's `|', which reports the exit status of the last stage alone, a
+pipeline that fails anywhere reports the stages that failed and raises; pass
+@code{#:allow-failure? #t} to get @code{#f} instead and decide in the task.
+This is the pipefail behaviour, and it is the one that does not let a failing
+producer hide behind a successful consumer.
+
+@sc{returns}:
+@code{#t} when every stage exits with code 0, @code{#f} when a stage failed and
+failures were allowed.
+
+@sc{errors}:
+Signals a maak error naming the failing stage or stages when a pipeline fails
+and failures are not allowed."
+  (when (or (not (list? stages))
+            (null? stages)
+            (not (every (lambda (stage)
+                          (and (list? stage)
+                               (pair? stage)
+                               (every string? stage)))
+                        stages)))
+    (raise-maak-error
+     "run-pipeline expects a non-empty list of non-empty argument lists"
+     #:hint "Write (run-pipeline (list (list \"cat\" file) (list \"grep\" pattern)))."))
+  (let ((rendered (string-join (map argv->string stages) " | ")))
+    (cond
+      ((dry-run?)
+       (unless (quiet?)
+         (display (bold-output (format #f "\n[DRY-RUN]: ~a\n" rendered))))
+       #t)
+      (else
+       (when (and verbose? (not (quiet?)))
+         (log-info "  Execute pipeline:\n~a\n" rendered))
+       (let loop ((remaining stages) (input #f) (pids '()))
+         (if (null? remaining)
+             (let ((statuses (map (lambda (pid) (cdr (waitpid pid 0)))
+                                  (reverse pids))))
+               (let scan ((stage-list stages)
+                          (status-list statuses)
+                          (position 1)
+                          (failures '()))
+                 (cond
+                   ((null? stage-list)
+                    (cond
+                      ((null? failures) #t)
+                      (allow-failure? #f)
+                      (else
+                       (raise-maak-error
+                        (format #f "pipeline failed: ~a"
+                                (string-join (reverse failures) ", "))
+                        #:hint
+                        "Fix the failing stage above, or run `maak --dry-run' to inspect the pipeline first."))))
+                   (else
+                    (let ((code (status:exit-val (car status-list))))
+                      (scan (cdr stage-list)
+                            (cdr status-list)
+                            (+ position 1)
+                            (if (and code (zero? code))
+                                failures
+                                (cons (format #f "stage ~a (~a) ~a"
+                                              position
+                                              (argv->string (car stage-list))
+                                              (if code
+                                                  (format #f "exited with code ~a"
+                                                          code)
+                                                  "was terminated by a signal"))
+                                      failures))))))))
+             (let* ((last? (null? (cdr remaining)))
+                    (out (if last? #f (pipe)))
+                    (pid (pipeline-stage-pid (car remaining) input out)))
+               (when input (close-port input))
+               (when out (close-port (cdr out)))
+               (loop (cdr remaining)
+                     (and out (car out))
+                     (cons pid pids)))))))))
 
 (define-syntax-rule (get-module-var setting)
   "Get a variable from the currently loaded maak file module."
@@ -460,10 +860,13 @@ given."
   (procedure? x))
 
 (define* (delete-file-recursively dir
-                                  #:key (verbose? #f))
+                                  #:key (verbose? #f) (expand? #f))
   "Delete a directory and all its contents recursively.
-Runs `rm -rfv DIR` using the `$` command wrapper. This means:
-The deletion is recursive.It forces removal without prompting (`-f`).It prints removed files (`-v`).
+Runs `rm -rfv DIR` through `run`, so DIR reaches `rm` as one argument however
+it is spelled.  The deletion is recursive, forced and verbose.
+
+With EXPAND? #t the shell expands DIR, so `build/*.o' names every matching
+file; the same opt-in applies to the other file helpers via `run'.
 
 @sc{arguments}:
 @itemize @bullet
@@ -481,15 +884,15 @@ If #t, logs the generated command before executing it.
 
 @sc{errors}:
   Signals an error if the underlying shell command exits with a non-zero status."
-  ($ (list (~ "rm -rfv ~a" dir))
-     #:verbose? verbose?))
+  (run (list "rm" "-rfv" dir)
+       #:verbose? verbose? #:expand? expand?))
 
 (define* (mkdir-p dir
-                  #:key (verbose? #f))
+                  #:key (verbose? #f) (expand? #f))
   "Create a directory and all necessary parent directories.
-Executes `mkdir -pv DIR` using the `$` wrapper. This means:
-Parent directories are created as needed (`-p`).
-The operation prints each created directory (`-v`).
+Executes `mkdir -pv DIR` through `run`.  Parent directories are created as
+needed and each created directory is printed.  A DIR that contains spaces is
+one directory, not several.
 
 @sc{arguments}:
 @itemize @bullet
@@ -507,10 +910,11 @@ If #t, logs the generated command before executing it.
 
 @sc{errors}:
   Signals an error if the underlying shell command exits with a non-zero code."
-  ($ (list (~ "mkdir -pv ~a" dir))))
+  (run (list "mkdir" "-pv" dir)
+       #:verbose? verbose? #:expand? expand?))
 
 (define* (remkdir-p dir
-                    #:key (verbose? #f))
+                    #:key (verbose? #f) (expand? #f))
   "Remove a directory if it exists, then recreate it.
 This results in an empty directory, regardless of its previous state.
 Calls `delete-file-recursively` then `mkdir-p` on DIR.
@@ -530,15 +934,17 @@ If #t, logs the generated command before executing it.
 @sc{errors}:
   Signals an error if any underlying shell command fails."
   (delete-file-recursively dir
-                           #:verbose? verbose?)
+                           #:verbose? verbose?
+                           #:expand? expand?)
   (mkdir-p dir
-           #:verbose? verbose?))
+           #:verbose? verbose?
+           #:expand? expand?))
 
 (define* (mv x y
-             #:key (verbose? #f))
+             #:key (verbose? #f) (expand? #f))
   "Move or rename a file or directory.
-  Executes `mv -v X Y` using the `$` wrapper. The `-v` flag prints
-  each move operation performed.
+  Executes `mv -v X Y` through `run`, so X and Y reach `mv` as one argument
+each.  The `-v` flag prints each move operation performed.
 
 @sc{arguments}:
 
@@ -558,20 +964,22 @@ If #t, logs the generated command before executing it.
 
 @sc{errors}:
   Signals an error if the underlying shell command returns a non-zero exit code."
-  ($ (list (~ "mv -v ~a ~a" x y))
-     #:verbose? verbose?))
+  (run (list "mv" "-v" x y)
+       #:verbose? verbose? #:expand? expand?))
 
 (define* (cat file
-              #:key (verbose? #f))
-  ($ (list (~ "cat ~a" file))
-     #:verbose? verbose?))
+              #:key (verbose? #f) (expand? #f))
+  "Print FILE to standard output."
+  (run (list "cat" file)
+       #:verbose? verbose? #:expand? expand?))
 
 (define* (cp x
              y
              #:key (recursive? #t)
              (force? #f)
              (verbose? #f)
-             (verbose-copy? #t))
+             (verbose-copy? #t)
+             (expand? #f))
   "Copy a file or directory from X to Y.
 
 @sc{arguments}:
@@ -582,24 +990,26 @@ If #t, logs the generated command before executing it.
   force?: If #t, overwrite existing files without prompting (`-f`). Defaults to #f.
   verbose?: If #t, logs the final shell command before execution. Defaults to #f.
   verbose-copy?: If #t, enables verbose output from `cp` (`-v`). Defaults to #t.
+  expand?: If #t, the shell expands X and Y, so a wildcard names the files it
+           matches. Defaults to #f, which passes both as one argument each.
 
   Constructs and executes a command of the form:
 
     cp [OPTIONS] X Y
 
-  using the `$` wrapper, ensuring errors are caught and logged.
+  through `run`, so X and Y reach `cp` as one argument each and a path with a
+  space in it is copied rather than split.
 
 @sc{returns}: #t if the copy succeeds.
 
 @sc{errors}:
   Signals an error if the underlying `cp` command exits with a non-zero status."
-  ($ (list (~ "cp ~a ~a ~a ~a ~a"
-              (if recursive? "-r" "")
-              (if force? "-f" "")
-              (if verbose-copy? "-v" "")
-              x
-              y))
-     #:verbose? verbose?))
+  (run (append (list "cp")
+               (if recursive? (list "-r") '())
+               (if force? (list "-f") '())
+               (if verbose-copy? (list "-v") '())
+               (list x y))
+       #:verbose? verbose? #:expand? expand?))
 
 (define* (~ #:rest args)
   "A utility function to format a string (interpolation). Alias for (apply format #f ARGS).
