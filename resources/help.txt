@@ -12,23 +12,114 @@
     See more at: https://codeberg.org/jjba23/maak
     License: GNU GPL v3 or newer
 
-Usage: maak [OPTIONS] [-- [TASKS]... [TASK_ARGS]...]
+Usage: maak [OPTIONS] [TASKS] [TASK_ARGS]...
+       maak [OPTIONS] -- TASK [TASK...] [-- TASK_ARGS]...
+
+Tasks, and the arguments they are given:
+
+    A run names the tasks it is to run, and passes the words that follow them
+    on as their arguments:
+
+        maak hello                     one task
+        maak quick-math 23 42          a task, then its arguments
+        maak quick-math -- 23 42       the same, with '--' setting the
+                                       arguments apart, which is how an
+                                       argument that begins with a dash gets
+                                       through
+
+    Several tasks are named in one word, separated by commas, or -- when a
+    '--' comes before any task word -- named one word each:
+
+        maak clean,build,test
+        maak -- clean build test
+
+    So a '--' before the first task word ends the options and begins the task
+    list, and a '--' after a task word ends the tasks and begins their
+    arguments.  A run that wants both writes both:
+
+        maak -- clean build -- -v      two tasks, each of them given a '-v'
+
+    Everything after the '--' that begins the arguments is passed on as it
+    stands: maak reads no options there, and a word that names one of its own
+    tasks is an argument like any other.
 
 Options:
     -f, --file FILE
         Specify the path to the Maak file (defaults to ./maak.scm).
 
+    -C, --directory DIR
+        Change to DIR before the Maak file is read.  A relative --file, the
+        default ./maak.scm and the .env read beside it are then looked up
+        inside DIR, and each directory entered is reported.  Repeat the flag,
+        or separate several directories with ':', to enter them in order.
+
+    -e, --env-file FILE
+        Read NAME=VALUE assignments from FILE before loading the Maak file.
+        Repeat the flag, or separate several files with ':', to read more
+        than one.  Without this flag MAAK_ENV_FILE is read, and failing that
+        a .env file next to the Maak file.
+
+    --no-env-file
+        Read no environment file at all, whatever the environment or the
+        checkout says.
+
+    --banner
+        Print the greeting banner.  This is the default, and is what turns
+        the banner back on after MAAK_NO_BANNER was exported.
+
+    --no-banner
+        Skip the greeting banner, keeping everything else the banner-free
+        run would print.
+
     -h, --help
         Display this help message and exit.
+
+    -i, --ignore-errors
+        Keep going after a task fails, and let the run succeed anyway.  Every
+        failure is reported where it happened, as a warning.
+
+    -j, --jobs N
+        Run up to N tasks at the same time.  Each task runs in a worker of
+        its own, and its output is printed as one block, in the order the
+        tasks were named.  A failure stops nothing -- every named task has
+        already been started -- and the run fails at the end if any failed.
+
+    -k, --keep-going
+        Keep going after a task fails.  Every failure is reported where it
+        happened, and the run fails at the end with the tasks that failed.
 
     -l, --list
         List all available tasks in the currently loaded Maak file.
 
+    -t, --tasks LIST
+        Run the tasks named in LIST, a comma separated list.  This is the
+        option the tasks named on the command line are turned into; naming
+        them here instead leaves every other word on the line as an argument
+        for them.
+
+    -L, --load-path DIR
+        Add DIR to Guile's load path, so a Maak file can require modules
+        that live outside its own directory.  Repeat the flag, or separate
+        several directories with ':' in one flag.  The directory of the
+        Maak file, and the directories named by the MAAK_LOAD_PATH
+        environment variable, are added automatically.
+
     -n, --dry-run
         Run in dry-run mode. Print shell commands instead of executing them.
 
+    --no-print-directory
+        Do not report the directories -C changes to, for a run whose output
+        is read by something other than a person.
+
     -q, --quiet
         Quiet mode. Suppress standard logging, banners, and header outputs.
+
+    -v, --version
+        Display the Maak version and exit.
+
+    --debug
+        Show the Guile backtrace on an error.  The same as setting the
+        MAAK_DEBUG environment variable.
 
 +----------------------------------------------------------------------------+
 
@@ -37,13 +128,34 @@ Examples:
     # Run the 'test' task
     maak test
 
+    # Run three tasks, named one word each
+    maak -- clean build test
+
     # Run 'test', then 'quick-math', passing arguments to the tasks
     maak quick-math -- 42 42
+
+    # Give one task an argument that starts with a dash
+    maak quick-math -- -42 42
 
     # Run tasks from a specific file
     maak -f ./build/tasks.scm -- fmt,test
 
     # Quietly test run a pipeline without modifying files
     maak -n -q -- clean,build,deploy
+
+    # Let the Maak file require modules from ./lib
+    maak -L ./lib -- build
+
+    # Read credentials from a file, without exporting anything
+    maak -e .env.production -- deploy
+
+    # A quiet run with no greeting banner
+    maak --no-banner -- test
+
+    # Run every task of a pipeline, and see every failure at once
+    maak -k -- fmt,lint,test
+
+    # Run the tasks of another checkout, without leaving this one
+    maak -C ../other-project -- build
 
 +----------------------------------------------------------------------------+

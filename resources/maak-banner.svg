@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" role="img" aria-labelledby="banner-title banner-desc">
+  <title id="banner-title">maak — the infinitely extensible command runner</title>
+  <desc id="banner-desc">A terminal window holding the maak ASCII cow beside the word maak, its tagline, and the prompt "maak test".</desc>
+
+  <defs>
+    <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#12151d"/>
+      <stop offset="1" stop-color="#0a0c11"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#181d27"/>
+      <stop offset="1" stop-color="#141821"/>
+    </linearGradient>
+    <linearGradient id="wordmark" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f6f1e7"/>
+      <stop offset="1" stop-color="#e9d9b8"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="320" fill="url(#page)"/>
+
+  <rect x="32" y="28" width="1136" height="264" rx="18" fill="url(#panel)" stroke="#2a3140" stroke-width="2"/>
+
+  <circle cx="66" cy="58" r="7" fill="#ff5f57"/>
+  <circle cx="90" cy="58" r="7" fill="#febc2e"/>
+  <circle cx="114" cy="58" r="7" fill="#28c840"/>
+
+  <g font-family="'DejaVu Sans Mono','Liberation Mono','Courier New',monospace" font-size="24" fill="#d9760f" xml:space="preserve" style="white-space:pre">
+    <text x="76" y="104">&#160;,---.&#160;&#160;&#160;&#160;&#160;&#160;&#160;,---.</text>
+    <text x="76" y="132">(&#160;&#160;&#160;&#160;&#160;\&#160;&#160;&#160;&#160;&#160;/&#160;&#160;&#160;&#160;&#160;)</text>
+    <text x="76" y="160">&#160;)&#160;&#160;(&#160;&#160;\____/&#160;&#160;)&#160;&#160;(</text>
+    <text x="76" y="188">(&#160;&#160;&#160;&#160;\&#160;@&#160;&#160;@&#160;/&#160;&#160;&#160;&#160;)</text>
+    <text x="76" y="216">&#160;)&#160;&#160;&#160;&#160;(&#160;oo&#160;)&#160;&#160;&#160;&#160;(</text>
+    <text x="76" y="244">(&#160;&#160;&#160;&#160;&#160;&#160;\__/&#160;&#160;&#160;&#160;&#160;&#160;)</text>
+    <text x="76" y="272">&#160;&#160;`------------'</text>
+  </g>
+
+  <rect x="470" y="96" width="3" height="172" rx="1.5" fill="#d9760f" opacity="0.85"/>
+
+  <g font-family="'DejaVu Sans Mono','Liberation Mono','Courier New',monospace">
+    <text x="520" y="146" font-size="90" font-weight="700" fill="url(#wordmark)" letter-spacing="-2">maak</text>
+    <text x="522" y="186" font-size="23" fill="#ccc4b5">the infinitely extensible command runner</text>
+    <text x="522" y="214" font-size="17" fill="#7f8798">tasks, pipelines and build logic in GNU Guile Scheme</text>
+    <text x="522" y="256" font-size="19" fill="#8fd0a0" xml:space="preserve">$ maak test</text>
+    <rect x="653" y="241" width="10" height="20" rx="2" fill="#8fd0a0"/>
+    <text x="522" y="283" font-size="13" fill="#5f6777">GNU Guix · GPL-3.0-or-later · no DSL to learn</text>
+  </g>
+</svg>

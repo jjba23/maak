@@ -22,11 +22,23 @@ complete -c maak -e
 complete -c maak -f
 
 # Define CLI options
+complete -c maak -s C -l directory -r -a "(__fish_complete_directories)" -d "Change to a directory before reading the Maak file"
+complete -c maak -s e -l env-file -r -F -d "Read NAME=VALUE assignments from a file"
 complete -c maak -s f -l file -r -F -d "Specify path to the Maak file"
 complete -c maak -s h -l help -d "Display help screen and exit"
+complete -c maak -s i -l ignore-errors -d "Keep going after a failure, and still succeed"
+complete -c maak -s k -l keep-going -d "Keep going after a failure"
 complete -c maak -s l -l list -d "List available tasks in the Maak file"
+complete -c maak -s L -l load-path -r -a "(__fish_complete_directories)" -d "Add a directory to the Guile load path"
 complete -c maak -s n -l dry-run -d "Dry-run mode (print shell commands without executing)"
 complete -c maak -s q -l quiet -d "Quiet mode (suppress logging output)"
+complete -c maak -s t -l tasks -r -d "Run the tasks in a comma separated list"
+complete -c maak -s v -l version -d "Print the version and exit"
+complete -c maak -l banner -d "Print the greeting banner"
+complete -c maak -l no-banner -d "Skip the greeting banner"
+complete -c maak -l no-env-file -d "Read no environment file at all"
+complete -c maak -l no-print-directory -d "Do not report the directories -C changes to"
+complete -c maak -l debug -d "Print the Guile backtrace on an error"
 
 # Dynamic task completion function
 function __fish_maak_targets

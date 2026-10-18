@@ -98,6 +98,12 @@ stdenv.mkDerivation {
       cp resources/help.txt $out/share/resources/
     fi
 
+    # Install the manual page
+    mkdir -p $out/share/man/man1
+    if [ -f "man/maak.1" ]; then
+      cp man/maak.1 $out/share/man/man1/
+    fi
+
     # Locate shell completion scripts
     copy_completion() {
       local src_file=$1

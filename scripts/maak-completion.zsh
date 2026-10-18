@@ -21,11 +21,23 @@ _maak() {
     local -A opt_args
 
     specs=(
+        '(-C --directory)'{-C,--directory}'[Change to a directory before reading the Maak file]:directory:_directories'
+        '(-e --env-file)'{-e,--env-file}'[Read NAME=VALUE assignments from a file]:environment file:_files'
         '(-f --file)'{-f,--file}'[Specify path to the Maak file]:Maak file:_files'
         '(-h --help)'{-h,--help}'[Display help screen and exit]'
+        '(-i --ignore-errors)'{-i,--ignore-errors}'[Keep going after a failure, and still succeed]'
+        '(-k --keep-going)'{-k,--keep-going}'[Keep going after a failure]'
         '(-l --list)'{-l,--list}'[List available tasks in the Maak file]'
+        '(-L --load-path)'{-L,--load-path}'[Add a directory to the Guile load path]:directory:_directories'
         '(-n --dry-run)'{-n,--dry-run}'[Dry-run mode (print shell commands without executing)]'
         '(-q --quiet)'{-q,--quiet}'[Quiet mode (suppress logging output)]'
+        '(-t --tasks)'{-t,--tasks}'[Run the tasks named in a comma separated list]:task:_maak_tasks'
+        '(-v --version)'{-v,--version}'[Print the version and exit]'
+        '--banner[Print the greeting banner]'
+        '--no-banner[Skip the greeting banner]'
+        '--no-env-file[Read no environment file at all]'
+        '--no-print-directory[Do not report the directories -C changes to]'
+        '--debug[Print the Guile backtrace on an error]'
         '*:task:_maak_tasks'
     )
 

@@ -1,0 +1,634 @@
+.\" maak - the infinitely extensible command runner
+.\" Copyright (C) Josep Bigorra <jjbigorra@gmail.com>
+.\"
+.\" This documentation is free documentation: you can redistribute it and/or
+.\" modify it under the terms of the GNU Free Documentation License, version
+.\" 1.3 or (at your option) any later version.
+.TH MAAK 1 "2026" "maak 0.8.17" "User Commands"
+.SH NAME
+maak \- run project tasks written in GNU Guile Scheme
+.SH SYNOPSIS
+.BR maak
+.RI [ OPTIONS ]
+.RI [ TASKS ]
+.RI [ TASK_ARGS ] ...
+.PP
+.BR maak
+.RI [ OPTIONS ]
+.RI \-\- \ TASKS ...
+.RI [ \-\- \ TASK_ARGS ] ...
+.SH DESCRIPTION
+.B maak
+is a command runner and control plane: instead of a bespoke build DSL it uses
+the full GNU Guile Scheme language, so a task is simply a procedure in a file
+called a
+.IR "Maak file" .
+.PP
+By default
+.B maak
+loads
+.B ./maak.scm
+and runs the task named
+.BR default .
+A Maak file declares the module
+.B (maak)
+and imports the library:
+.PP
+.RS 4
+.EX
+(define\-module (maak)
+  #:declarative? #t
+  #:use\-module (maak maak))
+
+(define (hello)
+  "Say hello from Maak!"
+  (display "Hello from Maak!\\n"))
+.EE
+.RE
+.PP
+Every procedure the module makes visible is a runnable task.  When the module
+declares
+.BR #:export ,
+only the exported procedures are tasks; other procedures become private
+helpers.
+.PP
+The tasks to run are named on the command line, and the words that follow
+them are passed to them as their arguments.  Several tasks may be run in one
+invocation -- as one comma separated word, or one word each after a
+.B \-\-
+-- and a
+.B \-\-
+may set the arguments apart from the tasks they belong to.  See
+.B TASKS AND ARGUMENTS
+below.
+.SH TASKS AND ARGUMENTS
+A run names the tasks it is to run, and passes the words that follow them on
+to them as their arguments:
+.PP
+.RS 4
+.EX
+maak hello                 one task
+maak quick\-math 23 42      a task, then its arguments
+.EE
+.RE
+.PP
+A
+.B \-\-
+may set the arguments apart from the task, which is how an argument that
+begins with a dash is passed on without being read as an option:
+.PP
+.RS 4
+.EX
+maak quick\-math \-\- \-23 42
+.EE
+.RE
+.PP
+Several tasks are named as one word, separated by commas:
+.PP
+.RS 4
+.EX
+maak clean,build,test
+.EE
+.RE
+.PP
+or, when a
+.B \-\-
+comes before any task word, as one word each:
+.PP
+.RS 4
+.EX
+maak \-\- clean build test
+.EE
+.RE
+.PP
+So a
+.B \-\-
+before the first task word ends the options and introduces the task list, and
+a
+.B \-\-
+after a task word ends the task list and starts the arguments of the tasks
+named before it.  A run that wants to name its tasks one word each and give
+them arguments writes both separators:
+.PP
+.RS 4
+.EX
+maak \-\- clean build \-\- \-v
+.EE
+.RE
+.PP
+Everything after the separator that begins the arguments is passed on as it
+stands:
+.B maak
+reads no options there, and a word that names one of its own tasks is an
+argument like any other.
+.SH OPTIONS
+.TP
+.BR \-f ", " \-\-file " " FILE
+Load
+.I FILE
+instead of
+.BR ./maak.scm .
+.TP
+.BR \-e ", " \-\-env\-file " " FILE
+Read
+.B NAME=VALUE
+assignments from
+.I FILE
+before the Maak file is loaded.  The flag may be repeated, or several files
+given at once separated by colons, as in
+.BR PATH .
+Without it,
+.B MAAK_ENV_FILE
+is read, and failing that a
+.B .env
+file beside the Maak file.
+.TP
+.B \-\-no\-env\-file
+Read no environment file at all, whatever the environment or the checkout
+says.
+.TP
+.BR \-C ", " \-\-directory " " DIR
+Change to
+.I DIR
+before anything else: the Maak file (
+.BR \-f ,
+the default
+.BR ./maak.scm )
+and the
+.B .env
+file beside it are then looked up inside
+.IR DIR ,
+and the directory entered is reported.  The flag may be repeated, or several
+directories given at once separated by colons, and they are entered in the
+order given.  A directory that is not there is an error rather than a quiet
+fallback, so a task never runs somewhere it was not asked to.
+.TP
+.B \-\-banner
+Print the greeting banner.  This is the default, and is what turns the banner
+back on after
+.B MAAK_NO_BANNER
+was exported.
+.TP
+.B \-\-no\-banner
+Skip the greeting banner, keeping everything else the run would print.
+.TP
+.BR \-h ", " \-\-help
+Display a help screen and exit.
+.TP
+.BR \-i ", " \-\-ignore\-errors
+Carry on after a task fails, and let the run succeed anyway: each failure is
+reported where it happened, as a warning.  This is
+.B \-\-keep\-going
+with a different verdict.
+.TP
+.BR \-j ", " \-\-jobs " " N
+Run up to
+.I N
+tasks at the same time, each in a worker of its own.  A task's standard output
+and standard error are captured and printed as one block, in the order the
+tasks were named, as soon as the next block in that order is ready.  A task
+that fails stops nothing -- every named task has already been started, so this
+flag has
+.B \-\-keep\-going
+for free -- and the run fails at the end with the tasks that did not succeed.
+Without this flag the tasks run one after another.
+.TP
+.BR \-k ", " \-\-keep\-going
+Carry on after a task fails instead of ending the run there.  Each failure is
+reported where it happened, naming the task that raised it, and the run then
+fails with the list of tasks that did not succeed.  Without this flag the first
+failure ends the run, which is what a pipeline of tasks usually wants.
+.TP
+.BR \-l ", " \-\-list
+List every task in the loaded Maak file, with its documentation.
+.TP
+.BR \-L ", " \-\-load\-path " " DIR
+Add
+.I DIR
+to Guile's load path so the Maak file can require modules that live outside
+its own directory.  The flag may be repeated, or several directories given at
+once separated by colons, as in
+.BR PATH .
+The directory holding the Maak file, and the directories named by
+.BR MAAK_LOAD_PATH ,
+are added automatically.
+.TP
+.BR \-n ", " \-\-dry\-run
+Print the shell commands a task would run instead of running them.  The same
+effect is available inside a task by parameterising
+.BR dry\-run? .
+.TP
+.B \-\-no\-print\-directory
+Do not report the directories
+.B \-C
+changes to.  A run says which directory it entered, because a task that ran
+somewhere else is worth knowing about; this is the switch that leaves those
+lines out, for a run whose output is read by something other than a person.
+.BR \-q
+silences them as well, among other things.
+.TP
+.BR \-q ", " \-\-quiet
+Suppress the banner, the log lines and the header output.
+.TP
+.BR \-v ", " \-\-version
+Print the version, the license and the homepage, then exit.
+.TP
+.B \-\-debug
+Let an error reach Guile's own top level handler so the full backtrace is
+printed.  Equivalent to setting
+.BR MAAK_DEBUG .
+.TP
+.BR \-t ", " \-\-tasks " " LIST
+Run the tasks named in
+.IR LIST ,
+a comma separated list.  The tasks named as words on the command line are
+turned into this option, which is what
+.B maak
+hands to the library; naming the tasks here instead leaves every other word on
+the line as an argument for them.
+.SH ENVIRONMENT
+.TP
+.B GUILE_LOAD_PATH
+Guile's own load path; honoured as usual and extended by
+.BR \-L .
+.TP
+.B MAAK_LOAD_PATH
+A colon separated list of extra directories to add to the load path.  Unlike
+.BR GUILE_LOAD_PATH
+it does not replace anything, which makes it convenient to set per project.
+.TP
+.B MAAK_ENV_FILE
+A colon separated list of environment files to read when
+.B \-\-env\-file
+is not given.  A name that is already in the environment is left alone.
+.TP
+.B MAAK_NO_BANNER
+When set to a non\-empty value, skip the greeting banner.
+.B \-\-banner
+overrides it.
+.TP
+.B MAAK_DEBUG
+When set to a non\-empty value, print the Guile backtrace on an error instead
+of the short maak message.
+.SH TASK AUTHORING
+A task is an ordinary procedure.  Its docstring is shown by
+.B \-\-list
+and before the task runs.
+.PP
+The following helpers are available from
+.BR "(maak maak)" ;
+all of them honour dry\-run and quiet modes.
+.SS Shell
+.TP
+.B (run argv)
+Run a program from a list of strings: the program first, then one string per
+argument.  No shell is involved, so a path containing a space stays one
+argument.  With
+.BR #:verbose? " #t"
+the command is logged first.  It accepts
+.BR #:env ,
+.BR #:sudo? ,
+.B #:dev\-null?
+and
+.B #:allow\-failure?
+with the same meanings as
+.BR $ .
+.TP
+.B (run argv #:async? #t)
+Start the program in the background and return a job record instead of a
+boolean.  Unlike a trailing
+.BR & ,
+the job has a pid and a status:
+.BR job? ,
+.BR job\-pid ,
+.BR job\-command ,
+.BR job\-done? ,
+.B job\-exit\-code
+and
+.BR wait\-job ,
+which returns
+.B #t
+when the exit code is 0.
+.PP
+With
+.BR #:expand? " #t"
+the arguments are joined with spaces and handed to the shell, so wildcards,
+.B $VAR
+and a leading tilde are expanded the way a shell expands them.  This is opt-in:
+the shell then sees words rather than arguments.
+.TP
+.B (run\-pipeline stages)
+Run programs one after another with each standard output feeding the next
+standard input, without a shell.  Each stage is an argument list shaped like
+.BR run 's ,
+or a
+.B stage
+form, which adds the options
+.B run
+takes for that stage alone:
+.BR #:env ,
+.B #:sudo?
+and
+.BR #:tee .
+The stage's environment is added to the pipeline's own, later names winning,
+and the command line is built the way
+.B run
+builds one, so an assignment reaches the program in a pipeline where no shell
+reads it.
+.BR #:env
+on the pipeline sets names for every stage of it, and
+.BR #:async? " #t"
+starts the whole pipeline in the background and returns a job whose exit code
+is 0 only when every stage succeeded; a stage is not a job of its own, because
+it cannot finish before the stage after it has read what it wrote.
+.PP
+.B #:tee FILE
+keeps a copy of the stage's standard output in FILE while the stage after it
+reads the
+same bytes, so a task can look at what a middle stage produced; a
+.B #:tee
+on the last stage prints as well as keeps, as
+.B tee
+itself does.
+.B #:capture? #t
+records every stage that way, in temporary files of its own, and returns a
+result record instead of printing: one string per stage from
+.BR pipeline\-outputs ,
+.B pipeline\-ok?
+for whether every stage succeeded, and the failures from
+.BR pipeline\-errors .
+A captured pipeline prints nothing itself, and
+.B #:capture? #t
+is refused together with
+.BR #:async? " #t" .
+.PP
+Unlike a shell's
+.BR | ,
+which reports only the last stage, a pipeline reports every stage that failed;
+.B #:allow\-failure? #t
+returns
+.B #f
+instead, or the result when the output was captured.
+.TP
+.B ($ parts)
+Run a shell command built from a list of strings, joined by spaces.  This is
+the escape hatch, for pipes, redirections, globs,
+.B $(...)
+and
+.B VAR=value
+prefixes.
+.PP
+The command can be decorated with keyword arguments, applied in the order a
+shell would write them:
+.BR "[sudo] [env A=1] COMMAND [>/dev/null 2>&1]" .
+.BR #:env " '((\(dqCI\(dq . \(dq1\(dq))"
+sets names for that command alone, given as an alist, as a list of
+.B KEY=VALUE
+strings, or as one such string.
+.BR #:sudo? " #t"
+runs the command as root, and
+.BR #:async? " #t"
+starts it in the background and returns a job.
+.BR #:dev\-null? " #t"
+discards its output.
+.BR #:allow\-failure? " #t"
+returns
+.B #f
+instead of raising when the command exits non\-zero, so the task is told the
+command failed rather than having the failure hidden from it.
+.PP
+The file helpers
+.RB ( mkdir\-p ,
+.BR cp ,
+.BR mv ,
+.BR cat ,
+.BR touch ,
+.B ln\-s ,
+.B chmod\-file
+and
+.BR delete\-file\-recursively )
+accept
+.BR #:expand? " #t"
+too, which is what lets
+.B (delete\-file\-recursively "build/*.o" #:expand? #t)
+name the files to remove.  A backgrounded
+command reports a job rather than having succeeded: wait for it with
+.BR wait\-job .
+.BR #:async? " also"
+works for
+.BR syscall .
+.TP
+.B (syscall command)
+Run
+.I command
+and raise an error when it exits non\-zero.
+.TP
+.B (capture command)
+Run
+.I command
+and return its standard output as a string.  A command that exits non\-zero
+raises an error naming its exit code rather than returning the empty or partial
+output it produced; with
+.BR #:allow\-failure? " #t"
+its output is returned anyway.
+.TP
+.B (which command)
+Return the absolute path of
+.IR command ,
+or
+.BR #f .
+.TP
+.B (require\-command command)
+Like
+.BR which ,
+but raise a maak error when the command is missing.
+.TP
+.B (shell\-quote string)
+Quote
+.I string
+so a shell reads it as one literal word.
+.SS Reporting a failure
+.TP
+.B (task\-error message)
+Stop the task with
+.I message
+treated as text with
+.B format
+directives.  The arguments for those directives are passed with
+.BR #:args ,
+and what the user should do about it with
+.BR #:hint :
+.PP
+.RS 4
+.EX
+(task-error "no artefact for ~a" #:args (list "linux-x86_64")
+            #:hint "Run `maak build' first.")
+.EE
+.RE
+.PP
+The message and the hint are printed on stderr without a backtrace, and the
+exit status is 1, so a failure reads like one of maak's own.  With
+.B \-\-debug
+the backtrace is printed as well.
+.TP
+.B (raise\-maak\-error message #:hint HINT)
+The same mechanism for a message that is already formatted.
+.TP
+.B (maak\-error? exception)
+Recognise either of the above once it has been caught.
+.SS Files
+.BR cp ", " mv ", " mkdir\-p ", " remkdir\-p ", " delete\-file\-recursively ", " cat ", "
+.BR touch ", " ln\-s ", " chmod\-file ", " read\-file ", " write\-file
+.SS Directory and environment
+.BR with\-directory ", " cd ", " env\-get ", " env\-set! ", " env\-unset! ", " with\-env ", "
+.BR with\-env\-vars ", " home\-dir ", " tmp\-dir ", " load\-env\-file ", "
+.BR env\-file\-entries
+.SS Load paths
+.BR add\-load\-path! ", " add\-load\-paths! ", " with\-load\-path ", " split\-load\-path ", "
+.BR environment\-load\-paths ", " maak\-load\-path
+.SS Pretty multiline strings
+.BR string\-lines ", " unlines ", " unwords ", " dedent\-string ", " indent\-string ", "
+.BR text
+.SS Guix
+.BR guix\-shell ", " guix\-container ", " guix\-pack ", " manifest\-shell ", " program\-shell ", "
+.BR time\-machine ", " time\-machine\-manifest\-shell ", " time\-machine\-program\-shell
+.PP
+The first group builds command lines.  The next group asks Guix for values
+instead:
+.BR guix\-available? ", " guix\-channels ", " guix\-derivation ", " guix\-build ", "
+.BR guix\-program ", " guix\-derivation\-at ", " guix\-build\-at ", " guix\-program\-at .
+They read the pins
+.B time\-machine
+would use -- from
+.I channels.scm
+or from a revision given to the
+.B \-at
+forms -- and answer with an alist, a store path or a running program, so a task
+can decide on what a pin contains.  Nothing in maak imports a
+.B (guix ...)
+module: the asking happens in
+.BR "guix repl" ,
+so maak builds and runs on a machine with no Guix, and only a call to one of
+these helpers reports that it is missing, with a hint.  The file a query is
+written to is removed after it runs, unless Guix refuses to answer: it is then
+kept, and the error names it so it can be run by hand.
+.SS Nix
+.BR nix\-shell ", " nix\-develop ", " nix\-build ", " nix\-flake\-build ", " nix\-flake\-check ", "
+.BR nix\-run
+.SS Internationalisation
+.BR i18n\-extract ", " i18n\-init ", " i18n\-merge ", " i18n\-compile ", " i18n\-refresh ", "
+.BR i18n\-init\-all ", " i18n\-merge\-all ", " i18n\-compile\-all ", " i18n\-translator ", "
+.BR i18n\-locale\-dir ", " i18n\-po\-file ", " i18n\-mo\-file ", " i18n\-pot\-file ", "
+.BR i18n\-source\-globs ", " i18n\-language
+.SH EXIT STATUS
+.TP
+.B 0
+Every requested task finished successfully.
+.TP
+.B 1
+The Maak file was missing, a task failed, or an option was invalid.
+.SH FILES
+.TP
+.B ./maak.scm
+The default Maak file.
+.TP
+.B ./.env
+Read before the Maak file when no
+.B \-\-env\-file
+is given and
+.B MAAK_ENV_FILE
+is unset.  It holds
+.B NAME=VALUE
+lines; surrounding quotes are removed and comments, blank lines and lines
+without an
+.B =
+are skipped.  A name the environment already has is left alone.
+.TP
+.B ./channels.scm
+The Guix channels file used by the
+.B time\-machine
+helpers, when present.
+.TP
+.B ./manifest.scm
+The Guix manifest used by the
+.B manifest\-shell
+helpers, when present.
+.SH EXAMPLES
+Run the default task:
+.PP
+.RS 4
+.EX
+maak
+.EE
+.RE
+.PP
+Run two tasks in sequence:
+.PP
+.RS 4
+.EX
+maak clean,build
+.EE
+.RE
+.PP
+Run three tasks, named one word each:
+.PP
+.RS 4
+.EX
+maak \-\- clean build test
+.EE
+.RE
+.PP
+Pass arguments to a task:
+.PP
+.RS 4
+.EX
+maak quick\-math \-\- 23 42
+.EE
+.RE
+.PP
+Give a task an argument that begins with a dash:
+.PP
+.RS 4
+.EX
+maak quick\-math \-\- \-23 42
+.EE
+.RE
+.PP
+List the tasks of another file, quietly:
+.PP
+.RS 4
+.EX
+maak \-q \-f ./tools/tasks.scm \-\-list
+.EE
+.RE
+.PP
+Let the Maak file require modules from
+.BR ./lib ,
+and dry\-run the release pipeline:
+.PP
+.RS 4
+.EX
+maak \-L ./lib \-n \-\- release
+.EE
+.RE
+.PP
+Read credentials from a file and skip the greeting banner:
+.PP
+.RS 4
+.EX
+maak \-\-no\-banner \-e .env.production \-\- deploy
+.EE
+.RE
+.SH SEE ALSO
+.BR guile (1),
+.BR guix (1),
+.BR make (1)
+.PP
+The Maak manual and the technical Guile Scheme API documentation are published
+at the project homepage listed below.
+.SH LICENSE
+Maak is licensed under the GNU General Public License, version 3 or later.
+This manual page is licensed under the GNU Free Documentation License, version
+1.3 or later.
+.PP
+Homepage: https://codeberg.org/jjba23/maak

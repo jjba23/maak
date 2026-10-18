@@ -31,6 +31,10 @@
 # can be explained due to the need of reliably and reproducibly
 # deploying source code and other resources to the store
 # and have access to those at runtime.
+#
+# NOTE: the option grammar here mirrors `maak-option-spec' in
+# `(maak main)'.  Keep the two in step so a mistyped flag is caught
+# before Guile starts.
 
 set -euo pipefail
 
@@ -39,6 +43,19 @@ store_dir=$(readlink -f "$script_dir/..")
 scheme_sources_dir="$store_dir/share/guile/site/3.0"
 resources_dir="$store_dir/share/resources"
 scripts_dir="$store_dir/share/scripts"
+
+# Installed, this script sits in a tree that holds the library under share/.
+# Run from a checkout of maak itself, the library is beside it instead, and an
+# installed `maak' earlier on PATH would load the version it was installed with
+# -- an older library than the maak file beside us asks for, which fails as a
+# missing module rather than as the version mismatch it is.  Falling back to the
+# sources here is what lets `./scripts/maak test' run the maak it belongs to.
+if [ ! -d "${scheme_sources_dir}/maak" ] && [ -d "${store_dir}/src/maak" ]; then
+  scheme_sources_dir="${store_dir}/src"
+fi
+if [ ! -f "${resources_dir}/help.txt" ] && [ -f "${store_dir}/resources/help.txt" ]; then
+  resources_dir="${store_dir}/resources"
+fi
 
 bold_text='\033[1m'
 red_text='\033[0;31m'
@@ -49,7 +66,7 @@ get_timestamp() {
 }
 
 log_error() {
-  if [ -z "${1}" ]; then
+  if [ -z "${1:-}" ]; then
     log_error "log-error was called without a message."
     return 1
   fi
@@ -58,7 +75,7 @@ log_error() {
 }
 
 log_info() {
-  if [ -z "${1}" ]; then
+  if [ -z "${1:-}" ]; then
     log_error "log-info was called without a message."
     return 1
   fi
@@ -71,23 +88,97 @@ show_help() {
   cat "$resources_dir/help.txt"
 }
 
-parsed_options=$(getopt -n "maak" -o lf:hnq --longoptions list,file,help,dry-run,quiet -- "$@")
+# The words are read as a task list followed by the arguments for those tasks,
+# and where the two divide is worked out here, before `getopt' sees anything:
+# `getopt' takes the first `--' it meets as the end of its own options, and the
+# separator would be gone by the time the tasks are counted.  The grammar this
+# reads is written down in help.txt and in the manual page:
+#
+#   maak clean,build           # one word, two tasks
+#   maak quick-math 23 42      # a task, then the arguments it is given
+#   maak -- clean build test   # a `--' before any task word introduces the task
+#                              # list: every word up to a further `--' names a
+#                              # task, and the arguments follow that one
+#   maak -t clean,build -- -q  # `-t' names the tasks outright, so every other
+#                              # word on the line is an argument
+#
+# A `--' after a task word sets the arguments apart from it --
+# `maak quick-math -- -23 42' -- and is otherwise what it looks like: the point
+# where the options stop and the words for maak begin.
+option_side=()
+argument_side=()
+separator_seen=no
+for word in "$@"; do
+  if [ "${separator_seen}" = no ] && [ "${word}" = "--" ]; then
+    separator_seen=yes
+    continue
+  fi
+  if [ "${separator_seen}" = yes ]; then
+    argument_side+=("${word}")
+  else
+    option_side+=("${word}")
+  fi
+done
+
+# Only the words before that first separator are options and task words; the
+# ones after it are the arguments, and are never shown to `getopt' -- a task
+# argument that looks like an option is an argument.
+parsed_options=$(getopt -n "maak" -o C:e:ij:klf:hL:nqvt: --longoptions list,file:,help,dry-run,quiet,load-path:,env-file:,no-env-file,banner,no-banner,version,debug,directory:,keep-going,ignore-errors,jobs:,no-print-directory,tasks: -- "${option_side[@]}")
 eval set -- "$parsed_options"
 
+# The Maak file is resolved once every -C has been honoured, so it is kept as
+# it was given until then.
 file_arg=""
+# Repeated -L flags are collected and handed to Guile as one colon separated
+# list, the same shape as PATH and GUILE_LOAD_PATH.
+load_paths=()
+# Repeated -e flags are collected the same way.
+env_files=()
+# Repeated -t flags name tasks directly, and are joined with commas the way the
+# words of a task list are.
+task_lists=()
+# Repeated -C flags are collected in order, and entered in that order.
+directories=()
 
 guile_cmd_args=(
   "-L" "${scheme_sources_dir}"
-  "-c" "((@(maak main) main))"
+  "-c" "(exit ((@(maak main) main)))"
   "--resources" "${resources_dir}"
 )
 
-while true; do
+while [ "$#" -gt 0 ]; do
   case "${1}" in
-  -f | --file)
-    file_arg="${2}"
-    guile_cmd_args+=("--file" "$(realpath "${file_arg}")")
+  -C | --directory)
+    if [ -z "${2:-}" ]; then
+      log_error "The --directory option needs a path."
+      exit 1
+    fi
+    directories+=("${2}")
     shift 2
+    ;;
+  -f | --file)
+    if [ -z "${2:-}" ]; then
+      log_error "The --file option needs a path."
+      exit 1
+    fi
+    file_arg="${2}"
+    shift 2
+    ;;
+  -i | --ignore-errors)
+    guile_cmd_args+=("--ignore-errors")
+    shift
+    ;;
+  -j | --jobs)
+    if [ -z "${2:-}" ]; then
+      log_error "The --jobs option needs a number."
+      exit 1
+    fi
+    guile_cmd_args+=("--jobs" "${2}")
+    shift 2
+    ;;
+  -k | --keep-going)
+    guile_cmd_args+=("--keep-going")
+    shift
     ;;
   -h | --help)
     show_help
@@ -97,29 +188,178 @@ while true; do
     guile_cmd_args+=("--list")
     shift
     ;;
+  -t | --tasks)
+    if [ -z "${2:-}" ]; then
+      log_error "The --tasks option needs a list of tasks."
+      exit 1
+    fi
+    task_lists+=("${2}")
+    shift 2
+    ;;
+  -L | --load-path)
+    if [ -z "${2:-}" ]; then
+      log_error "The --load-path option needs a directory."
+      exit 1
+    fi
+    load_paths+=("${2}")
+    shift 2
+    ;;
   -n | --dry-run)
     guile_cmd_args+=("--dry-run")
+    shift
+    ;;
+  --no-print-directory)
+    guile_cmd_args+=("--no-print-directory")
     shift
     ;;
   -q | --quiet)
     guile_cmd_args+=("--quiet")
     shift
     ;;
-  --)
+  -e | --env-file)
+    if [ -z "${2:-}" ]; then
+      log_error "The --env-file option needs a path."
+      exit 1
+    fi
+    env_files+=("${2}")
+    shift 2
+    ;;
+  --no-env-file)
+    guile_cmd_args+=("--no-env-file")
     shift
-    [ "$#" -gt 0 ] && guile_cmd_args+=("--tasks" "${@}")
+    ;;
+  --banner)
+    guile_cmd_args+=("--banner")
+    shift
+    ;;
+  --no-banner)
+    guile_cmd_args+=("--no-banner")
+    shift
+    ;;
+  -v | --version)
+    guile_cmd_args+=("--version")
+    shift
+    ;;
+  --debug)
+    guile_cmd_args+=("--debug")
+    shift
+    ;;
+  --)
+    # The rest of the line is words for maak rather than options.  Whether they
+    # name tasks or are the arguments of the tasks before it is settled below,
+    # where the task list is put together; here the loop simply ends, and the
+    # operands `getopt' left are what the words before the separator were.
+    shift
     break
     ;;
   *)
-    log_error "Error: unrecognized option '${1}' !"
+    log_error "unrecognized option '${1}'"
     show_help
     exit 1
     ;;
   esac
 done
 
-if [[ -z "${file_arg}" ]]; then
+if [ "${#load_paths[@]}" -gt 0 ]; then
+  joined_load_paths=$(IFS=:; echo "${load_paths[*]}")
+  guile_cmd_args+=("--load-path" "${joined_load_paths}")
+fi
+
+if [ "${#env_files[@]}" -gt 0 ]; then
+  joined_env_files=$(IFS=:; echo "${env_files[*]}")
+  guile_cmd_args+=("--env-file" "${joined_env_files}")
+fi
+
+# -C is honoured here, before the Maak file is looked for, so that `-f maak.scm'
+# with `-C sub' names sub/maak.scm and the default is the ./maak.scm of the
+# directory entered -- which is what `make -C' does.  A value may name several
+# directories at once separated by ':', the way -L and -e do, and they are
+# entered in the order given.  The directories are then handed to Guile as one
+# colon separated list of absolute paths, because it is the library that
+# reports each one it enters, and because `getopt-long' keeps only the last
+# value of a single-valued option.
+if [ "${#directories[@]}" -gt 0 ]; then
+  entered_directories=()
+  for dir in "${directories[@]}"; do
+    IFS=':' read -r -a dir_parts <<<"${dir}"
+    for part in "${dir_parts[@]}"; do
+      # `a::b' and `a:' name the same directories as `a:b' and `a'.
+      if [ -z "${part}" ]; then
+        continue
+      fi
+      if ! cd -- "${part}" 2>/dev/null; then
+        log_error "no such directory: '${part}'"
+        exit 1
+      fi
+      entered_directories+=("$(pwd -P)")
+    done
+  done
+  if [ "${#entered_directories[@]}" -gt 0 ]; then
+    joined_directories=$(IFS=:; echo "${entered_directories[*]}")
+    guile_cmd_args+=("--directory" "${joined_directories}")
+  fi
+fi
+
+# An absolute path keeps Guile from resolving the Maak file against its own
+# module directory.
+if [ -n "${file_arg}" ]; then
+  if [ ! -f "${file_arg}" ]; then
+    log_error "No such Maak file: '${file_arg}'"
+    exit 1
+  fi
+  guile_cmd_args+=("--file" "$(realpath "${file_arg}")")
+elif [ -f ./maak.scm ]; then
   guile_cmd_args+=("--file" "$(realpath ./maak.scm)")
+else
+  log_error "No Maak file found: './maak.scm'"
+  log_info "Create one, or name another with -f/--file. Run 'maak --help' for the options."
+  exit 1
+fi
+
+# ====== The task list, and the arguments it is given ======
+#
+# A task word before the separator names the tasks, and a `-t/--tasks' list
+# names them outright; either way the words that are left over are the arguments
+# of those tasks.  When the separator came before any task word it introduced
+# the task list, and the words after it are tasks up to a further separator that
+# starts their arguments -- the one spelling that runs several tasks named one
+# word each.
+task_names=()
+task_arguments=()
+if [ "${#task_lists[@]}" -gt 0 ]; then
+  task_names=("${task_lists[@]}")
+  task_arguments=("$@" "${argument_side[@]}")
+elif [ "$#" -gt 0 ]; then
+  task_names=("${1}")
+  shift
+  task_arguments=("$@" "${argument_side[@]}")
+elif [ "${separator_seen}" = yes ]; then
+  # The further separator is the one that starts their arguments; there is at
+  # most one of them, and the loop above left it in place.
+  arguments_started=no
+  for word in "${argument_side[@]}"; do
+    if [ "${arguments_started}" = no ] && [ "${word}" = "--" ]; then
+      arguments_started=yes
+      continue
+    fi
+    if [ "${arguments_started}" = yes ]; then
+      task_arguments+=("${word}")
+    else
+      task_names+=("${word}")
+    fi
+  done
+fi
+
+# The tasks travel as the one option `main' reads a task list from -- the words
+# of a list are joined with commas, which is the syntax that option already
+# has -- and the arguments as the words after `--', which `main' passes on to
+# the tasks untouched.
+if [ "${#task_names[@]}" -gt 0 ]; then
+  joined_task_names=$(IFS=,; echo "${task_names[*]}")
+  guile_cmd_args+=("--tasks" "${joined_task_names}")
+fi
+if [ "${#task_arguments[@]}" -gt 0 ]; then
+  guile_cmd_args+=("--" "${task_arguments[@]}")
 fi
 
 # Run Guile application

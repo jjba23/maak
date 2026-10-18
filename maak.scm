@@ -55,6 +55,14 @@
   "Default task to run, call program's help."
   (list-tasks))
 
+(define (man)
+  "Preview the maak manual page without installing it."
+  ($ '("man ./man/maak.1")))
+
+(define (version)
+  "Print the maak version."
+  (print-version))
+
 (define (arithmetics)
   "Do some quick math."
   (let* ((entries '(1 3 5 7 9))
@@ -203,9 +211,54 @@
        "bash coreutils util-linux-with-udev guile" "-- maak --list")
      #:verbose? #t))
 
+(define (nix-dev)
+  "Enter the Nix development shell this project's flake declares."
+  (nix-develop (list "maak --list")))
+
+(define (flake-check)
+  "Validate every output of this project's Nix flake."
+  (nix-flake-check #:flake "."))
+
+;; ====== Maak tests ======
+;;
+;; The suite runs once, in the environment the manifest declares.  The Veritas
+;; variables are set through `env' rather than as a `VAR=value' prefix:
+;; everything after `guix shell --' is executed directly, so a prefix would be
+;; looked up as a program name.
+(define veritas-command-head
+  (list "env VERITAS_TEST_MODULE=veritas VERITAS_TEST_TOP_DIR=test VERITAS_TEST_TYPE=unit"
+        "VERITAS_RUN_BENCHMARKS=false"))
+
+(define veritas-command-tail
+  (list "guile -L ./src -L ./test -c '(exit ((@ (veritas runner) run-tests)))'"))
+
+(define test-command
+  (append veritas-command-head veritas-command-tail))
+
+;; There is deliberately no task that audits the suite on top of running it.
+;; Two failure modes are worth naming, because deciding against a reader of the
+;; run means living with them: a test whose body never builds an
+;; assertion, and a case that writes more than one assertion, of which only the
+;; last is read.  Both pass silently, so neither the exit status nor a count of
+;; tests catches either one; what shows them is the report, where a test with no
+;; case under it ran nothing at all.  That is why the suite is kept to one
+;; assertion per case and why the rules are written down in the README.
+(define (test)
+  "Run the project's unit test suite with Veritas.
+
+The specs live under test/veritas/unit and are located by the Veritas runner,
+which needs both the library sources and the test tree on the load path."
+  (manifest-shell test-command))
+
+(define (container)
+  "Run the same unit test suite inside a Guix container, with no network."
+  (guix-container test-command
+                  #:manifest "manifest.scm"))
+
 ;; ====== Maak test playground =======
 
-(define (test)
+(define (test-playground)
+  "Play with temporary files and dry-run scopes."
   (define (new-temp-file)
     (let* ((now (localtime (current-time)))
            (time-string (string-replace-substring (strftime "%c" now) " " "-"))
