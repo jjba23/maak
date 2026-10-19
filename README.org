@@ -974,6 +974,19 @@ The ~git-*~ tasks are thin wrappers around the command of the same name: ~git-in
 
 ~package-tar~ and ~package-zip~ write the last commit as ~maak-VERSION.tar.gz~ and ~maak-VERSION.zip~, under a ~maak-VERSION/~ prefix. They use ~git archive~, so the archive holds what git tracks in that commit: no ~.git~, no untracked files, and the single top-level directory the RPM spec's ~%autosetup~ expects.
 
+The wrappers live in [[file:src/maak/git.scm][src/maak/git.scm]] as the module ~(maak git)~, so another project can import them and name its own tasks:
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak git))
+
+(define (save message)
+  "Commit every tracked change."
+  (git-commit message))
+#+end_src
+
+It also provides ~git~ itself for the commands without a wrapper (~git~ on ~("fetch" "--all")~) and ~git-archive~, ~git-archive-tar~ and ~git-archive-zip~ for the archives. This project's tasks reach the module when a task runs rather than importing it at the top of [[file:maak.scm][maak.scm]], so the Maak file still loads under a maak too old to have it; such a task then says which maak it needs instead of failing on an unbound name.
+
 ** Releasing
 
 The version is written by hand in one place: ~maak-version~ in [[file:src/maak/version.scm][src/maak/version.scm]], which is what ~maak --version~ prints. Everything else follows it.

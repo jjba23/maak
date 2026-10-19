@@ -267,63 +267,64 @@ are turned into the number a shell would report here, 127 when git never ran."
             (tag-release version)
             (log-info "Nothing to commit; tagged ~a at the current commit." tag))))))
 
-;; ====== Git ======
+;; ====== Git and source archives ======
 ;;
-;; Thin wrappers over the git commands this project uses, so the common ones are
-;; one word away rather than a remembered invocation.  `run' takes a program
-;; and its arguments as a list and never goes through a shell, so a message
-;; with spaces or quotes reaches git as one argument and nothing re-splits it:
-;; `maak git-commit "feat: a message with spaces"'.
+;; The wrappers are library code, `(maak git)', so another project's Maak file
+;; can import them and name its own tasks.  This file names them as tasks, and
+;; reaches the module when a task runs rather than importing it at the top: a
+;; top-level import would stop this whole file loading under an older installed
+;; maak, and take the tasks that need nothing new -- `sync-version' among them
+;; -- down with it.
+(define-syntax-rule (git-call name arguments)
+  (let ((library (resolve-module '(maak git) #:ensure #f)))
+    (unless library
+      (error "(maak git) is not part of the maak this Maak file is running under; run ./scripts/maak from the checkout, or install the maak this file belongs to"))
+    (apply (module-ref library 'name) arguments)))
 
 (define (git-init . arguments)
   "Initialise a git repository here, with any arguments git init takes."
-  (run (append (list "git" "init") arguments)))
+  (git-call git-init arguments))
 
 (define (git-status)
   "Show the current branch and a short status of the working tree."
-  (run (list "git" "status" "--short" "--branch")))
+  (git-call git-status '()))
 
 (define (git-add . paths)
   "Stage PATHS, or every change in the tree when none is named."
-  (run (if (null? paths)
-           (list "git" "add" "--all")
-           (append (list "git" "add" "--") paths))))
+  (git-call git-add paths))
 
 (define (git-commit message)
   "Commit every tracked change with MESSAGE."
-  (run (list "git" "commit" "-am" message)))
+  (git-call git-commit (list message)))
 
 (define (git-tag name)
   "Tag the current commit as NAME, without an annotation."
-  (run (list "git" "tag" name)))
+  (git-call git-tag (list name)))
 
 (define (git-branch . names)
   "List the branches, or create the branches NAMES name."
-  (run (append (list "git" "branch") names)))
+  (git-call git-branch names))
 
 (define (git-switch branch)
   "Switch to BRANCH, which must already exist."
-  (run (list "git" "switch" branch)))
+  (git-call git-switch (list branch)))
 
 (define (git-pull . arguments)
   "Pull from the upstream branch, with any arguments git pull takes."
-  (run (append (list "git" "pull") arguments)))
+  (git-call git-pull arguments))
 
 (define (git-push . arguments)
   "Push the current branch, with any arguments git push takes.
 
 A bare push does not send tags that are not annotated; `maak git-push --
 --tags' sends them too."
-  (run (append (list "git" "push") arguments)))
+  (git-call git-push arguments))
 
 (define (git-log . arguments)
   "Show the history as a decorated one-line graph, twenty commits by default."
-  (run (append (list "git" "log" "--oneline" "--graph" "--decorate")
-               (if (null? arguments) (list "-n" "20") arguments))))
+  (git-call git-log arguments))
 
-;; ====== Source archives ======
-;;
-;; Both archive the last commit with `git archive', so what is packed is what
+;; Both archives pack the last commit with `git archive', so what ships is what
 ;; the release commit contains: the tracked files, without `.git' and without
 ;; anything untracked or ignored.  The prefix is the directory the RPM spec's
 ;; `%autosetup -n %{name}-%{version}' expects to unpack into.
@@ -331,18 +332,16 @@ A bare push does not send tags that are not annotated; `maak git-push --
 (define (package-tar)
   "Write the last commit as maak-VERSION.tar.gz, under a maak-VERSION/ prefix."
   (let ((name (format #f "~a-~a" project-name maak-version)))
-    (run (list "git" "archive" "--format=tar.gz"
-               (format #f "--prefix=~a/" name)
-               "-o" (format #f "~a.tar.gz" name)
-               "HEAD"))))
+    (git-call git-archive-tar
+              (list (format #f "~a.tar.gz" name)
+                    #:prefix (format #f "~a/" name)))))
 
 (define (package-zip)
   "Write the last commit as maak-VERSION.zip, under a maak-VERSION/ prefix."
   (let ((name (format #f "~a-~a" project-name maak-version)))
-    (run (list "git" "archive" "--format=zip"
-               (format #f "--prefix=~a/" name)
-               "-o" (format #f "~a.zip" name)
-               "HEAD"))))
+    (git-call git-archive-zip
+              (list (format #f "~a.zip" name)
+                    #:prefix (format #f "~a/" name)))))
 
 (define (arithmetics)
   "Do some quick math."
