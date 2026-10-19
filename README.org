@@ -46,12 +46,16 @@ That is the whole idea. Everything below is what you get once you take it seriou
 - *The entire language, not a DSL* — define functions, use lists and hash tables, write macros, import libraries. If you can write it in Guile, you can write it in a task.
 - *A real command line, Make-compatible where it counts* — ~-f~, ~-C~, ~-n~, ~-k~, ~-i~, ~-j~, ~--list~ and friends behave the way your fingers expect.
 - *Shell-free by default* — ~run~ takes a program and its arguments as separate strings, so a path with a space in it stays one argument.
-- *Real pipelines* — ~run-pipeline~ connects argv stages with ~pipe~ and ~dup2~, reports *every* failing stage instead of just the last one, gives a stage its own environment or ~sudo~, keeps what each stage wrote with ~#:tee~ or ~#:capture?~ so a task can read it, and can run the whole pipeline as a background job.
+- *Real pipelines* — ~run-pipeline~ connects argv stages with ~pipe~ and ~dup2~, reports *every* failing stage instead of just the last one, gives a stage its own environment or root (through ~sudo~ or ~doas~), keeps what each stage wrote with ~#:tee~ or ~#:capture?~ so a task can read it, and can run the whole pipeline as a background job.
 - *Background jobs with a pid* — ~#:async?~ forks a process and hands back a job record you can poll, wait on, and read the exit code of.
 - *Parallel tasks with readable output* — ~maak -j 4 -- fmt,lint,test~ runs tasks in forked workers and prints each one's output as a single block, in the order you named them.
 - *Dry-run and quiet as lexical parameters* — ~(parameterize ((dry-run? #t)) …)~ makes destructive code safe to exercise inside a test, without a command-line flag.
 - *Environment files and load paths* — ~.env~ files, ~-e~, ~MAAK_ENV_FILE~, ~-L~, ~MAAK_LOAD_PATH~, and ~with-load-path~ for Maak files that are a thin front end over your own modules.
 - *Guix and Nix, first class* — ~manifest-shell~, ~program-shell~, time-machine variants, ~guix-container~, ~guix-pack~, mirror-image Nix helpers, and ~guix-build~ / ~guix-program~, which read a pinned Guix as *values* instead of running another Guix.
+- *Git, tar and zip without a shell string* — ~(maak git)~ and ~(maak archive)~ wrap the commands a release needs, with ~#:directory~, archive prefixes and compression as arguments rather than words that a shell might split.
+- *Containers, both engines* — ~(maak container)~ speaks Podman and Docker through one set of procedures, and Compose through either ~docker compose~, ~podman compose~ or ~podman-compose~; the engine is detected, not hard-coded.
+- *niri, from a task* — ~(maak niri)~ wraps ~niri msg~, so the session can be queried, rearranged or screenshotted from the same place as the build.
+- *Downloads with curl or wget* — ~(maak net)~ wraps the common requests: fetch a file, read a URL into a string, check a status code, post JSON, mirror a site. ~download~ picks curl or wget from what is installed.
 - *Translation tooling* — the whole GNU gettext workflow (~i18n-extract~, ~i18n-merge~, ~i18n-compile~, ~i18n-refresh~) packaged so you do not rewrite it per project.
 - *Errors that read like sentences* — ~task-error~ prints one line and a hint, exits non-zero, and keeps the backtrace behind ~--debug~.
 - *Self-documenting tasks* — a docstring becomes the entry in ~maak --list~, laid out so long descriptions stay readable.
@@ -66,6 +70,8 @@ That is the whole idea. Everything below is what you get once you take it seriou
 - *~bash~, ~coreutils~ and ~util-linux~* — for the ~scripts/maak~ launcher
 - *Tested on GNU/Linux but works anywhere Guile works* — the library itself is portable Scheme, but GNU/Linux is where it is built, packaged and exercised.
 - *Optional:* [[https://guix.gnu.org/][GNU Guix]] for reproducible environments (heartily recommended), or [[https://nixos.org/][Nix]] if that is your house.
+- *Optional tool modules:* ~git~, ~tar~ and ~zip~/ ~unzip~ for ~(maak git)~ and ~(maak archive)~; ~curl~ or ~wget~ for ~(maak net)~; ~podman~ or ~docker~ (and a Compose implementation) for ~(maak container)~; ~niri~ for ~(maak niri)~. Only the module that calls one needs it, and a missing program is reported as a missing program.
+- *Root escalation:* ~sudo~ or ~doas~, whichever the machine has, is used by ~#:sudo?~; neither is required unless a task asks for root.
 
 ** On Guix (recommended)
 
@@ -579,7 +585,7 @@ Two runners sit at the bottom. ~run~ takes a program and its arguments as separa
     (log-info "the tree is dirty\n"))
   #+end_src
 
-  It accepts the same ~#:env~, ~#:sudo?~, ~#:dev-null?~ and ~#:allow-failure?~ keywords as ~$~, and a program that cannot be started exits 127, which is reported like any other non-zero exit. The helpers below (~mkdir-p~, ~cp~, ~mv~, ~cat~, ~touch~, ~ln-s~, ~chmod-file~ and ~delete-file-recursively~) are built on ~run~, so a path with a space in it reaches the program as one argument.
+  It accepts the same ~#:env~, ~#:sudo?~, ~#:dev-null?~ and ~#:allow-failure?~ keywords as ~$~, and a program that cannot be started exits 127, which is reported like any other non-zero exit. The helpers below (~mkdir-p~, ~cp~, ~mv~, ~cat~, ~touch~, ~ln-s~, ~chmod-file~, ~delete-file-recursively~ and its short alias ~rm-rf~) are built on ~run~, so a path with a space in it reaches the program as one argument.
 
   ~#:expand? #t~ joins the arguments with spaces and hands them to the shell, so a wildcard, ~$VAR~ or a leading tilde is expanded the way a shell would. It is opt-in because the shell then sees words rather than arguments: a path with a space in it becomes several words again. The file helpers pass the keyword through, so ~(delete-file-recursively "build/*.o" #:expand? #t)~ removes every object file the shell names.
 
@@ -659,12 +665,14 @@ Two runners sit at the bottom. ~run~ takes a program and its arguments as separa
 
   ~#:allow-failure?~ returns ~#f~ instead of raising when the command exits non-zero, so the task is told the command failed and can decide what that means; it is the ~cmd || true~ idiom, except that the failure is not hidden from the task. ~#:async?~ starts the command in the background and returns a job, and ~#:sudo?~ runs it as root — both are printed by ~--dry-run~ like anything else, so they can be checked before they are really run.
 
+  ~#:sudo?~ does not hard-code ~sudo~. The program that answers it is the ~elevation-command~ parameter: ~doas~ when it is on ~PATH~, ~sudo~ otherwise, or whatever ~MAAK_ELEVATE~ names (options included, as in ~MAAK_ELEVATE="doas -n"~). A ~parameterize~ can pin it for one task, and an empty string turns the request into a no-op, which is what an unprivileged CI container wants.
+
 - ~syscall~ — run one shell line and raise when it exits non-zero; it is ~$~ without the list of parts.
 - ~capture~ — return a command's output. A command that exits non-zero raises an error naming its exit code instead of returning the empty or partial output it produced; pass ~#:allow-failure? #t~ to read that output anyway.
 - ~which~, ~command-exists?~, ~require-command~ — find a program on ~PATH~.
 - ~shell-quote~ — quote a value so a shell reads it as one word.
 - ~read-file~, ~write-file~ — read and write a file from Scheme.
-- ~mkdir-p~, ~remkdir-p~, ~delete-file-recursively~, ~cp~, ~mv~, ~cat~, ~touch~, ~ln-s~, ~chmod-file~ — file helpers, all built on ~run~.
+- ~mkdir-p~, ~remkdir-p~, ~delete-file-recursively~ / ~rm-rf~, ~cp~, ~mv~, ~cat~, ~touch~, ~ln-s~, ~chmod-file~ — file helpers, all built on ~run~. ~rm-rf~ is the short spelling for the times a task says ~rm -rfv build~.
 - ~with-directory~, ~cd~, ~env-get~, ~env-set!~, ~env-unset!~, ~with-env~, ~with-env-vars~, ~home-dir~, ~tmp-dir~, ~load-env-file~, ~env-file-entries~.
 - ~list-tasks~, ~available-task-names~, ~run-task~, ~run-tasks~ — the task registry, for tasks that run other tasks or print the menu.
 
@@ -782,6 +790,142 @@ The gettext workflow, packaged so it does not have to be rewritten per project. 
 - ~i18n-locale-dir~, ~i18n-po-file~, ~i18n-mo-file~, ~i18n-pot-file~, ~i18n-source-globs~ — where the catalogues live.
 - ~i18n-translator~, ~i18n-language~ — load a catalogue and get a translate procedure.
 
+* Git, archives, containers, niri and downloads
+
+The everyday tools have modules of their own, so a Maak file can import just the one it needs. Every procedure has a matching ~-argv~ builder where the command line has options worth inspecting; the builder is what the procedure feeds to ~run~, what ~--dry-run~ prints, and what a test can assert without the tool installed.
+
+** Git
+
+~(maak git)~ wraps the commands a release or a check actually uses. The wrappers that take a subcommand of their own accept it as trailing arguments, so a new git subcommand does not need a new wrapper:
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak git))
+
+(define (save message)
+  "Commit every tracked change and show the result."
+  (git-add)
+  (git-commit message)
+  (git-log "-5"))
+
+(define (release-tag version)
+  "Tag the release, then push the tag."
+  (git-tag version #:message version)
+  (git-push "--follow-tags"))
+#+end_src
+
+- ~git-init~, ~git-clone~, ~git-status~, ~git-add~, ~git-commit~, ~git-tag~, ~git-branch~, ~git-switch~, ~git-checkout~, ~git-fetch~, ~git-pull~, ~git-push~, ~git-log~.
+- ~git-diff~, ~git-show~, ~git-merge~, ~git-rebase~, ~git-reset~, ~git-restore~, ~git-stash~, ~git-clean~, ~git-cherry-pick~, ~git-revert~, ~git-remote~, ~git-submodule~, ~git-config~, ~git-rev-parse~, ~git-describe~ — each takes the command's own flags.
+- ~git~ is the escape hatch: ~(git '("fetch" "--all"))~, and ~#:directory~ names another checkout.
+- ~git-output~ runs the same commands and *returns* what git printed, which is what a decision needs: ~git-current-branch~, ~git-current-revision~, ~git-describe-tag~, ~git-remote-url~, ~git-tags~, ~git-remotes~, ~git-dirty?~ are built on it.
+- ~git-archive~, ~git-archive-tar~ and ~git-archive-zip~ pack a commit -- what git tracks, with no ~.git~ and nothing untracked.
+
+** Tar and zip
+
+~(maak archive)~ builds the two archive formats a release usually ships. The arguments are a list of paths, a directory to read them from, and the options the format needs:
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak archive))
+
+(define (dist)
+  "Write the source tarball and zip beside the build."
+  (tar-create "maak-1.0.tar.gz" '("src" "README.org" "COPYING")
+              #:directory "."
+              #:exclude '("*.go" "*.o"))
+  (zip-create "maak-1.0.zip" '("src" "README.org" "COPYING")
+              #:directory "."
+              #:exclude '("*.go" "*.o")))
+#+end_src
+
+- ~tar-create~, ~tar-extract~, ~tar-list~ — the compressor follows the output's extension (~.tar.gz~, ~.tar.bz2~, ~.tar.xz~, ~.tar.zst~, or plain ~.tar~) unless ~#:compression~ names one. Extraction can ~#:strip-components~ and unpack into ~#:directory~.
+- ~zip-create~, ~zip-extract~, ~zip-list~ — ~#:recursive?~, ~#:exclude~, ~#:junk-paths?~ and ~#:overwrite?~ cover the usual cases. The zip is written beside the task's directory even when ~#:directory~ names the tree to read.
+- ~tar-create-argv~, ~tar-extract-argv~, ~tar-list-argv~, ~zip-create-argv~, ~zip-extract-argv~, ~zip-list-argv~ and ~tar-compression-option~ expose the command line for tests or logging.
+
+** Containers and Compose
+
+~(maak container)~ treats Podman and Docker as one interface. The engine is detected once (~podman~ when it is installed, then ~docker~), and ~MAAK_CONTAINER_ENGINE~ or the ~container-engine~ parameter chooses another:
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak container))
+
+(define (db-up)
+  "Start a throw-away PostgreSQL and wait until it answers."
+  (container-run "postgres:16" #:name "maak-db" #:detach? #t
+                 #:publish '("5432:5432")
+                 #:env '("POSTGRES_PASSWORD=secret"))
+  (container-exec "maak-db" '("pg_isready")))
+
+(define (stack-up)
+  "Bring the compose project up, rebuilding first."
+  (compose-up '()
+              #:file "compose.yml"
+              #:project "maak"
+              #:build? #t))
+#+end_src
+
+- Container commands: ~container-run~, ~container-build~, ~container-ps~, ~container-images~, ~container-stop~, ~container-rm~, ~container-exec~, ~container-logs~, ~container-pull~, ~container-push~, ~container-tag~, ~container-inspect~, plus ~container~ for anything else.
+- Compose commands: ~compose-up~, ~compose-down~, ~compose-build~, ~compose-logs~, ~compose-ps~, ~compose-exec~, ~compose-run~, ~compose-pull~, ~compose-restart~, ~compose-config~, plus ~run-compose~ for the rest.
+- ~container-argv~, ~container-run-argv~, ~container-build-argv~, the other ~-argv~ builders, ~compose-argv~ and the ~compose-*-argv~ builders expose the argument lists; ~container-output~ and ~compose-output~ read a command's output.
+- The Compose program is detected too: ~podman-compose~ when it is installed, otherwise ~podman compose~; Docker always uses ~docker compose~. ~MAAK_COMPOSE~ or ~container-compose-command~ overrides it.
+- ~container-available?~ and ~compose-available?~ answer whether the chosen program is on ~PATH~, so a task can give one clear error rather than a 127.
+
+** niri
+
+~(maak niri)~ wraps ~niri msg~, both the queries and the actions. The queries can ask for JSON, and ~niri-capture~ returns the output as a string for the task to parse:
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak niri))
+
+(define (focus-web)
+  "Put the browser on workspace 2 and start it."
+  (niri-focus-workspace 2)
+  (niri-spawn '("firefox")))
+
+(define (screens)
+  "Show the outputs as niri describes them."
+  (niri-outputs #:json? #t))
+#+end_src
+
+- Queries: ~niri-version~, ~niri-outputs~, ~niri-workspaces~, ~niri-windows~, ~niri-layers~, ~niri-keyboard-layouts~, ~niri-focused-output~, ~niri-focused-window~, ~niri-pick-window~, ~niri-pick-color~, ~niri-overview-state~, ~niri-casts~, ~niri-request-error~.
+- Actions: ~niri-focus-workspace~, ~niri-focus-column~, ~niri-focus-monitor~, ~niri-focus-window~, ~niri-close-window~, ~niri-fullscreen-window~, ~niri-toggle-windowed-fullscreen~, ~niri-toggle-overview~, ~niri-spawn~, ~niri-spawn-sh~, ~niri-quit~, the three screenshot actions, the monitor power actions, the move-to-workspace and move-to-monitor actions, ~niri-set-window-width~, ~niri-set-column-width~, ~niri-set-workspace-name~ and ~niri-unset-workspace-name~.
+- Outputs: ~niri-output~ for a generic change, and ~niri-output-on~, ~niri-output-off~, ~niri-output-mode~, ~niri-output-scale~, ~niri-output-transform~, ~niri-output-position~ for the common ones.
+- ~niri~, ~niri-argv~, ~niri-action~, ~niri-action-argv~, ~niri-output-argv~ and ~niri-capture~ are the building blocks when a subcommand or flag has no wrapper.
+
+** Downloads with curl and wget
+
+~(maak net)~ wraps the requests a task makes: download a file, read a URL into a string, check a status code, post JSON, upload an artefact, or mirror a documentation site. The defaults are the unattended ones -- redirects followed, HTTP errors raised, progress output silenced -- and every option is a keyword rather than a shell word:
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak net))
+
+(define (fetch-release version)
+  "Download the release tarball, resuming a partial file."
+  (download (string-append "https://example.org/maak-" version ".tar.gz")
+            #:output (string-append "maak-" version ".tar.gz")
+            #:continue? #t))
+
+(define (api-ok?)
+  "Ask the API for a record, and fail clearly when it is not there."
+  (= 200 (curl-status "https://example.org/api/health")))
+
+(define (publish-artifact path)
+  "Upload a build artefact with a bearer token."
+  (curl-upload "https://example.org/artifacts" path
+               #:headers (list (string-append "Authorization: Bearer "
+                                             (getenv "TOKEN")))))
+#+end_src
+
+- ~curl-get~, ~curl-text~, ~curl-head~, ~curl-status~, ~curl-post~, ~curl-download~ and ~curl-upload~ — the common curl requests. ~curl-get~ writes the body where curl normally does, ~curl-text~ returns it as a string, and ~curl-status~ answers with the HTTP code as a number.
+- ~wget-download~, ~wget-mirror~ and ~wget-text~ — the same jobs through wget, including ~#:continue?~, ~#:timestamping?~, ~#:no-clobber?~ and the recursive mirror options (~#:page-requisites?~, ~#:convert-links?~, ~#:cut-dirs~).
+- ~download~ chooses curl when it is installed, wget otherwise, or whatever ~MAAK_FETCH~ or the ~fetch-command~ parameter names. It takes the options both programs share, so a task does not have to know which one is present.
+- ~curl~ and ~wget~ are the escape hatches: ~(curl '("--http2" "-sS" url))~, with ~curl-output~ and ~wget-output~ returning what they printed.
+- ~curl-argv~, ~curl-get-argv~, ~curl-text-argv~, ~curl-head-argv~, ~curl-status-argv~, ~curl-post-argv~, ~curl-download-argv~, ~curl-upload-argv~, ~wget-argv~, ~wget-download-argv~, ~wget-mirror-argv~ and ~wget-text-argv~ expose the command line for tests or logging.
+- ~fetch-command~, ~detect-fetch-command~ and ~fetch-available?~ answer which downloader is in use, and whether it is on ~PATH~.
+
 * Configuration
 
 maak is configured three ways, in increasing order of precision: command-line flags, environment variables, and Scheme parameters you set lexically inside a task.
@@ -794,12 +938,16 @@ maak is configured three ways, in increasing order of precision: command-line fl
 | ~MAAK_LOAD_PATH~  | Extra Guile load path entries, ~:~-separated.                        |
 | ~MAAK_NO_BANNER~  | Set to ~1~ to skip the greeting banner.                             |
 | ~MAAK_DEBUG~      | Set to ~1~ to print the Guile backtrace on error.                   |
+| ~MAAK_ELEVATE~    | The program that answers ~#:sudo?~: ~doas~, ~sudo~, or one with options. |
+| ~MAAK_CONTAINER_ENGINE~ | The container engine: ~podman~ or ~docker~.                  |
+| ~MAAK_COMPOSE~    | The Compose program, for example ~podman-compose~ or ~docker compose~. |
+| ~MAAK_FETCH~      | The downloader ~download~ uses: ~curl~ or ~wget~.                   |
 
 #+begin_src shell
 MAAK_ENV_FILE=".env:.env.local" MAAK_NO_BANNER=1 maak -- build
 #+end_src
 
-** Parameters: dry-run, quiet, banner
+** Parameters: dry-run, quiet, banner, escalation
 
 Dry-run and quietness can be set globally with ~-n~ / ~-q~, but they are also Scheme parameters that can be overridden in lexical scope. That gives you precise control, and it is what makes destructive code safe to exercise in tests:
 
@@ -817,6 +965,13 @@ Dry-run and quietness can be set globally with ~-n~ / ~-q~, but they are also Sc
 ;; it will print instead of running
 ;; [DRY-RUN]: rm -rfv tmp
 ;; [DRY-RUN]: find . -maxdepth 8 -name '*.scm' -type f -exec guix style -f {} \;
+#+end_src
+
+~elevation-command~ is the same kind of parameter. It holds the program ~#:sudo?~ runs — detected as ~doas~ or ~sudo~ when maak starts — and can be pinned for one call, which is how a test keeps its expected command line independent of the machine:
+
+#+begin_src scheme
+(parameterize ((elevation-command "doas -n"))
+  ($ '("install -d /var/lib/maak") #:sudo? #t))
 #+end_src
 
 * Coming from Make
@@ -985,7 +1140,7 @@ The wrappers live in [[file:src/maak/git.scm][src/maak/git.scm]] as the module ~
   (git-commit message))
 #+end_src
 
-It also provides ~git~ itself for the commands without a wrapper (~git~ on ~("fetch" "--all")~) and ~git-archive~, ~git-archive-tar~ and ~git-archive-zip~ for the archives. This project's tasks reach the module when a task runs rather than importing it at the top of [[file:maak.scm][maak.scm]], so the Maak file still loads under a maak too old to have it; such a task then says which maak it needs instead of failing on an unbound name.
+It also provides ~git~ itself for the commands without a wrapper and ~git-archive~, ~git-archive-tar~ and ~git-archive-zip~ for the archives, along with the wider set described under [[*Git][Git]] above -- fetch, merge, rebase, reset, stash, diff, remotes, and the ~git-output~ queries. This project's tasks reach the module when a task runs rather than importing it at the top of [[file:maak.scm][maak.scm]], so the Maak file still loads under a maak too old to have it; such a task then says which maak it needs instead of failing on an unbound name.
 
 ** Releasing
 

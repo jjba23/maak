@@ -415,10 +415,12 @@ A bare push does not send tags that are not annotated; `maak git-push --
 
 (define (deb-build)
   "Build .deb package (unsigned)"
-  ($ '("sudo apt update")
+  ($ '("apt update")
+     #:sudo? #t
      #:verbose? #t)
-  ($ (cons "sudo apt install -y"
+  ($ (cons "apt install -y"
            (deb-packages))
+     #:sudo? #t
      #:verbose? #t)
 
   (dynamic-wind
@@ -429,7 +431,8 @@ A bare push does not send tags that are not annotated; `maak git-push --
 
    ;; Execution: run debian build commands against ./debian
    (lambda ()
-     ($ '("sudo mk-build-deps -i -r debian/control")
+     ($ '("mk-build-deps -i -r debian/control")
+        #:sudo? #t
         #:verbose? #t)
      ($ '("debuild -b -uc -us")
         #:verbose? #t))

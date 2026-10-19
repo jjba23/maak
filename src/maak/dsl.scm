@@ -35,6 +35,7 @@
                         log-separator
                         get-module-var
                         delete-file-recursively
+                        rm-rf
                         manifest-shell
                         program-shell
                         mkdir-p
@@ -50,6 +51,9 @@
                         ~
                         environment-assignments
                         decorate-command
+                        elevation-command
+                        detect-elevation-command
+                        command-on-path?
                         time-machine
                         time-machine-manifest-shell
                         time-machine-program-shell
@@ -279,7 +283,7 @@ those are filled in here so the user never sees a bare `~S'."
 ;; and in one order, the order someone would write by hand, so a command
 ;; printed by `--dry-run' can be pasted straight into a shell:
 ;;
-;;   [sudo] [env A=1 B=2] COMMAND [>/dev/null 2>&1]
+;;   [sudo|doas] [env A=1 B=2] COMMAND [>/dev/null 2>&1]
 ;;
 ;; Mindering whether a command fails is deliberately *not* one of them: `cmd ||
 ;; true' would tell the shell to report success, and maak would then have no
@@ -305,6 +309,68 @@ value cannot be written as a literal."
           env))
     (else '())))
 
+;; ====== Privilege escalation ======
+;;
+;; A task that needs root should not have to decide whether the machine uses
+;; `sudo' or `doas'.  The command is a parameter, detected once from `PATH'
+;; (`doas' wins when both are installed) and overridable through
+;; `MAAK_ELEVATE' or lexically with `parameterize'.  Every `#:sudo?' in maak
+;; goes through it, so a doas user never needs sudo installed to run a task that
+;; changes something as root.
+
+(define (executable-file? path)
+  "Return #t when PATH names an executable file."
+  (catch #t
+    (lambda () (and (file-exists? path) (access? path X_OK)))
+    (lambda args #f)))
+
+(define (command-on-path? command path)
+  "Return #t when COMMAND is an executable in one of the directories in PATH."
+  (and (string? command)
+       (not (string=? command ""))
+       (let ((dirs (if path (string-split path #\:) '())))
+         (any (lambda (dir)
+                (executable-file?
+                 (string-append (if (string=? dir "") "." dir)
+                                "/" command)))
+              dirs))))
+
+(define* (detect-elevation-command
+          #:key (path (getenv "PATH")) (preferred (getenv "MAAK_ELEVATE")))
+  "Return the command maak should use to run something as root.
+
+PREFERRED, when non-empty, wins unchanged, which is how `MAAK_ELEVATE' lets a
+user name an escalation program maak has never heard of.  Otherwise `doas' is
+chosen when it is on PATH, and `sudo' when it is not: `doas' is the smaller
+tool and the one a machine that has it usually means, while `sudo' remains the
+fallback every other system understands.
+
+PATH is the search path, `PATH' itself by default, so the function can be
+tested without changing the process environment.
+
+@example
+(detect-elevation-command #:path \"/usr/bin:/bin\")     ;; => \"sudo\"
+(detect-elevation-command #:preferred \"doas -n\")      ;; => \"doas -n\"
+@end example"
+  (cond
+    ((and preferred (not (string=? preferred ""))) preferred)
+    ((command-on-path? "doas" path) "doas")
+    (else "sudo")))
+
+(define elevation-command
+  (make-parameter (detect-elevation-command)))
+
+(define (elevation-arguments)
+  "Return `elevation-command' as the words of an argv.
+
+The command may carry options (for example @code{MAAK_ELEVATE=doas -n}), so
+it is split on whitespace, and the result is what `run' and a pipeline stage
+put before the program.  An empty command means no escalation at all, which is
+how a test or an unprivileged container turns `#:sudo?' into a no-op."
+  (if (not (string? (elevation-command)))
+      '()
+      (string-tokenize (string-trim-both (elevation-command)))))
+
 (define* (decorate-command cmd
                            #:key (env '()) (sudo? #f) (dev-null? #f))
   "Return CMD with the decorations a task asked for, applied in a fixed order.
@@ -322,7 +388,10 @@ Backgrounding is not one either: a trailing `&' leaves nothing to wait on, so
                        cmd
                        (format #f "env ~a ~a"
                                (string-join assignments " ") cmd)))
-         (with-sudo (if sudo? (format #f "sudo ~a" with-env) with-env)))
+         (escalation (string-join (elevation-arguments) " "))
+         (with-sudo (if (and sudo? (not (string=? escalation "")))
+                        (format #f "~a ~a" escalation with-env)
+                        with-env)))
     (if dev-null?
         (format #f "~a >/dev/null 2>&1" with-sudo)
         with-sudo)))
@@ -557,7 +626,9 @@ Environment variables to set for this command only, given as an alist
 string.  They are passed through @code{env} and reach the command itself.
 
 @item @strong{#:sudo?} (boolean, default #f):
-If #t, the command runs through @code{sudo}.
+If #t, the command runs through the configured privilege escalation command --
+@code{doas} when it is installed, @code{sudo} otherwise, or whatever
+@code{MAAK_ELEVATE} names.  See @code{elevation-command}.
 
 @item @strong{#:dev-null?} (boolean, default #f):
 If #t, both standard output and standard error are discarded to
@@ -643,7 +714,9 @@ If #t, logs the command before running it.
 Environment variables for this program only, in the shapes `$' accepts.
 
 @item @strong{#:sudo?} (boolean, default #f):
-If #t, the program runs through @code{sudo}.
+If #t, the program runs through the configured privilege escalation command --
+@code{doas} when it is installed, @code{sudo} otherwise, or whatever
+@code{MAAK_ELEVATE} names.  See @code{elevation-command}.
 
 @item @strong{#:dev-null?} (boolean, default #f):
 If #t, standard output and standard error are connected to @code{/dev/null}.
@@ -684,7 +757,7 @@ allowed."
          #:allow-failure? allow-failure?
          #:async? async?)
       (let* ((assignments (environment-assignments env))
-         (parts (append (if sudo? (list "sudo") '())
+         (parts (append (if sudo? (elevation-arguments) '())
                         (if (null? assignments)
                             '()
                             (append (list "env") assignments))
@@ -789,7 +862,8 @@ copy process of a captured last stage puts what it has already written."
 ARGV is a program and its arguments, in the shape `run' takes them.  ENV sets
 names for this stage alone, in the shapes `$' accepts; they are added to the
 pipeline's own environment, later names winning.  With SUDO? the stage runs
-through `sudo'.  TEE names a file that the stage's standard output is also
+through the configured privilege escalation command (see `elevation-command').
+TEE names a file that the stage's standard output is also
 written to, the way `tee' does it: the stage after this one reads the same
 bytes, and the file keeps them for the task to look at once the pipeline is
 done.
@@ -822,16 +896,16 @@ A stage is a description only; `run-pipeline' starts it."
 (define (pipeline-stage-argv spec pipeline-env)
   "Return SPEC as the argv to exec, with PIPELINE-ENV and its own options.
 
-The command line is built the way `run' builds one: `sudo' first, then `env'
-with the assignments, then the program and its arguments.  That is what lets an
-assignment reach a stage inside a pipeline, where the shell that usually reads
-it is not there."
+The command line is built the way `run' builds one: the privilege escalation
+command first, then `env' with the assignments, then the program and its
+arguments.  That is what lets an assignment reach a stage inside a pipeline,
+where the shell that usually reads it is not there."
   (let* ((argv (if (stage? spec) (stage-argv spec) spec))
          (assignments (append (environment-assignments pipeline-env)
                               (environment-assignments
                                (if (stage? spec) (stage-env spec) '()))))
          (sudo? (and (stage? spec) (stage-sudo? spec))))
-    (append (if sudo? (list "sudo") '())
+    (append (if sudo? (elevation-arguments) '())
             (if (null? assignments)
                 '()
                 (append (list "env") assignments))
@@ -1282,6 +1356,22 @@ If #t, logs the generated command before executing it.
   Signals an error if the underlying shell command exits with a non-zero status."
   (run (list "rm" "-rfv" dir)
        #:verbose? verbose? #:expand? expand?))
+
+(define* (rm-rf path #:key (verbose? #f) (expand? #f))
+  "Delete PATH recursively, forcefully and verbosely.
+
+A short spelling of @code{delete-file-recursively}, for the times a task says
+@code{rm -rfv build} in the shell.  It is an alias rather than a second
+implementation, so it takes the same @code{#:verbose?} and @code{#:expand?}
+keywords and behaves the same way.
+
+@example
+(rm-rf \"build\")
+(rm-rf \"build/*.o\" #:expand? #t)
+@end example"
+  (delete-file-recursively path
+                           #:verbose? verbose?
+                           #:expand? expand?))
 
 (define* (mkdir-p dir
                   #:key (verbose? #f) (expand? #f))

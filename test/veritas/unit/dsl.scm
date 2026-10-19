@@ -33,6 +33,7 @@
   #:use-module (srfi srfi-1)
   #:use-module (srfi srfi-13)
   #:use-module (maak dsl)
+  #:use-module (maak shell)
   #:export (spec))
 
 (define strings-suite
@@ -404,7 +405,8 @@ only way for a test to see what such a process printed."
                      (delete-file-recursively dir))
                    (assert-equal #:expect "stage" #:got text))))
          (test "a dry run shows a stage's environment and sudo"
-               (let ((printed (parameterize ((dry-run? #t) (quiet? #f))
+               (let ((printed (parameterize ((dry-run? #t) (quiet? #f)
+                                            (elevation-command "sudo"))
                                 (with-output-to-string
                                   (lambda ()
                                     (run-pipeline
@@ -581,6 +583,49 @@ only way for a test to see what such a process printed."
                    (delete-file-recursively dir))
                  (assert-true created?)))))
 
+(define file-helpers-suite
+  (suite "File helpers"
+         #:concurrent? #f
+         #:shuffle? #f
+         (test "rm-rf removes a directory and its contents"
+               (let* ((dir (process-scratch-directory))
+                      (sub (string-append dir "/sub"))
+                      (file (string-append sub "/a.txt"))
+                      (removed? (begin
+                                  (parameterize ((quiet? #t))
+                                    (mkdir-p sub)
+                                    (touch file)
+                                    (rm-rf dir))
+                                  (not (file-exists? dir)))))
+                 (assert-true removed?)))
+         (test "rm-rf is a dry run under dry-run?"
+               (let* ((dir (process-scratch-directory))
+                      (file (string-append dir "/keep.txt"))
+                      (kept? (begin
+                               (parameterize ((quiet? #t))
+                                 (touch file))
+                               (parameterize ((dry-run? #t) (quiet? #t))
+                                 (rm-rf dir))
+                               (file-exists? file))))
+                 (parameterize ((quiet? #t))
+                   (delete-file-recursively dir))
+                 (assert-true kept?)))
+         (test "rm-rf expands a wildcard when asked to"
+               (let* ((dir (process-scratch-directory))
+                      (victim (string-append dir "/a.txt"))
+                      (keep (string-append dir "/keep.log"))
+                      (removed? (begin
+                                  (parameterize ((quiet? #t))
+                                    (touch victim)
+                                    (touch keep)
+                                    (rm-rf (string-append dir "/*.txt")
+                                           #:expand? #t))
+                                  (and (not (file-exists? victim))
+                                       (file-exists? keep)))))
+                 (parameterize ((quiet? #t))
+                   (delete-file-recursively dir))
+                 (assert-true removed?)))))
+
 (define (spec)
   (veritas-run #:concurrent? #f
                #:shuffle? #f
@@ -588,4 +633,5 @@ only way for a test to see what such a process printed."
                load-path-suite
                error-suite
                processes-suite
-               pipeline-suite))
+               pipeline-suite
+               file-helpers-suite))

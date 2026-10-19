@@ -57,9 +57,13 @@
       (else (loop (cdr chars) (cons (car chars) out) #f)))))
 
 (define (dry-run-command thunk)
-  "Return the command THUNK would run, as printed by dry-run mode."
+  "Return the command THUNK would run, as printed by dry-run mode.
+
+The escalation command is pinned to `sudo' so the expected lines do not
+depend on whether the machine running the suite happens to have `doas'."
   (parameterize ((dry-run? #t)
-                 (quiet? #f))
+                 (quiet? #f)
+                 (elevation-command "sudo"))
     (strip-ansi (with-output-to-string thunk))))
 
 ;; A case is read for its last form only: a body of several forms leaves every

@@ -35,12 +35,18 @@
   #:use-module (maak guix)
   #:use-module (maak i18n)
   #:use-module (maak version)
+  #:use-module (maak git)
+  #:use-module (maak archive)
+  #:use-module (maak container)
+  #:use-module (maak niri)
+  #:use-module (maak net)
   #:re-export (log-message log-info
                            log-error
                            log-separator
                            bold-output
                            get-module-var
                            delete-file-recursively
+                           rm-rf
                            manifest-shell
                            time-machine
                            time-machine-manifest-shell
@@ -112,6 +118,9 @@
                            ;; ====== Shell helpers ======
                            environment-assignments
                            decorate-command
+                           elevation-command
+                           detect-elevation-command
+                           command-on-path?
                            shell-quote
                            which
                            command-exists?
@@ -156,6 +165,204 @@
                            i18n-refresh
                            i18n-translator
                            i18n-language
+                           ;; ====== Git ======
+                           git
+                           git-argv
+                           git-output
+                           git-init
+                           git-clone
+                           git-status
+                           git-add
+                           git-commit
+                           git-tag
+                           git-branch
+                           git-switch
+                           git-checkout
+                           git-fetch
+                           git-pull
+                           git-push
+                           git-log
+                           git-diff
+                           git-show
+                           git-merge
+                           git-rebase
+                           git-reset
+                           git-restore
+                           git-stash
+                           git-clean
+                           git-cherry-pick
+                           git-revert
+                           git-remote
+                           git-submodule
+                           git-config
+                           git-rev-parse
+                           git-describe
+                           git-current-branch
+                           git-current-revision
+                           git-describe-tag
+                           git-remote-url
+                           git-tags
+                           git-remotes
+                           git-dirty?
+                           git-archive
+                           git-archive-tar
+                           git-archive-zip
+                           ;; ====== Archives ======
+                           tar-create
+                           tar-extract
+                           tar-list
+                           tar-create-argv
+                           tar-extract-argv
+                           tar-list-argv
+                           tar-compression-option
+                           zip-create
+                           zip-extract
+                           zip-list
+                           zip-create-argv
+                           zip-extract-argv
+                           zip-list-argv
+                           ;; ====== Containers ======
+                           container-engine
+                           container-compose-command
+                           detect-container-engine
+                           detect-compose-command
+                           container-available?
+                           compose-available?
+                           container-argv
+                           container
+                           container-output
+                           container-run-argv
+                           container-run
+                           container-build-argv
+                           container-build
+                           container-ps-argv
+                           container-ps
+                           container-images-argv
+                           container-images
+                           container-stop-argv
+                           container-stop
+                           container-rm-argv
+                           container-rm
+                           container-exec-argv
+                           container-exec
+                           container-logs-argv
+                           container-logs
+                           container-pull-argv
+                           container-pull
+                           container-push-argv
+                           container-push
+                           container-tag-argv
+                           container-tag
+                           container-inspect-argv
+                           container-inspect
+                           compose-argv
+                           run-compose
+                           compose-output
+                           compose-up-argv
+                           compose-up
+                           compose-down-argv
+                           compose-down
+                           compose-build-argv
+                           compose-build
+                           compose-logs-argv
+                           compose-logs
+                           compose-ps-argv
+                           compose-ps
+                           compose-exec-argv
+                           compose-exec
+                           compose-run-argv
+                           compose-run
+                           compose-pull-argv
+                           compose-pull
+                           compose-restart-argv
+                           compose-restart
+                           compose-config-argv
+                           compose-config
+                           ;; ====== niri ======
+                           niri
+                           niri-available?
+                           niri-argv
+                           niri-capture
+                           niri-action
+                           niri-action-argv
+                           niri-version
+                           niri-outputs
+                           niri-workspaces
+                           niri-windows
+                           niri-layers
+                           niri-keyboard-layouts
+                           niri-focused-output
+                           niri-focused-window
+                           niri-pick-window
+                           niri-pick-color
+                           niri-overview-state
+                           niri-casts
+                           niri-request-error
+                           niri-focus-workspace
+                           niri-focus-workspace-previous
+                           niri-focus-column
+                           niri-focus-monitor
+                           niri-focus-window
+                           niri-focus-window-previous
+                           niri-close-window
+                           niri-fullscreen-window
+                           niri-toggle-windowed-fullscreen
+                           niri-toggle-overview
+                           niri-spawn
+                           niri-spawn-sh
+                           niri-quit
+                           niri-screenshot
+                           niri-screenshot-screen
+                           niri-screenshot-window
+                           niri-power-off-monitors
+                           niri-power-on-monitors
+                           niri-move-window-to-workspace
+                           niri-move-column-to-workspace
+                           niri-move-window-to-monitor
+                           niri-move-column-to-monitor
+                           niri-set-window-width
+                           niri-set-column-width
+                           niri-set-workspace-name
+                           niri-unset-workspace-name
+                           niri-output
+                           niri-output-argv
+                           niri-output-on
+                           niri-output-off
+                           niri-output-mode
+                           niri-output-scale
+                           niri-output-transform
+                           niri-output-position
+                           ;; ====== Downloads ======
+                           fetch-command
+                           detect-fetch-command
+                           fetch-available?
+                           curl
+                           curl-argv
+                           curl-output
+                           curl-get-argv
+                           curl-get
+                           curl-text-argv
+                           curl-text
+                           curl-head-argv
+                           curl-head
+                           curl-status-argv
+                           curl-status
+                           curl-post-argv
+                           curl-post
+                           curl-download-argv
+                           curl-download
+                           curl-upload-argv
+                           curl-upload
+                           wget
+                           wget-argv
+                           wget-output
+                           wget-download-argv
+                           wget-download
+                           wget-mirror-argv
+                           wget-mirror
+                           wget-text-argv
+                           wget-text
+                           download
                            ;; ====== Version ======
                            maak-version
                            maak-version-string

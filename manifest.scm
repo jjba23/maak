@@ -32,6 +32,7 @@
              (gnu packages texinfo)
              (gnu packages autotools)
              (gnu packages rust-apps)
+             (gnu packages version-control)
              ((guix licenses)
               #:prefix license:))
 
@@ -70,4 +71,10 @@ concurrently by default.")
                           guile-veritas
                           coreutils
                           util-linux
+                          ;; The archive tests build and unpack real tar and zip
+                          ;; files, and the git tests need git itself.
+                          tar
+                          zip
+                          unzip
+                          git
                           watchexec))
