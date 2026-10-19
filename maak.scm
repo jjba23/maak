@@ -98,12 +98,21 @@
      . "maak ([0-9]+\\.[0-9]+\\.[0-9]+)")))
 
 (define* (sync-version #:optional (directory "."))
-  "Write the version into every file that cannot read it from the module.
+  "Write the version into every file that cannot read it from the module, then
+commit and tag the release.
 
 The version is written by hand once, in src/maak/version.scm, which is what
 `maak --version' prints and what default.nix reads while it evaluates the
 derivation.  The RPM spec, the manual page and the README cannot read a Scheme
 module, so they carry copies, and this task rewrites them from that file.
+
+A release is then the whole ritual in one command: the copies are made to agree,
+everything tracked that changed is committed as `chore: Release vX.Y.Z', and
+that commit is tagged `vX.Y.Z'.  The commit is `git commit -am', so it takes
+every tracked change in the tree rather than only the ones this task made;
+commit anything unrelated first if it should not ride along.  A version whose
+tag already exists is refused rather than committed again or retagged, and a
+tree with nothing left to commit is tagged where it stands.
 
 DIRECTORY is the checkout to work in, the current directory by default.  The
 version is read from the file there rather than from the running library, so
@@ -113,6 +122,9 @@ maak or by an older one already installed.
 Each copy is found by a regular expression over the file and only the version
 inside the match is replaced, so everything around it -- the spec's alignment,
 the manual page's quoting, the README's wording -- is left exactly as it was."
+  (define repo
+    (if (string=? directory ".") "." directory))
+
   (define (path file)
     (if (string=? directory ".")
         file
@@ -172,17 +184,165 @@ the manual page's quoting, the README's wording -- is left exactly as it was."
           #f
           (begin (write-text file rewritten) #t))))
 
-  (let ((version (current-version))
-        (changed '()))
-    (for-each (lambda (file)
-                (when (sync-file file version)
-                  (set! changed (append changed (list file)))))
-              (named-files))
-    (if (null? changed)
-        (log-info "Every file that names the version already says ~a." version)
-        (for-each (lambda (file)
-                    (log-info "Wrote ~a into ~a." version file))
-                  changed))))
+  (define (sync-copies! version)
+    "Write VERSION into every copy, and return the files that changed."
+    (let ((changed '()))
+      (for-each (lambda (file)
+                  (when (sync-file file version)
+                    (set! changed (append changed (list file)))))
+                (named-files))
+      changed))
+
+  ;; ---- The commit and the tag --------------------------------------------
+  ;;
+  ;; git runs as a program with its arguments, never through a shell, and is
+  ;; pointed at DIRECTORY with `-C' so a release of another checkout commits
+  ;; there and not wherever maak was started from.
+
+  (define (git . arguments)
+    "Run git in the checkout, and return the exit code it ended with.
+
+`system*' answers with the wait status rather than the exit code, so a command
+that exited 1 reads as 256 and one that could not be started reads as #f; both
+are turned into the number a shell would report here, 127 when git never ran."
+    (let ((status (apply system* "git" "-C" repo arguments)))
+      (or (and status (status:exit-val status)) 127)))
+
+  (define (checkout?)
+    "Return whether DIRECTORY is a git checkout."
+    (file-exists? (path ".git")))
+
+  (define (tag-exists? tag)
+    "Return whether TAG is already a tag of the checkout."
+    (zero? (git "rev-parse" "--verify" "--quiet"
+                (string-append "refs/tags/" tag))))
+
+  (define (changes-to-commit?)
+    "Return whether anything tracked differs from the last commit."
+    (case (git "diff" "--quiet" "HEAD")
+      ((0) #f)
+      ((1) #t)
+      (else
+       (error (format #f
+                      "sync-version: git could not compare ~a with a commit; is it a checkout with one?"
+                      repo)))))
+
+  (define (commit-release version)
+    "Commit every tracked change as the release VERSION, and return the message."
+    (let ((message (format #f "chore: Release v~a" version)))
+      (unless (zero? (git "commit" "-am" message))
+        (error "sync-version: git commit failed, so nothing was tagged"))
+      message))
+
+  (define (tag-release version)
+    "Tag the current commit as the release VERSION, and return the tag."
+    (let ((tag (string-append "v" version)))
+      (unless (zero? (git "tag" tag))
+        (error (format #f
+                       "sync-version: `git tag ~a' failed; the release was committed, but not tagged"
+                       tag)))
+      tag))
+
+  (let* ((version (current-version))
+         (tag (string-append "v" version)))
+    (unless (checkout?)
+      (error (format #f
+                     "sync-version: ~a is not a git checkout, so there is nothing to commit or tag"
+                     repo)))
+    (when (tag-exists? tag)
+      (error (format #f
+                     "sync-version: ~a is already released as ~a; bump ~a first"
+                     version tag version-source)))
+    (let ((changed (sync-copies! version)))
+      (if (null? changed)
+          (log-info "Every file that names the version already says ~a." version)
+          (for-each (lambda (file)
+                      (log-info "Wrote ~a into ~a." version file))
+                    changed))
+      (if (changes-to-commit?)
+          (let ((message (commit-release version)))
+            (tag-release version)
+            (log-info "Committed `~a' and tagged ~a." message tag))
+          (begin
+            (tag-release version)
+            (log-info "Nothing to commit; tagged ~a at the current commit." tag))))))
+
+;; ====== Git ======
+;;
+;; Thin wrappers over the git commands this project uses, so the common ones are
+;; one word away rather than a remembered invocation.  `run' takes a program
+;; and its arguments as a list and never goes through a shell, so a message
+;; with spaces or quotes reaches git as one argument and nothing re-splits it:
+;; `maak git-commit "feat: a message with spaces"'.
+
+(define (git-init . arguments)
+  "Initialise a git repository here, with any arguments git init takes."
+  (run (append (list "git" "init") arguments)))
+
+(define (git-status)
+  "Show the current branch and a short status of the working tree."
+  (run (list "git" "status" "--short" "--branch")))
+
+(define (git-add . paths)
+  "Stage PATHS, or every change in the tree when none is named."
+  (run (if (null? paths)
+           (list "git" "add" "--all")
+           (append (list "git" "add" "--") paths))))
+
+(define (git-commit message)
+  "Commit every tracked change with MESSAGE."
+  (run (list "git" "commit" "-am" message)))
+
+(define (git-tag name)
+  "Tag the current commit as NAME, without an annotation."
+  (run (list "git" "tag" name)))
+
+(define (git-branch . names)
+  "List the branches, or create the branches NAMES name."
+  (run (append (list "git" "branch") names)))
+
+(define (git-switch branch)
+  "Switch to BRANCH, which must already exist."
+  (run (list "git" "switch" branch)))
+
+(define (git-pull . arguments)
+  "Pull from the upstream branch, with any arguments git pull takes."
+  (run (append (list "git" "pull") arguments)))
+
+(define (git-push . arguments)
+  "Push the current branch, with any arguments git push takes.
+
+A bare push does not send tags that are not annotated; `maak git-push --
+--tags' sends them too."
+  (run (append (list "git" "push") arguments)))
+
+(define (git-log . arguments)
+  "Show the history as a decorated one-line graph, twenty commits by default."
+  (run (append (list "git" "log" "--oneline" "--graph" "--decorate")
+               (if (null? arguments) (list "-n" "20") arguments))))
+
+;; ====== Source archives ======
+;;
+;; Both archive the last commit with `git archive', so what is packed is what
+;; the release commit contains: the tracked files, without `.git' and without
+;; anything untracked or ignored.  The prefix is the directory the RPM spec's
+;; `%autosetup -n %{name}-%{version}' expects to unpack into.
+
+(define (package-tar)
+  "Write the last commit as maak-VERSION.tar.gz, under a maak-VERSION/ prefix."
+  (let ((name (format #f "~a-~a" project-name maak-version)))
+    (run (list "git" "archive" "--format=tar.gz"
+               (format #f "--prefix=~a/" name)
+               "-o" (format #f "~a.tar.gz" name)
+               "HEAD"))))
+
+(define (package-zip)
+  "Write the last commit as maak-VERSION.zip, under a maak-VERSION/ prefix."
+  (let ((name (format #f "~a-~a" project-name maak-version)))
+    (run (list "git" "archive" "--format=zip"
+               (format #f "--prefix=~a/" name)
+               "-o" (format #f "~a.zip" name)
+               "HEAD"))))
 
 (define (arithmetics)
   "Do some quick math."
@@ -225,7 +385,7 @@ the manual page's quoting, the README's wording -- is left exactly as it was."
 (define (deploy)
   "Generate documentation for the project and publish to web directory."
   (docs)
-  (delete-file-recursively-p (~ "~a/api-docs/maak" deploy-dir))
+  (delete-file-recursively (~ "~a/api-docs/maak" deploy-dir))
   (mv "doc/api-dist"
       (~ "~a/api-docs/maak" deploy-dir))
   (delete-file-recursively "doc"))
