@@ -160,14 +160,14 @@ rpmbuild -ba ~/rpmbuild/SPECS/maak.spec
 You should end up with:
 
 #+begin_src shell
-~/rpmbuild/RPMS/x86_64/maak-0.9.1-0.x86_64.rpm
-~/rpmbuild/SRPMS/maak-0.9.1-0.src.rpm
+~/rpmbuild/RPMS/x86_64/maak-0.9.2-0.x86_64.rpm
+~/rpmbuild/SRPMS/maak-0.9.2-0.src.rpm
 #+end_src
 
 Install and run it:
 
 #+begin_src shell
-sudo zypper install ~/rpmbuild/RPMS/x86_64/maak-0.9.1-0.x86_64.rpm
+sudo zypper install ~/rpmbuild/RPMS/x86_64/maak-0.9.2-0.x86_64.rpm
 maak --help
 #+end_src
 
@@ -194,7 +194,7 @@ maak --version
 #+end_src
 
 #+begin_src
-maak 0.9.1
+maak 0.9.2
 License: GPL-3.0-or-later
 Homepage: https://codeberg.org/jjba23/maak
 #+end_src
@@ -1046,11 +1046,7 @@ The manual page lives in ~man/maak.1~, is installed with the program, and is pre
 
 A build should never fail because "it worked on my machine." Reliable software development requires explicit, bit-for-bit reproducibility and a functional approach to package management and system deployment.
 
-#+BEGIN_EXPORT html
-<a href="https://guix.gnu.org/">
-  <img src="https://jointhefreeworld.org/ggg/dist/gnu-guix.svg" alt="GNU Guix logo" style="max-width: 250px; width: 100%; height: auto;" />
-</a>
-#+END_EXPORT
+[[https://jointhefreeworld.org/ggg/dist/gnu-guix.svg]]
 
 - *Declarative build graphs.* Packages are pure functions of their inputs, with no implicit system state.
 - *Programmable with Guile.* Full system and package configurations in [[https://www.gnu.org/software/guile/][Guile Scheme]] rather than rigid DSLs or static files.
