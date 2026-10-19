@@ -21,9 +21,10 @@
 ;; handful of facts the CLI reports about itself.  `--version' prints it, the
 ;; Nix derivation reads this file while it evaluates, and the copies that cannot
 ;; read Scheme -- the RPM spec, the manual page and the README -- are rewritten
-;; from it by `(maak release)', which is what `maak sync-version' runs.  A
-;; release is therefore one edit, not a search of the tree, and a test fails
-;; while any copy disagrees with this one.
+;; from it by the `sync-version' task, which reads this file rather than the
+;; library it happens to be running under.  A release is therefore one edit,
+;; not a search of the tree, and the suite fails while any copy disagrees with
+;; this one.
 
 ;;; Code:
 

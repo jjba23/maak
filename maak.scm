@@ -20,6 +20,8 @@
   #:use-module (ice-9 string-fun)
   #:use-module (ice-9 textual-ports)
   #:use-module (ice-9 popen)
+  #:use-module (ice-9 regex)
+  #:use-module (srfi srfi-1)
   #:use-module (maak maak))
 
 ;; ====== Maak file constants ======
@@ -63,21 +65,123 @@
   "Print the maak version."
   (print-version))
 
-(define (sync-version)
+;; ====== The version's copies ======
+;;
+;; The version is written by hand once, in src/maak/version.scm.  The RPM spec,
+;; the manual page and the README cannot read a Scheme module, so they carry
+;; copies, and `sync-version' rewrites them from that file.
+;;
+;; Which files carry a copy is this Maak file's business rather than the
+;; library's, and the version is read from the working tree rather than from the
+;; library the task is running under.  Both halves of that are what keep the
+;; task free: a helper module would have to exist in the installed maak before
+;; the task could start at all, and the version a library knows is its own, so a
+;; release cut under an older maak would have written that older number into
+;; every copy.
+
+(define version-source
+  "src/maak/version.scm")
+
+;; Each site is a file and a regular expression matching one place in it where
+;; the version is written, with the version itself as the first group.  Only
+;; that group is replaced, so the field's alignment, the `.TH' quoting and the
+;; wording of the README's sample output stay the file's business rather than
+;; this list's.
+(define version-sites
+  '(("packaging/opensuse/maak.spec"
+     . "Version:[ \t]+([0-9]+\\.[0-9]+\\.[0-9]+)")
+    ("man/maak.1"
+     . "maak ([0-9]+\\.[0-9]+\\.[0-9]+)")
+    ("README.org"
+     . "maak-([0-9]+\\.[0-9]+\\.[0-9]+)")
+    ("README.org"
+     . "maak ([0-9]+\\.[0-9]+\\.[0-9]+)")))
+
+(define* (sync-version #:optional (directory "."))
   "Write the version into every file that cannot read it from the module.
 
 The version is written by hand once, in src/maak/version.scm, which is what
 `maak --version' prints and what default.nix reads while it evaluates the
 derivation.  The RPM spec, the manual page and the README cannot read a Scheme
-module, so they carry copies, and this task rewrites them from the module.
-`maak test' fails while one of them is behind."
-  (use-modules (maak release))
-  (let ((version maak-version)
-        (changed (sync-version!)))
+module, so they carry copies, and this task rewrites them from that file.
+
+DIRECTORY is the checkout to work in, the current directory by default.  The
+version is read from the file there rather than from the running library, so
+the task writes the checkout's version whether it is run by this checkout's
+maak or by an older one already installed.
+
+Each copy is found by a regular expression over the file and only the version
+inside the match is replaced, so everything around it -- the spec's alignment,
+the manual page's quoting, the README's wording -- is left exactly as it was."
+  (define (path file)
+    (if (string=? directory ".")
+        file
+        (string-append directory "/" file)))
+
+  (define (read-text file)
+    (let ((full (path file)))
+      (if (file-exists? full)
+          (call-with-input-file full get-string-all)
+          (error (format #f
+                         "sync-version: no ~a in ~a; name the checkout's root"
+                         file directory)))))
+
+  (define (write-text file text)
+    (call-with-output-file (path file)
+      (lambda (port) (display text port))))
+
+  (define (current-version)
+    (let ((found (string-match
+                  "maak-version[ \t\n]+\"([0-9]+\\.[0-9]+\\.[0-9]+)\""
+                  (read-text version-source))))
+      (unless found
+        (error (format #f
+                       "sync-version: ~a does not define maak-version as a version"
+                       (path version-source))))
+      (match:substring found 1)))
+
+  (define (sites-of file)
+    (filter (lambda (site) (string=? (car site) file)) version-sites))
+
+  (define (named-files)
+    (fold (lambda (site files)
+            (if (member (car site) files)
+                files
+                (append files (list (car site)))))
+          '()
+          version-sites))
+
+  (define (rewrite text pattern version)
+    "Return TEXT with the version PATTERN names replaced by VERSION."
+    (regexp-substitute/global
+     #f pattern text 'pre
+     (lambda (match)
+       (regexp-substitute/global #f "[0-9]+\\.[0-9]+\\.[0-9]+"
+                                 (match:substring match 0)
+                                 'pre version 'post))
+     'post))
+
+  (define (sync-file file version)
+    "Write VERSION into FILE, and return whether it had to."
+    (let* ((text (read-text file))
+           (rewritten (fold (lambda (site text)
+                              (rewrite text (cdr site) version))
+                            text
+                            (sites-of file))))
+      (if (string=? text rewritten)
+          #f
+          (begin (write-text file rewritten) #t))))
+
+  (let ((version (current-version))
+        (changed '()))
+    (for-each (lambda (file)
+                (when (sync-file file version)
+                  (set! changed (append changed (list file)))))
+              (named-files))
     (if (null? changed)
-        (log-info "Every file that names the version already says ~a.\n" version)
+        (log-info "Every file that names the version already says ~a." version)
         (for-each (lambda (file)
-                    (log-info "Wrote ~a into ~a.\n" version file))
+                    (log-info "Wrote ~a into ~a." version file))
                   changed))))
 
 (define (arithmetics)
@@ -121,8 +225,8 @@ module, so they carry copies, and this task rewrites them from the module.
 (define (deploy)
   "Generate documentation for the project and publish to web directory."
   (docs)
-  (remkdir-p (~ "~a/api-docs/maak" deploy-dir))
-  (mv "doc/api-dist/*"
+  (delete-file-recursively-p (~ "~a/api-docs/maak" deploy-dir))
+  (mv "doc/api-dist"
       (~ "~a/api-docs/maak" deploy-dir))
   (delete-file-recursively "doc"))
 

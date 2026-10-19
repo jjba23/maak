@@ -971,8 +971,10 @@ The repository's automation is written in maak itself — read [[file:maak.scm][
 The version is written by hand in one place: ~maak-version~ in [[file:src/maak/version.scm][src/maak/version.scm]], which is what ~maak --version~ prints. Everything else follows it.
 
 - ~default.nix~ reads that file while it evaluates the derivation, so a Nix build cannot fall behind the program. There is no second copy there to remember.
-- The RPM spec, the manual page and the README carry copies, because an RPM spec is parsed before its source is unpacked and a manual page is roff. ~maak sync-version~ rewrites those copies from the module.
-- A unit test compares every copy with ~maak-version~, so a bump that skipped the sync fails ~maak test~ instead of shipping a spec that disagrees with the binary.
+- The RPM spec, the manual page and the README carry copies, because an RPM spec is parsed before its source is unpacked and a manual page is roff. ~maak sync-version~ rewrites those copies from that file.
+- The task is a few lines of plain Guile in [[file:maak.scm][maak.scm]] rather than a module of the library, so it starts under any installed maak. It reads the version from the tree rather than from the library it is running under, so it writes the checkout's version even when an older maak is the one running it. ~maak sync-version DIR~ does the same for another checkout.
+- Each copy is found by a regular expression and only the version inside the match is replaced, so the spec's alignment and the README's wording stay the file's business.
+- The suite compares every copy with ~maak-version~, on a copy of the tree so the check cannot repair what it is checking. A bump that skipped the sync fails ~maak test~ instead of shipping a spec that disagrees with the binary.
 
 A release is then one edit, one command, and the tag:
 
