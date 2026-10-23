@@ -22,6 +22,19 @@
 ;; and `zip' archives of files written into a temporary directory.  `zip' and
 ;; `unzip' are part of the test environment in `manifest.scm', so the real
 ;; tests do not depend on what the host happens to have installed.
+;;
+;; Three rules keep the cases independent of each other, because the suite runs
+;; in the same process as every other test file and a case that read files it
+;; did not write would pass for the wrong reason:
+;;
+;; - each case writes into a directory of its own, made fresh and removed
+;;   afterwards (`in-scratch-directory'), never into a fixed path;
+;; - a case's tree holds the files and its archive sits beside the tree, so no
+;;   archive is written into the tree being packed, which is what makes GNU tar
+;;   abort with "file changed as we read it";
+;; - `#:directory' is a change of the process working directory for the length
+;;   of `zip-create', so the suite is kept sequential and the library is asked
+;;   to put the directory back, which one case asserts.
 
 ;;; Code:
 
@@ -59,17 +72,59 @@
   (parameterize ((dry-run? #t) (quiet? #f))
     (strip-ansi (with-output-to-string thunk))))
 
-(define (scratch-directory label)
-  "Return a fresh, empty directory under the temporary directory."
-  (let ((dir (format #f "~a/maak-test-archive-~a-~a"
-                     (tmp-dir) label (getpid))))
-    (mkdir-p dir)
-    dir))
-
 (define (remove-directory dir)
   "Remove DIR quietly, whatever the tests left in it."
   (parameterize ((quiet? #t))
     (delete-file-recursively dir)))
+
+;; Every case that writes files gets a directory of its own, made fresh, and
+;; gives it back when it is done.  Both halves matter here:
+;;
+;; - The unit suite is loaded into one process (the runner walks the test files
+;;   one after another), so a name written down on disk is a name the rest of
+;;   the suite shares.  A case that found another case's archive would be
+;;   reading files it did not write, and could pass for the wrong reason.
+;; - `zip-create' changes the process working directory for the length of its
+;;   command, because Info-ZIP has no `-C'.  A case that left the working
+;;   directory changed would run every case after it somewhere else, so the
+;;   directory is removed on the way out even when the case raised, and
+;;   `packing a tree leaves the working directory where it was' checks that the
+;;   library puts it back.
+;;
+;; The name carries the process and a counter of the directories this suite has
+;; asked for, so no two cases -- and no two runs sharing a TMPDIR -- name the
+;; same path.  A path that is there anyway, because an earlier run was killed
+;; before it could clean up, is removed rather than reused: a case that starts
+;; from somebody else's files is a case that is not testing anything.
+
+(define scratch-count 0)
+
+(define (scratch-directory label)
+  "Return an empty directory of this case's own for LABEL."
+  (set! scratch-count (+ scratch-count 1))
+  (let ((dir (format #f "~a/maak-test-archive-~a-~a-~a"
+                     (tmp-dir) label (getpid) scratch-count)))
+    (when (file-exists? dir)
+      (remove-directory dir))
+    (mkdir-p dir)
+    dir))
+
+(define (in-scratch-directory label thunk)
+  "Call THUNK with a fresh directory for LABEL, and remove the directory after.
+
+THUNK is handed the path.  The directory is removed whether THUNK returned or
+raised, so nothing this suite writes outlives the case that wrote it, and the
+removal happens while the case is still running rather than in its last line,
+where an error would skip it."
+  (let ((dir (scratch-directory label)))
+    (dynamic-wind
+     (lambda () #t)
+     (lambda () (thunk dir))
+     (lambda () (remove-directory dir)))))
+
+(define (mentions? text needle)
+  "Return whether TEXT holds NEEDLE, as #t or #f."
+  (and (string-contains text needle) #t))
 
 (define (listing-of archive)
   "Return the names `tar -tf' prints for ARCHIVE."
@@ -191,179 +246,235 @@
                (assert-error (lambda () (tar-create "p.tar" '()))))
          (test "an empty file list is refused by zip"
                (assert-error (lambda () (zip-create "p.zip" '()))))
-         (test "a dry run prints the command it would run"
-               (assert-contains
-                #:expect (dry-run-command
-                          (lambda ()
-                            (tar-create "/tmp/maak-test-dry.tar.gz" (list "src"))))
-                #:got "tar -c -z -f /tmp/maak-test-dry.tar.gz src"))))
+                  (test "a dry run prints the command it would run"
+                        ;; The archive is named inside a directory of the case's own, so
+                        ;; the expectation is built from the same string the command
+                        ;; would have used rather than from a path fixed in the source
+                        ;; that two runs could disagree about.
+                        (in-scratch-directory
+                         "dry-run"
+                         (lambda (dir)
+                           (let ((archive (string-append dir "/p.tar.gz")))
+                             (assert-contains
+                              #:expect (dry-run-command
+                                        (lambda ()
+                                          (tar-create archive (list "src"))))
+                              #:got (format #f "tar -c -z -f ~a src" archive))))))))
+
+;; Each case below is a directory of its own, a tree inside it holding the
+;; files to pack, and the archive beside the tree rather than inside it.
+;;
+;; The tree/archive split is not decoration.  tar reads the tree it packs, so an
+;; archive written into that tree changes while tar is reading it, and GNU tar
+;; aborts with "file changed as we read it".  Keeping the two apart is what the
+;; case `packing a tree does not fail on the tarball being written' asks about,
+;; and every other case stays clear of the trap so that a failure here means
+;; what it says.
 
 (define tar-suite
   (suite "Real tar archives"
          #:concurrent? #f
          #:shuffle? #f
          (test "a created tarball lists its files"
-               (let* ((dir (scratch-directory "tar-create"))
-                      (archive (string-append dir "/p.tar.gz"))
-                      (names (begin
-                               (write-file (string-append dir "/a.txt") "one")
-                               (write-file (string-append dir "/b.txt") "two")
-                               (tar-create archive (list "a.txt" "b.txt")
-                                           #:directory dir)
-                               (listing-of archive))))
-                 (remove-directory dir)
-                 (assert-contains #:expect names #:got "a.txt")))
-         ;; The tarball is written next to TREE, never inside it: tar reads the
-         ;; tree it packs, so an archive written into that tree changes while
-         ;; tar is reading it and GNU tar aborts with "file changed as we read
-         ;; it".
+               (in-scratch-directory
+                "tar-create"
+                (lambda (dir)
+                  (let ((tree (string-append dir "/tree"))
+                        (archive (string-append dir "/p.tar.gz")))
+                    (mkdir-p tree)
+                    (write-file (string-append tree "/a.txt") "one")
+                    (write-file (string-append tree "/b.txt") "two")
+                    (tar-create archive (list "a.txt" "b.txt")
+                                #:directory tree)
+                    (let ((names (listing-of archive)))
+                      (assert-equal #:expect (list #t #t)
+                                    #:got (list (mentions? names "a.txt")
+                                                (mentions? names "b.txt"))))))))
          (test "an excluded file is not in the tarball"
-               (let* ((dir (scratch-directory "tar-exclude"))
-                      (tree (string-append dir "/tree"))
-                      (archive (string-append dir "/p.tar.gz"))
-                      (names (begin
-                               (mkdir-p tree)
-                               (write-file (string-append tree "/a.txt") "one")
-                               (write-file (string-append tree "/b.log") "two")
-                               (tar-create archive (list ".")
-                                           #:directory tree
-                                           #:exclude (list "*.log"))
-                               (listing-of archive))))
-                 (remove-directory dir)
-                 (assert-false (string-contains names "b.log"))
-                 (assert-contains #:expect names #:got "a.txt")))
+               (in-scratch-directory
+                "tar-exclude"
+                (lambda (dir)
+                  (let ((tree (string-append dir "/tree"))
+                        (archive (string-append dir "/p.tar.gz")))
+                    (mkdir-p tree)
+                    (write-file (string-append tree "/a.txt") "one")
+                    (write-file (string-append tree "/b.log") "two")
+                    (tar-create archive (list ".")
+                                #:directory tree
+                                #:exclude (list "*.log"))
+                    (let ((names (listing-of archive)))
+                      (assert-equal #:expect (list #t #f)
+                                    #:got (list (mentions? names "a.txt")
+                                                (mentions? names "b.log"))))))))
          (test "packing a tree does not fail on the tarball being written"
-               (let* ((dir (scratch-directory "tar-tree"))
-                      (tree (string-append dir "/tree"))
-                      (ok? (begin
-                             (mkdir-p tree)
-                             (write-file (string-append tree "/a.txt") "one")
-                             (parameterize ((quiet? #t))
-                               (tar-create (string-append dir "/p.tar.gz")
-                                           (list ".")
-                                           #:directory tree)))))
-                 (remove-directory dir)
-                 (assert-true ok?)))
+               (in-scratch-directory
+                "tar-tree"
+                (lambda (dir)
+                  (let ((tree (string-append dir "/tree")))
+                    (mkdir-p tree)
+                    (write-file (string-append tree "/a.txt") "one")
+                    (assert-true
+                     (parameterize ((quiet? #t))
+                       (tar-create (string-append dir "/p.tar.gz")
+                                   (list ".")
+                                   #:directory tree)))))))
          (test "the tarball lands in the task directory, not the packed tree"
-               (let* ((dir (scratch-directory "tar-outside"))
-                      (tree (string-append dir "/tree"))
-                      (made (begin
-                              (mkdir-p tree)
-                              (write-file (string-append tree "/a.txt") "one")
-                              (with-directory dir
-                                (lambda ()
-                                  (tar-create "p.tar.gz" (list ".")
-                                              #:directory tree)))
-                              (list (file-exists?
-                                     (string-append dir "/p.tar.gz"))
-                                    (file-exists?
-                                     (string-append tree "/p.tar.gz"))))))
-                 (remove-directory dir)
-                 (assert-equal #:expect (list #t #f) #:got made)))
+               (in-scratch-directory
+                "tar-outside"
+                (lambda (dir)
+                  (let ((tree (string-append dir "/tree")))
+                    (mkdir-p tree)
+                    (write-file (string-append tree "/a.txt") "one")
+                    (with-directory dir
+                      (lambda ()
+                        (tar-create "p.tar.gz" (list ".") #:directory tree)))
+                    (assert-equal
+                     #:expect (list #t #f)
+                     #:got (list (file-exists?
+                                  (string-append dir "/p.tar.gz"))
+                                 (file-exists?
+                                  (string-append tree "/p.tar.gz"))))))))
          (test "a tarball can be extracted"
-               (let* ((dir (scratch-directory "tar-extract"))
-                      (archive (string-append dir "/p.tar.gz"))
-                      (out (string-append dir "/out"))
-                      (text (begin
-                              (write-file (string-append dir "/a.txt") "hello")
-                              (tar-create archive (list "a.txt") #:directory dir)
-                              (mkdir-p out)
-                              (tar-extract archive #:directory out)
-                              (read-file (string-append out "/a.txt")))))
-                 (remove-directory dir)
-                 (assert-equal #:expect "hello" #:got text)))
+               (in-scratch-directory
+                "tar-extract"
+                (lambda (dir)
+                  (let ((tree (string-append dir "/tree"))
+                        (archive (string-append dir "/p.tar.gz"))
+                        (out (string-append dir "/out")))
+                    (mkdir-p tree)
+                    (write-file (string-append tree "/a.txt") "hello")
+                    (tar-create archive (list "a.txt") #:directory tree)
+                    (mkdir-p out)
+                    (tar-extract archive #:directory out)
+                    (assert-equal
+                     #:expect "hello"
+                     #:got (read-file (string-append out "/a.txt")))))))
          (test "a strip count removes the top-level directory"
-               (let* ((dir (scratch-directory "tar-strip"))
-                      (archive (string-append dir "/p.tar.gz"))
-                      (out (string-append dir "/out"))
-                      (text (begin
-                              (mkdir-p (string-append dir "/p"))
-                              (write-file (string-append dir "/p/a.txt") "deep")
-                              (tar-create archive (list "p") #:directory dir)
-                              (mkdir-p out)
-                              (tar-extract archive
-                                           #:directory out
-                                           #:strip-components 1)
-                              (read-file (string-append out "/a.txt")))))
-                 (remove-directory dir)
-                 (assert-equal #:expect "deep" #:got text)))
+               (in-scratch-directory
+                "tar-strip"
+                (lambda (dir)
+                  (let ((tree (string-append dir "/tree"))
+                        (archive (string-append dir "/p.tar.gz"))
+                        (out (string-append dir "/out")))
+                    (mkdir-p (string-append tree "/p"))
+                    (write-file (string-append tree "/p/a.txt") "deep")
+                    (tar-create archive (list "p") #:directory tree)
+                    (mkdir-p out)
+                    (tar-extract archive #:directory out #:strip-components 1)
+                    (assert-equal
+                     #:expect "deep"
+                     #:got (read-file (string-append out "/a.txt")))))))
          (test "an xz tarball round-trips"
-               (let* ((dir (scratch-directory "tar-xz"))
-                      (archive (string-append dir "/p.tar.xz"))
-                      (names (begin
-                               (write-file (string-append dir "/a.txt") "xz")
-                               (tar-create archive (list "a.txt") #:directory dir)
-                               (listing-of archive))))
-                 (remove-directory dir)
-                 (assert-contains #:expect names #:got "a.txt")))
+               (in-scratch-directory
+                "tar-xz"
+                (lambda (dir)
+                  (let ((tree (string-append dir "/tree"))
+                        (archive (string-append dir "/p.tar.xz")))
+                    (mkdir-p tree)
+                    (write-file (string-append tree "/a.txt") "xz")
+                    (tar-create archive (list "a.txt") #:directory tree)
+                    (assert-true (mentions? (listing-of archive)
+                                            "a.txt"))))))
          (test "tar-list succeeds on a real archive"
-               (let* ((dir (scratch-directory "tar-list"))
-                      (archive (string-append dir "/p.tar.gz"))
-                      (ok? (begin
-                             (write-file (string-append dir "/a.txt") "one")
-                             (tar-create archive (list "a.txt") #:directory dir)
-                             (parameterize ((quiet? #t))
-                               (tar-list archive)))))
-                 (remove-directory dir)
-                 (assert-true ok?)))))
+               (in-scratch-directory
+                "tar-list"
+                (lambda (dir)
+                  (let ((tree (string-append dir "/tree"))
+                        (archive (string-append dir "/p.tar.gz")))
+                    (mkdir-p tree)
+                    (write-file (string-append tree "/a.txt") "one")
+                    (tar-create archive (list "a.txt") #:directory tree)
+                    (assert-true (parameterize ((quiet? #t))
+                                   (tar-list archive)))))))
+         ;; `#:directory' is how both families are told which tree to read, and
+         ;; `zip-create' changes into it for the length of its command.  Both are
+         ;; supposed to come back: a task that ran later would otherwise run in
+         ;; whatever the last archive left behind, which is why this is asserted
+         ;; rather than assumed.
+         (test "packing a tree leaves the working directory where it was"
+               (in-scratch-directory
+                "tar-cwd"
+                (lambda (dir)
+                  (let ((tree (string-append dir "/tree"))
+                        (before (getcwd)))
+                    (mkdir-p tree)
+                    (write-file (string-append tree "/a.txt") "one")
+                    (parameterize ((quiet? #t))
+                      (tar-create (string-append dir "/p.tar.gz") (list ".")
+                                  #:directory tree)
+                      (zip-create (string-append dir "/p.zip") (list ".")
+                                  #:directory tree))
+                    (assert-equal #:expect before
+                                  #:got (getcwd))))))))
 
 (define zip-suite
   (suite "Real zip archives"
          #:concurrent? #f
          #:shuffle? #f
          (test "a created zip lists its files"
-               (let* ((dir (scratch-directory "zip-create"))
-                      (archive (string-append dir "/p.zip"))
-                      (names (begin
-                               (write-file (string-append dir "/a.txt") "one")
-                               (zip-create archive (list "a.txt") #:directory dir)
-                               (zip-listing-of archive))))
-                 (remove-directory dir)
-                 (assert-contains #:expect names #:got "a.txt")))
+               (in-scratch-directory
+                "zip-create"
+                (lambda (dir)
+                  (let ((tree (string-append dir "/tree"))
+                        (archive (string-append dir "/p.zip")))
+                    (mkdir-p tree)
+                    (write-file (string-append tree "/a.txt") "one")
+                    (zip-create archive (list "a.txt") #:directory tree)
+                    (assert-true (mentions? (zip-listing-of archive)
+                                            "a.txt"))))))
          (test "a zip can be extracted"
-               (let* ((dir (scratch-directory "zip-extract"))
-                      (archive (string-append dir "/p.zip"))
-                      (out (string-append dir "/out"))
-                      (text (begin
-                              (write-file (string-append dir "/a.txt") "hello")
-                              (zip-create archive (list "a.txt") #:directory dir)
-                              (mkdir-p out)
-                              (zip-extract archive #:directory out)
-                              (read-file (string-append out "/a.txt")))))
-                 (remove-directory dir)
-                 (assert-equal #:expect "hello" #:got text)))
+               (in-scratch-directory
+                "zip-extract"
+                (lambda (dir)
+                  (let ((tree (string-append dir "/tree"))
+                        (archive (string-append dir "/p.zip"))
+                        (out (string-append dir "/out")))
+                    (mkdir-p tree)
+                    (write-file (string-append tree "/a.txt") "hello")
+                    (zip-create archive (list "a.txt") #:directory tree)
+                    (mkdir-p out)
+                    (zip-extract archive #:directory out)
+                    (assert-equal
+                     #:expect "hello"
+                     #:got (read-file (string-append out "/a.txt")))))))
          (test "an excluded file is not in the zip"
-               (let* ((dir (scratch-directory "zip-exclude"))
-                      (archive (string-append dir "/p.zip"))
-                      (names (begin
-                               (write-file (string-append dir "/a.txt") "one")
-                               (write-file (string-append dir "/b.log") "two")
-                               (zip-create archive (list "a.txt" "b.log")
-                                           #:directory dir
-                                           #:exclude (list "*.log"))
-                               (zip-listing-of archive))))
-                 (remove-directory dir)
-                 (assert-false (string-contains names "b.log"))))
+               (in-scratch-directory
+                "zip-exclude"
+                (lambda (dir)
+                  (let ((tree (string-append dir "/tree"))
+                        (archive (string-append dir "/p.zip")))
+                    (mkdir-p tree)
+                    (write-file (string-append tree "/a.txt") "one")
+                    (write-file (string-append tree "/b.log") "two")
+                    (zip-create archive (list "a.txt" "b.log")
+                                #:directory tree
+                                #:exclude (list "*.log"))
+                    (let ((names (zip-listing-of archive)))
+                      (assert-equal #:expect (list #t #f)
+                                    #:got (list (mentions? names "a.txt")
+                                                (mentions? names "b.log"))))))))
          (test "a directory tree is added recursively"
-               (let* ((dir (scratch-directory "zip-recursive"))
-                      (archive (string-append dir "/p.zip"))
-                      (names (begin
-                               (mkdir-p (string-append dir "/src"))
-                               (write-file (string-append dir "/src/a.txt") "one")
-                               (zip-create archive (list "src") #:directory dir)
-                               (zip-listing-of archive))))
-                 (remove-directory dir)
-                 (assert-contains #:expect names #:got "src/a.txt")))
+               (in-scratch-directory
+                "zip-recursive"
+                (lambda (dir)
+                  (let ((tree (string-append dir "/tree"))
+                        (archive (string-append dir "/p.zip")))
+                    (mkdir-p (string-append tree "/src"))
+                    (write-file (string-append tree "/src/a.txt") "one")
+                    (zip-create archive (list "src") #:directory tree)
+                    (assert-true (mentions? (zip-listing-of archive)
+                                            "src/a.txt"))))))
          (test "zip-list succeeds on a real archive"
-               (let* ((dir (scratch-directory "zip-list"))
-                      (archive (string-append dir "/p.zip"))
-                      (ok? (begin
-                             (write-file (string-append dir "/a.txt") "one")
-                             (zip-create archive (list "a.txt") #:directory dir)
-                             (parameterize ((quiet? #t))
-                               (zip-list archive)))))
-                 (remove-directory dir)
-                 (assert-true ok?)))))
+               (in-scratch-directory
+                "zip-list"
+                (lambda (dir)
+                  (let ((tree (string-append dir "/tree"))
+                        (archive (string-append dir "/p.zip")))
+                    (mkdir-p tree)
+                    (write-file (string-append tree "/a.txt") "one")
+                    (zip-create archive (list "a.txt") #:directory tree)
+                    (assert-true (parameterize ((quiet? #t))
+                                   (zip-list archive)))))))))
 
 (define (spec)
   (veritas-run #:concurrent? #f
