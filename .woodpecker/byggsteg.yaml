@@ -54,7 +54,8 @@ steps:
                                                  "/etc/byggsteg/job-clone/"
                                                  "%%CI_REPO_NAME%%/%%CI_COMMIT_BRANCH%%"
                                                  " && "
-                                                 "sudo guix shell -f guix.scm -- ~a")))
+                                                 "sudo guix time-machine --channels=channels.scm --"
+                                                 " shell -f guix.scm -- ~a")))
                     (format #f time-cmd cmd)))
 
           (list
