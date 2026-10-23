@@ -37,6 +37,13 @@
 ;; Nothing here changes maak's working directory permanently.  `#:directory'
 ;; names the tree the files are read from, and the archive path is still
 ;; resolved against the directory the task was started in.
+;;
+;; One trap is worth knowing about, because tar reports it badly.  Writing the
+;; archive inside the tree it is packing means tar reads a file that is still
+;; growing, and GNU tar aborts with "file changed as we read it" and exit
+;; code 1.  A relative output name is therefore always written in the task
+;; directory, and a task that packs "." should not hand tar an absolute output
+;; path that points back into that tree.
 
 ;;; Code:
 
@@ -156,6 +163,11 @@ prints every file it adds."
 FILES is a list of paths relative to DIRECTORY, which defaults to the current
 directory.  The compressor follows the output's extension unless COMPRESSION
 names one, and EXCLUDE is a list of patterns to leave out.
+
+OUTPUT is written in the directory the task started in, not in DIRECTORY, so
+packing the current directory does not put the growing tarball into the tree
+tar is reading.  Passing an absolute OUTPUT that points inside the packed tree
+does, and tar then fails with \"file changed as we read it\".
 
 @example
 (tar-create \"maak-1.0.tar.gz\" (list \"src\" \"README.org\" \"COPYING\")

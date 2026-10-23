@@ -213,18 +213,53 @@
                                (listing-of archive))))
                  (remove-directory dir)
                  (assert-contains #:expect names #:got "a.txt")))
+         ;; The tarball is written next to TREE, never inside it: tar reads the
+         ;; tree it packs, so an archive written into that tree changes while
+         ;; tar is reading it and GNU tar aborts with "file changed as we read
+         ;; it".
          (test "an excluded file is not in the tarball"
                (let* ((dir (scratch-directory "tar-exclude"))
+                      (tree (string-append dir "/tree"))
                       (archive (string-append dir "/p.tar.gz"))
                       (names (begin
-                               (write-file (string-append dir "/a.txt") "one")
-                               (write-file (string-append dir "/b.log") "two")
+                               (mkdir-p tree)
+                               (write-file (string-append tree "/a.txt") "one")
+                               (write-file (string-append tree "/b.log") "two")
                                (tar-create archive (list ".")
-                                           #:directory dir
+                                           #:directory tree
                                            #:exclude (list "*.log"))
                                (listing-of archive))))
                  (remove-directory dir)
-                 (assert-false (string-contains names "b.log"))))
+                 (assert-false (string-contains names "b.log"))
+                 (assert-contains #:expect names #:got "a.txt")))
+         (test "packing a tree does not fail on the tarball being written"
+               (let* ((dir (scratch-directory "tar-tree"))
+                      (tree (string-append dir "/tree"))
+                      (ok? (begin
+                             (mkdir-p tree)
+                             (write-file (string-append tree "/a.txt") "one")
+                             (parameterize ((quiet? #t))
+                               (tar-create (string-append dir "/p.tar.gz")
+                                           (list ".")
+                                           #:directory tree)))))
+                 (remove-directory dir)
+                 (assert-true ok?)))
+         (test "the tarball lands in the task directory, not the packed tree"
+               (let* ((dir (scratch-directory "tar-outside"))
+                      (tree (string-append dir "/tree"))
+                      (made (begin
+                              (mkdir-p tree)
+                              (write-file (string-append tree "/a.txt") "one")
+                              (with-directory dir
+                                (lambda ()
+                                  (tar-create "p.tar.gz" (list ".")
+                                              #:directory tree)))
+                              (list (file-exists?
+                                     (string-append dir "/p.tar.gz"))
+                                    (file-exists?
+                                     (string-append tree "/p.tar.gz"))))))
+                 (remove-directory dir)
+                 (assert-equal #:expect (list #t #f) #:got made)))
          (test "a tarball can be extracted"
                (let* ((dir (scratch-directory "tar-extract"))
                       (archive (string-append dir "/p.tar.gz"))
