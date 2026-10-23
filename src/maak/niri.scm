@@ -393,7 +393,7 @@ line takes it."
   "Return the argv that changes OUTPUT with ACTION and ARGUMENTS.
 
 The output name comes first and the action after it, which is the order
-`niri msg output' requires: @code{niri msg output DP-1 mode 1920x1080@60}.
+`niri msg output' requires: @code{niri msg output DP-1 mode 1920x1080@@60}.
 
 @example
 (niri-output-argv \"DP-1\" \"scale\" \"1.5\")
@@ -415,7 +415,7 @@ The change is temporary and is not written to niri's configuration file."
   (run (niri-output-argv output "off") #:allow-failure? allow-failure?))
 
 (define* (niri-output-mode output mode #:key (allow-failure? #f))
-  "Set OUTPUT's mode, such as @code{1920x1080@60}."
+  "Set OUTPUT's mode, such as @code{1920x1080@@60}."
   (run (niri-output-argv output "mode" mode)
        #:allow-failure? allow-failure?))
 
