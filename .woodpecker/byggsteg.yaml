@@ -51,7 +51,8 @@ steps:
         (lambda()
           (define (time-machine cmd)
                   (let ((time-cmd (string-append "cd "
-                                                 "/etc/byggsteg/job-clone/%%CI_REPO_NAME%%/%%CI_COMMIT_BRANCH%%"
+                                                 "/etc/byggsteg/job-clone/"
+                                                 "%%CI_REPO_NAME%%/%%CI_COMMIT_BRANCH%%"
                                                  " && "
                                                  "sudo guix shell -f guix.scm -- ~a")))
                     (format #f time-cmd cmd)))
