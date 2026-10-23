@@ -84,8 +84,16 @@ log_info() {
 }
 
 
+# The help screen is the resource the launcher ships beside itself.  A launcher
+# that cannot find it -- a tree that was copied around without its resources, or
+# a checkout laid out differently -- still answers `--help' with the one line
+# that matters, which is the usage line, rather than failing on a missing file.
 show_help() {
-  cat "$resources_dir/help.txt"
+  if [ -f "${resources_dir}/help.txt" ]; then
+    cat "${resources_dir}/help.txt"
+  else
+    echo "Usage: maak [OPTIONS] [-- [TASKS]... [TASK_ARGS]...]"
+  fi
 }
 
 # The words are read as a task list followed by the arguments for those tasks,
@@ -139,6 +147,12 @@ env_files=()
 task_lists=()
 # Repeated -C flags are collected in order, and entered in that order.
 directories=()
+# Whether this command line asks for something that reads a Maak file.  Listing
+# the tasks and running them do; printing the version does not, so `maak
+# --version' has to work in a directory that holds no Maak file as much as in
+# one that does.  `-h/--help' never reaches the check below: it prints the help
+# screen and exits in the loop.
+needs_maak_file=yes
 
 guile_cmd_args=(
   "-L" "${scheme_sources_dir}"
@@ -237,6 +251,9 @@ while [ "$#" -gt 0 ]; do
     shift
     ;;
   -v | --version)
+    # The version is the library's, not the Maak file's, so nothing is read
+    # from the checkout for it.
+    needs_maak_file=no
     guile_cmd_args+=("--version")
     shift
     ;;
@@ -302,12 +319,22 @@ fi
 
 # An absolute path keeps Guile from resolving the Maak file against its own
 # module directory.
+#
+# A Maak file is only looked for when the run has something to do with one.  A
+# `--version' prints the library's version and reads nothing, so it is answered
+# in any directory -- which is what a user asking what maak they have installed
+# expects, and what a script that only probes the version relies on.  Every
+# other action either names a file outright or is refused when there is none, so
+# `maak' in an empty directory still says so rather than running whatever it
+# found.
 if [ -n "${file_arg}" ]; then
   if [ ! -f "${file_arg}" ]; then
     log_error "No such Maak file: '${file_arg}'"
     exit 1
   fi
   guile_cmd_args+=("--file" "$(realpath "${file_arg}")")
+elif [ "${needs_maak_file}" = no ]; then
+  : # No Maak file is read, so there is none to resolve.
 elif [ -f ./maak.scm ]; then
   guile_cmd_args+=("--file" "$(realpath ./maak.scm)")
 else

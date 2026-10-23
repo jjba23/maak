@@ -30,6 +30,11 @@ loads
 .B ./maak.scm
 and runs the task named
 .BR default .
+A command line that asks only for the help screen or the version reads no Maak
+file at all, so
+.B maak \-\-version
+answers in any directory, while a run that would execute a task says there is
+no Maak file to read.
 A Maak file declares the module
 .B (maak)
 and imports the library:
@@ -173,7 +178,8 @@ was exported.
 Skip the greeting banner, keeping everything else the run would print.
 .TP
 .BR \-h ", " \-\-help
-Display a help screen and exit.
+Display a help screen and exit.  The screen is a resource of the launcher, so
+no Maak file is read and the screen is available in any directory.
 .TP
 .BR \-i ", " \-\-ignore\-errors
 Carry on after a task fails, and let the run succeed anyway: each failure is
@@ -231,7 +237,11 @@ silences them as well, among other things.
 Suppress the banner, the log lines and the header output.
 .TP
 .BR \-v ", " \-\-version
-Print the version, the license and the homepage, then exit.
+Print the version, the license and the homepage, then exit.  The version is
+the library's rather than the Maak file's, so no Maak file is read: the answer
+is the same in a directory that holds none, which is how a script asks which
+.B maak
+is installed before it decides to run anything.
 .TP
 .B \-\-debug
 Let an error reach Guile's own top level handler so the full backtrace is

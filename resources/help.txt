@@ -72,7 +72,8 @@ Options:
         run would print.
 
     -h, --help
-        Display this help message and exit.
+        Display this help message and exit.  This reads no Maak file, so it
+        works in a directory that holds none.
 
     -i, --ignore-errors
         Keep going after a task fails, and let the run succeed anyway.  Every
@@ -115,7 +116,8 @@ Options:
         Quiet mode. Suppress standard logging, banners, and header outputs.
 
     -v, --version
-        Display the Maak version and exit.
+        Display the Maak version and exit.  This reads no Maak file either, so
+        `maak --version' answers in any directory.
 
     --debug
         Show the Guile backtrace on an error.  The same as setting the

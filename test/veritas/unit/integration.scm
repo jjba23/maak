@@ -90,6 +90,18 @@
 
 (define no-maak-file-dir (unique-path "empty"))
 
+(define (with-empty-directory thunk)
+  "Run THUNK with NO-MAAK-FILE-DIR created, and remove it afterwards.
+
+The directory is made and removed around the run because a run that enters it
+needs it to exist and to be empty, and because a case is a form of its own: the
+cleanup goes in the `after' thunk of a `dynamic-wind' rather than after the
+assertion, so it happens whether the case passed or failed."
+  (dynamic-wind
+    (lambda () (mkdir no-maak-file-dir))
+    thunk
+    (lambda () (rmdir no-maak-file-dir))))
+
 (define (without-load-notes text)
   "Return TEXT without the notes Guile prints while it compiles a file.
 
@@ -180,6 +192,36 @@ that a case can ask about it alongside the status of the run."
                                #:got (list (status-of result)
                                            (said? result "stdout"
                                                   (maak-version-string))))))
+
+         ;; ---- What works without a Maak file -----------------------------
+         ;;
+         ;; The version and the help screen belong to maak itself rather than to
+         ;; the checkout it is started in, so both have to answer in a directory
+         ;; that holds no Maak file -- which is what an installer or a script
+         ;; probing the maak it has just put on PATH does before there is a
+         ;; project to run it in.  `-C' into an empty directory is how a case
+         ;; asks for that without leaving the checkout.
+
+         (test "the version is answered where there is no Maak file to read"
+               (with-empty-directory
+                (lambda ()
+                  (let ((result (launcher-run "-C" no-maak-file-dir
+                                              "--version")))
+                    (assert-equal
+                     #:expect (list 0 #t #f)
+                     #:got (list (status-of result)
+                                 (said? result "stdout" (maak-version-string))
+                                 (said? result "stderr" "No Maak file found")))))))
+
+         (test "the help screen is answered where there is no Maak file to read"
+               (with-empty-directory
+                (lambda ()
+                  (let ((result (launcher-run "-C" no-maak-file-dir "--help")))
+                    (assert-equal
+                     #:expect (list 0 #t #f)
+                     #:got (list (status-of result)
+                                 (said? result "stdout" "Usage: maak")
+                                 (said? result "stderr" "No Maak file found")))))))
 
          (test "a task of a named Maak file runs and reports its own output"
                (let ((result (launcher-run "-f" cli-fixture
@@ -380,20 +422,17 @@ that a case can ask about it alongside the status of the run."
                                            (said? result "stderr" "Unknown task: -n")))))
 
          (test "a directory with no Maak file is refused rather than run"
-               ;; The directory is made and removed around the run: the run
-               ;; itself needs it to exist and to be empty, and the assertion is
-               ;; the last form of the case, so the cleanup goes in the `after'
-               ;; thunk of a `dynamic-wind' rather than after the assertion.
-               (dynamic-wind
-                 (lambda () (mkdir no-maak-file-dir))
-                 (lambda ()
-                   (let ((result (launcher-run "-C" no-maak-file-dir
-                                               "--no-banner")))
-                     (assert-equal #:expect (list 1 #t)
-                                   #:got (list (status-of result)
-                                               (said? result "stderr"
-                                                      "No Maak file found")))))
-                 (lambda () (rmdir no-maak-file-dir))))))
+               ;; The other half of the fix above: a command line that would
+               ;; run something still needs a file to read, so a run in an empty
+               ;; directory says there is none rather than looking further.
+               (with-empty-directory
+                (lambda ()
+                  (let ((result (launcher-run "-C" no-maak-file-dir
+                                              "--no-banner")))
+                    (assert-equal #:expect (list 1 #t)
+                                  #:got (list (status-of result)
+                                              (said? result "stderr"
+                                                     "No Maak file found")))))))))
 
 (define (spec)
   (veritas-run #:concurrent? #f
