@@ -402,7 +402,7 @@ A bare push does not send tags that are not annotated; `maak git-push --
 
 (define (push-docker-tag)
   "Push the locally generated Docker image to Dockerhub."
-  ($ '("git fetch --all"))
+  (git-fetch "--all")
   (let* ((latest-tag (syscall-with-output "git describe --tags --abbrev=0")))
     ($ (list (~ "podman push localhost/~a:latest" project-name)
              (~ "docker.io/jjba23/~a:~a" project-name latest-tag))
