@@ -16,7 +16,7 @@
 #
 
 Name:           maak
-Version:        0.12.2
+Version:        0.12.4
 Release:        0
 Summary:        Command runner à la Make using Guile Scheme
 License:        GPL-3.0-or-later

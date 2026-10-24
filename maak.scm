@@ -19,10 +19,14 @@
   #:declarative? #t
   #:use-module (ice-9 string-fun)
   #:use-module (ice-9 textual-ports)
-  #:use-module (ice-9 popen)
   #:use-module (ice-9 regex)
   #:use-module (srfi srfi-1)
-  #:use-module (maak maak))
+  #:use-module (maak maak)
+  ;; The git and container helpers are imported under prefixes because the
+  ;; tasks below are named the way maak exposes them on the command line, and a
+  ;; task may not shadow the helper it calls.
+  #:use-module ((maak git) #:prefix git:)
+  #:use-module ((maak container) #:prefix ct:))
 
 ;; ====== Maak file constants ======
 
@@ -40,18 +44,11 @@
 (define hot-reload-file-types
   '(scm))
 
-;; ====== Maak abstractions ======
-
-(define (syscall-with-output cmd)
-  (let* ((process (open-input-pipe cmd))
-         (process-output (get-string-all process)))
-    (close-pipe process) process-output))
-
 ;; ====== Maak file tasks ======
 
 (define (help)
   "Display program help screen."
-  (program-shell '("maak --help")))
+  (program-shell (list "maak" "--help")))
 
 (define (default)
   "Default task to run, call program's help."
@@ -59,7 +56,7 @@
 
 (define (man)
   "Preview the maak manual page without installing it."
-  ($ '("man ./man/maak.1")))
+  (run (list "man" "./man/maak.1")))
 
 (define (version)
   "Print the maak version."
@@ -128,15 +125,15 @@ the manual page's quoting, the README's wording -- is left exactly as it was."
   (define (path file)
     (if (string=? directory ".")
         file
-        (string-append directory "/" file)))
+        (~ "~a/~a" directory file)))
 
   (define (read-text file)
     (let ((full (path file)))
       (if (file-exists? full)
           (call-with-input-file full get-string-all)
-          (error (format #f
-                         "sync-version: no ~a in ~a; name the checkout's root"
-                         file directory)))))
+          (task-error "sync-version: no ~a in ~a"
+                      #:args (list file directory)
+                      #:hint "Name the checkout's root as DIRECTORY."))))
 
   (define (write-text file text)
     (call-with-output-file (path file)
@@ -147,9 +144,8 @@ the manual page's quoting, the README's wording -- is left exactly as it was."
                   "maak-version[ \t\n]+\"([0-9]+\\.[0-9]+\\.[0-9]+)\""
                   (read-text version-source))))
       (unless found
-        (error (format #f
-                       "sync-version: ~a does not define maak-version as a version"
-                       (path version-source))))
+        (task-error "sync-version: ~a does not define maak-version as a version"
+                    #:args (list (path version-source))))
       (match:substring found 1)))
 
   (define (sites-of file)
@@ -195,18 +191,8 @@ the manual page's quoting, the README's wording -- is left exactly as it was."
 
   ;; ---- The commit and the tag --------------------------------------------
   ;;
-  ;; git runs as a program with its arguments, never through a shell, and is
-  ;; pointed at DIRECTORY with `-C' so a release of another checkout commits
-  ;; there and not wherever maak was started from.
-
-  (define (git . arguments)
-    "Run git in the checkout, and return the exit code it ended with.
-
-`system*' answers with the wait status rather than the exit code, so a command
-that exited 1 reads as 256 and one that could not be started reads as #f; both
-are turned into the number a shell would report here, 127 when git never ran."
-    (let ((status (apply system* "git" "-C" repo arguments)))
-      (or (and status (status:exit-val status)) 127)))
+  ;; The library wrappers take `#:directory', so a release of another checkout
+  ;; commits there rather than wherever maak was started from.
 
   (define (checkout?)
     "Return whether DIRECTORY is a git checkout."
@@ -214,45 +200,40 @@ are turned into the number a shell would report here, 127 when git never ran."
 
   (define (tag-exists? tag)
     "Return whether TAG is already a tag of the checkout."
-    (zero? (git "rev-parse" "--verify" "--quiet"
-                (string-append "refs/tags/" tag))))
+    (member tag (git:git-tags #:directory repo)))
 
   (define (changes-to-commit?)
     "Return whether anything tracked differs from the last commit."
-    (case (git "diff" "--quiet" "HEAD")
-      ((0) #f)
-      ((1) #t)
-      (else
-       (error (format #f
-                      "sync-version: git could not compare ~a with a commit; is it a checkout with one?"
-                      repo)))))
+    (not (string=? ""
+                   (string-trim-both
+                    (git:git-output (list "diff" "--name-only" "HEAD")
+                                    #:directory repo)))))
 
   (define (commit-release version)
     "Commit every tracked change as the release VERSION, and return the message."
-    (let ((message (format #f "chore: Release v~a" version)))
-      (unless (zero? (git "commit" "-am" message))
-        (error "sync-version: git commit failed, so nothing was tagged"))
+    (let ((message (~ "chore: Release v~a" version)))
+      (unless (git:git (list "commit" "--all" "-m" message)
+                       #:directory repo #:allow-failure? #t)
+        (task-error "sync-version: git commit failed, so nothing was tagged"))
       message))
 
   (define (tag-release version)
     "Tag the current commit as the release VERSION, and return the tag."
-    (let ((tag (string-append "v" version)))
-      (unless (zero? (git "tag" tag))
-        (error (format #f
-                       "sync-version: `git tag ~a' failed; the release was committed, but not tagged"
-                       tag)))
+    (let ((tag (~ "v~a" version)))
+      (unless (git:git (list "tag" tag)
+                       #:directory repo #:allow-failure? #t)
+        (task-error "sync-version: `git tag ~a' failed; the release was committed, but not tagged"
+                    #:args (list tag)))
       tag))
 
   (let* ((version (current-version))
-         (tag (string-append "v" version)))
+         (tag (~ "v~a" version)))
     (unless (checkout?)
-      (error (format #f
-                     "sync-version: ~a is not a git checkout, so there is nothing to commit or tag"
-                     repo)))
+      (task-error "sync-version: ~a is not a git checkout, so there is nothing to commit or tag"
+                  #:args (list repo)))
     (when (tag-exists? tag)
-      (error (format #f
-                     "sync-version: ~a is already released as ~a; bump ~a first"
-                     version tag version-source)))
+      (task-error "sync-version: ~a is already released as ~a; bump ~a first"
+                  #:args (list version tag version-source)))
     (let ((changed (sync-copies! version)))
       (if (null? changed)
           (log-info "Every file that names the version already says ~a." version)
@@ -269,60 +250,52 @@ are turned into the number a shell would report here, 127 when git never ran."
 
 ;; ====== Git and source archives ======
 ;;
-;; The wrappers are library code, `(maak git)', so another project's Maak file
-;; can import them and name its own tasks.  This file names them as tasks, and
-;; reaches the module when a task runs rather than importing it at the top: a
-;; top-level import would stop this whole file loading under an older installed
-;; maak, and take the tasks that need nothing new -- `sync-version' among them
-;; -- down with it.
-(define-syntax-rule (git-call name arguments)
-  (let ((library (resolve-module '(maak git) #:ensure #f)))
-    (unless library
-      (error "(maak git) is not part of the maak this Maak file is running under; run ./scripts/maak from the checkout, or install the maak this file belongs to"))
-    (apply (module-ref library 'name) arguments)))
+;; The wrappers are library code, `(maak git)', and this file imports it under
+;; the `git:' prefix so the tasks below keep the names maak exposes on the
+;; command line without shadowing the helpers they call.
 
 (define (git-init . arguments)
   "Initialise a git repository here, with any arguments git init takes."
-  (git-call git-init arguments))
+  (apply git:git-init arguments))
 
 (define (git-status)
   "Show the current branch and a short status of the working tree."
-  (git-call git-status '()))
+  (git:git-status))
 
 (define (git-add . paths)
   "Stage PATHS, or every change in the tree when none is named."
-  (git-call git-add paths))
+  (apply git:git-add paths))
 
 (define (git-commit message)
   "Commit every tracked change with MESSAGE."
-  (git-call git-commit (list message)))
+  (git:git-commit message))
 
 (define (git-tag name)
   "Tag the current commit as NAME, without an annotation."
-  (git-call git-tag (list name)))
+  (git:git-tag name))
 
 (define (git-branch . names)
   "List the branches, or create the branches NAMES name."
-  (git-call git-branch names))
+  (apply git:git-branch names))
 
 (define (git-switch branch)
   "Switch to BRANCH, which must already exist."
-  (git-call git-switch (list branch)))
+  (git:git-switch branch))
 
 (define (git-pull . arguments)
   "Pull from the upstream branch, with any arguments git pull takes."
-  (git-call git-pull arguments))
+  (apply git:git-pull arguments))
 
 (define (git-push . arguments)
   "Push the current branch, with any arguments git push takes.
 
 A bare push does not send tags that are not annotated; `maak git-push --
 --tags' sends them too."
-  (git-call git-push arguments))
+  (apply git:git-push arguments))
 
 (define (git-log . arguments)
   "Show the history as a decorated one-line graph, twenty commits by default."
-  (git-call git-log arguments))
+  (apply git:git-log arguments))
 
 ;; Both archives pack the last commit with `git archive', so what ships is what
 ;; the release commit contains: the tracked files, without `.git' and without
@@ -331,17 +304,13 @@ A bare push does not send tags that are not annotated; `maak git-push --
 
 (define (package-tar)
   "Write the last commit as maak-VERSION.tar.gz, under a maak-VERSION/ prefix."
-  (let ((name (format #f "~a-~a" project-name maak-version)))
-    (git-call git-archive-tar
-              (list (format #f "~a.tar.gz" name)
-                    #:prefix (format #f "~a/" name)))))
+  (let ((name (~ "~a-~a" project-name maak-version)))
+    (git:git-archive-tar (~ "~a.tar.gz" name) #:prefix (~ "~a/" name))))
 
 (define (package-zip)
   "Write the last commit as maak-VERSION.zip, under a maak-VERSION/ prefix."
-  (let ((name (format #f "~a-~a" project-name maak-version)))
-    (git-call git-archive-zip
-              (list (format #f "~a.zip" name)
-                    #:prefix (format #f "~a/" name)))))
+  (let ((name (~ "~a-~a" project-name maak-version)))
+    (git:git-archive-zip (~ "~a.zip" name) #:prefix (~ "~a/" name))))
 
 (define (arithmetics)
   "Do some quick math."
@@ -353,14 +322,16 @@ A bare push does not send tags that are not annotated; `maak git-push --
 
 (define (fmt)
   "Format Scheme source code files according to the Guix style guide."
-  ($ '("find . -maxdepth 8 -name '*.scm'" "-type f -exec guix style -f {} \\;")
-     #:verbose? #t))
+  (run (list "find" "." "-maxdepth" "8" "-name" "*.scm" "-type" "f"
+             "-exec" "guix" "style" "-f" "{}" ";")
+       #:verbose? #t))
 
 (define (vars)
   "Display some system variables."
-  ($ '("echo -n \"\nHome directory: ${HOME}\"" "echo -n \"\nShell: ${SHELL}\"")
-     #:join " && ")
-  ($ '("echo -n \"\nUser: ${USER}\"")))
+  (log-info "Home directory: ~a\nShell: ~a\nUser: ~a\n"
+            (home-dir)
+            (or (getenv "SHELL") "")
+            (or (getenv "USER") "")))
 
 (define (quick-math x-arg y-arg)
   (let* ((x (string->number x-arg))
@@ -370,15 +341,16 @@ A bare push does not send tags that are not annotated; `maak git-push --
 
 (define (repl)
   "Development REPL."
-  (manifest-shell '("guile -L ./src"
-                    "-c '((@ (ares server) run-nrepl-server))'")))
+  (manifest-shell (list "guile" "-L" "./src"
+                        "-c" "'((@ (ares server) run-nrepl-server))'")))
 
 (define (docs)
   "Generate technical API documentation for Maak."
   (delete-file-recursively "doc")
-  (manifest-shell (list "documenta api ./src/maak && "
-                        (~ "texi2any -v --html --css-ref=~a -o index_html"
-                           api-docs-css-url) "./doc/api/index.texi"))
+  (manifest-shell (list "documenta" "api" "./src/maak"))
+  (manifest-shell (list "texi2any" "-v" "--html"
+                        (~ "--css-ref=~a" api-docs-css-url)
+                        "-o" "index_html" "./doc/api/index.texi"))
   (mv "./index_html" "./doc/api-dist"))
 
 (define (deploy)
@@ -390,23 +362,29 @@ A bare push does not send tags that are not annotated; `maak git-push --
   (delete-file-recursively "doc"))
 
 (define (package-docker)
-  "Create a Docker image for Maak."
-  ($ '("guix pack --file=./guix.scm" "--format=docker" "--image-tag=maak"
-       "-S /bin=bin" "bash coreutils util-linux-with-udev guile")))
+  "Build a Docker image for Maak."
+  (guix-pack '()
+             #:format "docker"
+             #:image-tag "maak"
+             #:symlinks '("/bin=bin")
+             #:extra-packages '("bash" "coreutils" "util-linux-with-udev" "guile")
+             #:verbose? #t))
 
 (define (push-docker-latest)
   "Push the latest locally generated Docker image to Dockerhub."
-  ($ (list (~ "podman push localhost/~a:latest" project-name)
-           (~ "docker.io/jjba23/~a:latest" project-name))
-     #:verbose? #t))
+  (ct:container (list "push"
+                      (~ "localhost/~a:latest" project-name)
+                      (~ "docker.io/jjba23/~a:latest" project-name))
+                #:verbose? #t))
 
 (define (push-docker-tag)
   "Push the locally generated Docker image to Dockerhub."
-  (git-fetch "--all")
-  (let* ((latest-tag (syscall-with-output "git describe --tags --abbrev=0")))
-    ($ (list (~ "podman push localhost/~a:latest" project-name)
-             (~ "docker.io/jjba23/~a:~a" project-name latest-tag))
-       #:verbose? #t)))
+  (git:git-fetch "--all")
+  (let ((latest-tag (git:git-describe-tag)))
+    (ct:container (list "push"
+                        (~ "localhost/~a:latest" project-name)
+                        (~ "docker.io/jjba23/~a:~a" project-name latest-tag))
+                  #:verbose? #t)))
 
 (define deb-packages
   (make-parameter (map symbol->string
@@ -415,70 +393,79 @@ A bare push does not send tags that are not annotated; `maak git-push --
 
 (define (deb-build)
   "Build .deb package (unsigned)"
-  ($ '("apt update")
-     #:sudo? #t
-     #:verbose? #t)
-  ($ (cons "apt install -y"
-           (deb-packages))
-     #:sudo? #t
-     #:verbose? #t)
+  (run (list "apt" "update")
+       #:sudo? #t
+       #:verbose? #t)
+  (run (append (list "apt" "install" "-y")
+               (deb-packages))
+       #:sudo? #t
+       #:verbose? #t)
 
   (dynamic-wind
    ;; Setup: create temporary symlink at project root
    (lambda ()
-     ($ '("ln -s packaging/debian debian")
-        #:verbose? #t))
+     (ln-s "packaging/debian" "debian"
+           #:force? #f
+           #:verbose? #t))
 
    ;; Execution: run debian build commands against ./debian
    (lambda ()
-     ($ '("mk-build-deps -i -r debian/control")
-        #:sudo? #t
-        #:verbose? #t)
-     ($ '("debuild -b -uc -us")
-        #:verbose? #t))
+     (run (list "mk-build-deps" "-i" "-r" "debian/control")
+          #:sudo? #t
+          #:verbose? #t)
+     (run (list "debuild" "-b" "-uc" "-us")
+          #:verbose? #t))
 
    ;; Cleanup: remove symlink safely (leaves packaging/debian intact)
    (lambda ()
-     ($ '("rm -rf debian")
-        #:verbose? #t))))
+     (rm-rf "debian"
+            #:verbose? #t))))
 
 (define (rpm-build)
   "Build RPM package for openSUSE and Fedora/RHEL"
-  (let* ((latest-tag (syscall-with-output "git describe --tags --abbrev=0"))
-         (latest-tag-num (string-trim-both (string-drop latest-tag 1))))
-    ($ '("rpmdev-setuptree")
-       #:verbose? #t)
-    ($ (list "git archive --format=tar.gz"
-             (~ "--prefix=maak-~a/" latest-tag-num)
-             (~ "-o ~~/rpmbuild/SOURCES/maak-~a.tar.gz" latest-tag-num)
-             latest-tag)
-       #:verbose? #t)
-    ($ '("cp packaging/opensuse/maak.spec ~/rpmbuild/SPECS/")
-       #:verbose? #t)
-    ($ '("rpmbuild -ba ~/rpmbuild/SPECS/maak.spec")
-       #:verbose? #t)
-    ($ '("ls ~/rpmbuild/RPMS/x86_64/maak-[0-9]*.rpm"))
-    (let* ((latest-rpm (syscall-with-output
-                        "ls -t ~/rpmbuild/RPMS/x86_64/maak-[0-9]*.rpm | head -n 1"))
-           (latest-src-rpm (syscall-with-output
-                            "ls -t ~/rpmbuild/SRPMS/maak-[0-9]*.rpm | head -n 1")))
-      ($ '("cp packaging/opensuse/maak-rpmlintrc ~/rpmbuild/RPMS/x86_64/")
+  (let* ((latest-tag (git:git-describe-tag))
+         (latest-tag-num (cond ((string=? latest-tag "") "")
+                               ((string-prefix? "v" latest-tag)
+                                (string-drop latest-tag 1))
+                               (else latest-tag)))
+         (sources (~ "~a/rpmbuild/SOURCES" (home-dir)))
+         (specs (~ "~a/rpmbuild/SPECS" (home-dir)))
+         (rpms (~ "~a/rpmbuild/RPMS/x86_64" (home-dir)))
+         (srpms (~ "~a/rpmbuild/SRPMS" (home-dir))))
+    (run (list "rpmdev-setuptree")
          #:verbose? #t)
-      ($ (list (~ "rpmlint ~a" latest-rpm))
+    (git:git-archive-tar (~ "~a/maak-~a.tar.gz" sources latest-tag-num)
+                         #:prefix (~ "maak-~a/" latest-tag-num)
+                         #:revision latest-tag)
+    (cp "packaging/opensuse/maak.spec" specs
+        #:verbose? #t)
+    (run (list "rpmbuild" "-ba" (~ "~a/maak.spec" specs))
          #:verbose? #t)
-      ($ (list (~ "rpmlint ~a" latest-src-rpm))
-         #:verbose? #t))))
+    (run (list "ls" (~ "~a/maak-[0-9]*.rpm" rpms))
+         #:expand? #t)
+    (let* ((latest-rpm
+            (string-trim-both
+             (capture (~ "ls -t ~a/maak-[0-9]*.rpm | head -n 1" rpms))))
+           (latest-src-rpm
+            (string-trim-both
+             (capture (~ "ls -t ~a/maak-[0-9]*.rpm | head -n 1" srpms)))))
+      (cp "packaging/opensuse/maak-rpmlintrc" rpms
+          #:verbose? #t)
+      (run (list "rpmlint" latest-rpm)
+           #:verbose? #t)
+      (run (list "rpmlint" latest-src-rpm)
+           #:verbose? #t))))
 
 (define (hot-reload)
   "Hot-reloading developer's setup."
-  (manifest-shell (list "watchexec 'maak --list'"
+  (manifest-shell (list "watchexec" "'maak --list'"
                         "--clear"
                         (~ "--exts ~a"
                            (string-join (map symbol->string
                                              hot-reload-file-types) ","))
                         "--on-busy-update=restart"
-                        "--shell bash"
-                        "--watch .")))
+                        "--shell" "bash"
+                        "--watch" ".")))
 
 (define (hr)
   "Alias to hot-reloading."
@@ -490,13 +477,15 @@ A bare push does not send tags that are not annotated; `maak git-push --
 
 (define (pure-dev)
   "Pure isolated development shell."
-  ($ '("guix shell --pure -f guix.scm"
-       "bash coreutils util-linux-with-udev guile" "-- maak --list")
-     #:verbose? #t))
+  (guix-shell (list "maak" "--list")
+              #:pure? #t
+              #:file "guix.scm"
+              #:packages '("bash" "coreutils" "util-linux-with-udev" "guile")
+              #:verbose? #t))
 
 (define (nix-dev)
   "Enter the Nix development shell this project's flake declares."
-  (nix-develop (list "maak --list")))
+  (nix-develop (list "maak" "--list")))
 
 (define (flake-check)
   "Validate every output of this project's Nix flake."
@@ -505,18 +494,18 @@ A bare push does not send tags that are not annotated; `maak git-push --
 ;; ====== Maak tests ======
 ;;
 ;; The suite runs once, in the environment the manifest declares.  The Veritas
-;; variables are set through `env' rather than as a `VAR=value' prefix:
-;; everything after `guix shell --' is executed directly, so a prefix would be
-;; looked up as a program name.
-(define veritas-command-head
-  (list "env VERITAS_TEST_MODULE=veritas VERITAS_TEST_TOP_DIR=test VERITAS_TEST_TYPE=unit"
-        "VERITAS_RUN_BENCHMARKS=false"))
-
-(define veritas-command-tail
-  (list "guile -L ./src -L ./test -c '(exit ((@ (veritas runner) run-tests)))'"))
+;; variables go through `#:env' rather than as a `VAR=value' prefix: everything
+;; after `guix shell --' is executed directly, so `env' sets them for the guile
+;; that runs the tests.
+(define veritas-env
+  '("VERITAS_TEST_MODULE=veritas"
+    "VERITAS_TEST_TOP_DIR=test"
+    "VERITAS_TEST_TYPE=unit"
+    "VERITAS_RUN_BENCHMARKS=false"))
 
 (define test-command
-  (append veritas-command-head veritas-command-tail))
+  (list "guile" "-L" "./src" "-L" "./test"
+        "-c" "'(exit ((@ (veritas runner) run-tests)))'"))
 
 ;; There is deliberately no task that audits the suite on top of running it.
 ;; Two failure modes are worth naming, because deciding against a reader of the
@@ -531,12 +520,14 @@ A bare push does not send tags that are not annotated; `maak git-push --
 
 The specs live under test/veritas/unit and are located by the Veritas runner,
 which needs both the library sources and the test tree on the load path."
-  (manifest-shell test-command))
+  (manifest-shell test-command
+                  #:env veritas-env))
 
 (define (container)
   "Run the same unit test suite inside a Guix container, with no network."
   (guix-container test-command
-                  #:manifest "manifest.scm"))
+                  #:manifest "manifest.scm"
+                  #:env veritas-env))
 
 ;; ====== Maak test playground =======
 
@@ -550,9 +541,9 @@ which needs both the library sources and the test tree on the load path."
 
   (let* ((temp-file-name (new-temp-file)))
     (mkdir-p "./tmp")
-    ($ (list (~ "touch ~a" temp-file-name)))
-    ($ (list (~ "touch ~a" temp-file-name)))
+    (touch temp-file-name)
+    (touch temp-file-name)
     (parameterize ((dry-run? #t))
-      ($ (list (~ "touch ~a" temp-file-name)))
+      (touch temp-file-name)
       (delete-file-recursively temp-file-name))
     (delete-file-recursively temp-file-name)))
