@@ -93,6 +93,20 @@ depend on whether the machine running the suite happens to have `doas'."
    (lambda ()
      ($ '("make failing-target") #:allow-failure? #t))))
 
+(define (signalled-command-message)
+  "Return the message `$' raises for a command killed by SIGTERM."
+  (parameterize ((quiet? #t))
+    (catch #t
+      (lambda ()
+        ;; `$' runs the command through `sh -c', so `$$' is that shell's pid.
+        ($ '("kill -TERM $$"))
+        "no error was raised")
+      (lambda (key . vals)
+        (let ((error (find-maak-error key vals)))
+          (if error
+              (maak-error-message error)
+              (exception->message key vals)))))))
+
 (define (async-command-result)
   "Return what starting a slow command in the background returns, and how long
 it took."
@@ -412,6 +426,9 @@ it took."
                (assert-error (lambda ()
                                (parameterize ((quiet? #t))
                                  ($ '("exit 3"))))))
+         (test "a signalled command raises a maak error"
+               (assert-contains #:expect (signalled-command-message)
+                                #:got "command was terminated by a signal"))
          (test "a failure that is allowed is reported, not raised"
                (parameterize ((quiet? #t))
                  (assert-equal #:expect #f

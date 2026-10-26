@@ -534,9 +534,9 @@ is remembered after the first wait."
 The shell command to be executed.
 
 @item @strong{#:allow-failure?} (boolean, default #f):
-If #t, a non-zero exit code does not raise: it comes back as @code{#f}, the way
-`cmd || true' would keep a shell going, except that the task also learns that
-the command failed.
+If #t, a non-zero exit code or a signal does not raise: it comes back as
+@code{#f}, the way `cmd || true' would keep a shell going, except that the task
+also learns that the command failed.
 
 @item @strong{#:async?} (boolean, default #f):
 If #t, the command is started in the background and a job record is returned
@@ -552,8 +552,9 @@ failed and failures are allowed, and a job record when @code{#:async?} was
 given.
 
 @sc{errors}:
-  Signals an error if the command returns a non-zero exit code,
-  providing the command and the exit code in the error message."
+  Signals an error if the command returns a non-zero exit code or is
+  terminated by a signal.  The message names the command, and the exit code
+  when there is one."
   (cond
     ((dry-run?)
      (unless (quiet?)
@@ -572,7 +573,7 @@ given.
               (let* ((exit-val (system cmd))
                      (exit-code (status:exit-val exit-val)))
                 (cond
-                  ((zero? exit-code) #t)
+                  ((and exit-code (zero? exit-code)) #t)
                   ;; A signalled command (segfault, SIGTERM) has no exit code;
                   ;; say so rather than reporting a misleading number.
                   ((not exit-code)
