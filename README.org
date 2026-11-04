@@ -1,4 +1,4 @@
-#+title: maak — the infinitely extensible command runner
+#+title: maak: infinitely extensible command runner
 #+author: Josep Bigorra
 #+email: jjbigorra@gmail.com
 #+options: toc:nil num:nil
@@ -1301,25 +1301,6 @@ https://www.gnu.org/licenses/fdl-1.3.html
 
 In short: use it, study it, change it, share it — and if you ship a modified maak, ship the source too.
 
-* Colophon
-
-- The mascot is the *maak* skeu icon — a skeuomorphic document holding the Guile lambda — a copy of which lives beside the banner:
-
-  #+attr_html: :width 200px :alt the maak skeu icon
-  [[file:resources/maak-icon.png]]
-- The banner at the top of this file is hand-written SVG, living in [[file:resources/maak-banner.svg][resources/maak-banner.svg]] — the mascot is embedded in it, so there are no external assets and no font downloads, and it renders anywhere the file goes.
-- The Emacs front end, [[https://codeberg.org/jjba23/maak.el][maak.el]], wears the same icon and a banner laid out the same way, so the two projects read as one family.
-- The badges come from the [[https://jointhefreeworld.org/][jointhefreeworld]] glyph generator.
-- The text-mode logo, for terminals and plain-text readers:
-
-#+begin_src
- ,---.       ,---.
-(     \     /     )
- )  (  \____/  )  (
-(    \ @  @ /    )      [ Maak ]
- )    ( oo )    (       The infinitely extensible
-(      \__/      )      command runner, control plane,
-  `------------'        and project automator.
-#+end_src
+-------
 
 Happy hacking! ✨
