@@ -3,11 +3,11 @@
 #+email: jjbigorra@gmail.com
 #+options: toc:nil num:nil
 
-#+attr_html: :width 100% :alt maak — the infinitely extensible command runner
-[[file:resources/maak-banner.svg]]
-
 [[https://jointhefreeworld.org/ggg/dist/scheme-guile.svg]]  [[https://jointhefreeworld.org/ggg/dist/gnu-guix.svg]]  [[https://jointhefreeworld.org/ggg/dist/maak.svg]]  [[https://jointhefreeworld.org/ggg/dist/license-gpl3+.svg]]  [[https://jointhefreeworld.org/ggg/dist/license-fdl13+.svg]]
 [[https://jointhefreeworld.org/ggg/dist/jointhefreeworld-org.svg]]
+
+#+attr_html: :width 160 :alt maak logo
+[[file:logo.svg]]
 
 *Write your tasks, pipelines and build logic as ordinary Scheme. No DSL to learn, no hidden magic, no leftover build step you cannot read.*
 
