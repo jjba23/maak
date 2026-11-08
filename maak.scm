@@ -54,8 +54,9 @@
 ;; ====== The version's copies ======
 ;;
 ;; The version is written by hand once, in src/maak/version.scm.  The RPM spec,
-;; the manual page and the installation page cannot read a Scheme module, so
-;; they carry copies, and `sync-version' rewrites them from that file.
+;; the Arch recipe, the manual page and the installation page cannot read a
+;; Scheme module, so they carry copies, and `sync-version' rewrites them from
+;; that file.
 ;;
 ;; Which files carry a copy is this Maak file's business rather than the
 ;; library's, and the version is read from the working tree rather than from the
@@ -76,6 +77,8 @@
 (define version-sites
   '(("packaging/opensuse/maak.spec"
      . "Version:[ \t]+([0-9]+\\.[0-9]+\\.[0-9]+)")
+    ("packaging/arch/PKGBUILD"
+     . "pkgver=([0-9]+\\.[0-9]+\\.[0-9]+)")
     ("man/maak.1"
      . "maak ([0-9]+\\.[0-9]+\\.[0-9]+)")
     ("docs/installation.org"
@@ -89,9 +92,9 @@ commit and tag the release.
 
 The version is written by hand once, in src/maak/version.scm, which is what
 `maak --version' prints and what default.nix reads while it evaluates the
-derivation.  The RPM spec, the manual page and the installation page cannot
-read a Scheme module, so they carry copies, and this task rewrites them from
-that file.
+derivation.  The RPM spec, the Arch recipe, the manual page and the
+installation page cannot read a Scheme module, so they carry copies, and this
+task rewrites them from that file.
 
 A release is then the whole ritual in one command: the copies are made to agree,
 everything tracked that changed is committed as `chore: Release vX.Y.Z', and

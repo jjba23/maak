@@ -5,7 +5,7 @@
 
 # Maintainer: Josep Bigorra <jjbigorra@gmail.com>
 pkgname=maak
-pkgver=0.12.2
+pkgver=0.14.1
 pkgrel=1
 pkgdesc="Command runner à la Make using Guile Scheme"
 arch=('any')
@@ -30,8 +30,12 @@ checkdepends=(
   'zip'
 )
 
-source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
-sha256sums=('4f31b07bcc84178f502f6565ae479529da269edcd0ac9994dcd6ff6100586b7f')
+# The tag is published on GitHub, where the pipeline and the release live;
+# Codeberg carries the repository, so an archive of a new tag can lag there.
+# `maak sync-version' writes $pkgver, and the checksum is updated afterwards
+# from the published archive, which is the one thing no release task can know.
+source=("$pkgname-$pkgver.tar.gz::https://github.com/jjba23/maak/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('973afcdbeb6a9f1e5113b3ff709443687c50517163af1186811dbc0f446ee83f')
 
 # Guile looks for byte-compiled modules under the site-ccache directory, which
 # differs between distributions (and between a Guile installed system-wide and
@@ -48,7 +52,9 @@ _compiled_dir() {
 }
 
 build() {
-  cd "$srcdir/$pkgname"
+  # `makepkg' unpacks the tag's archive, whose top directory is named after the
+  # package and its version, not after the package alone.
+  cd "$srcdir/$pkgname-$pkgver"
 
   # Byte-compile every module, mirroring the source tree under a staging
   # directory that package() copies into the compiled site directory.
@@ -64,7 +70,7 @@ build() {
 }
 
 check() {
-  cd "$srcdir/$pkgname"
+  cd "$srcdir/$pkgname-$pkgver"
 
   env VERITAS_TEST_MODULE=veritas VERITAS_TEST_TOP_DIR=test \
     VERITAS_TEST_TYPE=unit VERITAS_RUN_BENCHMARKS=false \
@@ -72,7 +78,7 @@ check() {
 }
 
 package() {
-  cd "$srcdir/$pkgname"
+  cd "$srcdir/$pkgname-$pkgver"
 
   # The launcher resolves its modules and resources relative to its own
   # prefix, so the installed layout below is what it expects.

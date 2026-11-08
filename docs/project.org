@@ -52,11 +52,14 @@ The wrappers live in [[file:../src/maak/git.scm][src/maak/git.scm]] as the modul
 It also provides ~git~ itself for the commands without a wrapper and ~git-archive~, ~git-archive-tar~ and ~git-archive-zip~ for the archives, along with the wider set described under [[file:git-and-archives.org::#git][Git]] above -- fetch, merge, rebase, reset, stash, diff, remotes, and the ~git-output~ queries. This project's tasks reach the module when a task runs rather than importing it at the top of [[file:../maak.scm][maak.scm]], so the Maak file still loads under a maak too old to have it; such a task then says which maak it needs instead of failing on an unbound name.
 
 * Releasing
+:PROPERTIES:
+:CUSTOM_ID: releasing
+:END:
 
 The version is written by hand in one place: ~maak-version~ in [[file:../src/maak/version.scm][src/maak/version.scm]], which is what ~maak --version~ prints. Everything else follows it.
 
 - ~default.nix~ reads that file while it evaluates the derivation, so a Nix build cannot fall behind the program. There is no second copy there to remember.
-- The RPM spec, the manual page and [[file:installation.org][the installation page]] carry copies, because an RPM spec is parsed before its source is unpacked and a manual page is roff. ~maak sync-version~ rewrites those copies from that file.
+- The RPM spec, the Arch recipe, the manual page and [[file:installation.org][the installation page]] carry copies, because an RPM spec is parsed before its source is unpacked, a PKGBUILD is read by a program that knows no Scheme, and a manual page is roff. ~maak sync-version~ rewrites those copies from that file.
 - The task is a few lines of plain Guile in [[file:../maak.scm][maak.scm]] rather than a module of the library, so it starts under any installed maak. It reads the version from the tree rather than from the library it is running under, so it writes the checkout's version even when an older maak is the one running it. ~maak sync-version DIR~ does the same for another checkout.
 - Each copy is found by a regular expression and only the version inside the match is replaced, so the spec's alignment and the installation page's wording stay the file's business.
 - The task finishes the release: it commits everything tracked that changed as ~chore: Release vX.Y.Z~ and tags that commit ~vX.Y.Z~. The commit is ~git commit -am~, so other modifications in the tree ride along; commit unrelated work first if it should not. A version whose tag already exists is refused rather than re-released, and a tree with nothing left to commit is tagged where it stands.
@@ -67,6 +70,21 @@ A release is then one edit and one command:
 $EDITOR src/maak/version.scm   # the only place the version is written by hand
 maak sync-version              # rewrite the copies, commit, and tag
 maak test                      # verify the released tree with the rest of the suite
+#+end_src
+
+Two copies are left to a person, because neither is a number in a file:
+
+- ~packaging/debian/changelog~ takes an entry per release, with its own date and
+  maintainer line. ~test/veritas/unit/version.scm~ compares the newest entry
+  with the program, so a release whose changelog was forgotten fails the suite
+  instead of shipping a package named after an older version.
+- ~packaging/arch/PKGBUILD~ carries a checksum of the release's archive, which
+  cannot be known until the tag is published. Write it after the push, from the
+  archive ~makepkg~ downloads:
+
+#+begin_src shell
+curl -sL https://github.com/jjba23/maak/archive/refs/tags/vX.Y.Z.tar.gz \
+  | sha256sum
 #+end_src
 
 Because the tag is cut before the suite runs, a failure afterwards means the release exists already: fix the tree, bump the version, and release again, rather than moving a tag that has been published.

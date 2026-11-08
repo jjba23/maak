@@ -1,3 +1,13 @@
+maak (0.14.1-1) unstable; urgency=medium
+
+  * Package the Arch recipe as well: its pkgver follows the release now, it
+    unpacks the directory makepkg actually creates, and it fetches the tag
+    from GitHub, where the releases are published.
+  * Ship the guide and the release notes with the package.
+  * The suite fails when a copy of the version lags behind the program.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Mon, 09 Nov 2026 00:30:00 +0000
+
 maak (0.8.3-1) unstable; urgency=medium
 
   * Initial Debian release (Closes: #1000000).

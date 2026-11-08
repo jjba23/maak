@@ -131,9 +131,22 @@ sudo apt install build-essential debhelper devscripts cme lintian guile-3.0-dev
 debuild -b -uc -us
 #+end_src
 
-* Arch Linux 🧪
+* Arch Linux
 
-TODO 🚧 — patches welcome, see [[file:community.org::#contributing][Contributing]].
+~packaging/arch/PKGBUILD~ builds a package from the archive of the release tag:
+it byte-compiles every module into the ~site-ccache~ that Guile reports through
+~pkg-config~, and installs the launcher, the completions, the manual page, the
+licence, the README and the guide. From a checkout:
+
+#+begin_src shell
+cd packaging/arch
+makepkg -si
+#+end_src
+
+~makepkg~ fetches =maak-VERSION.tar.gz= from the tag on GitHub, checks its
+checksum, builds it and installs the result. The recipe is in this repository
+rather than in the AUR, so a change to it is a change to a pull request here,
+and the checksum is refreshed from the published archive after each release.
 
 * Check the installation
 

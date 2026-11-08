@@ -44,6 +44,17 @@ Two kinds of spec sit in that directory, and the difference is what each one can
 
 The fixtures those tests use — a module with exports and one without, a Maak file with failing tasks for the keep-going flags, and a directory holding a Maak file of its own — live under ~test/maak/fixtures~ and are deliberately kept out of the directory the runner scans.
 
+Two specs check the tree rather than the library, and they are why a change to the packaging or to the guide does not need a reviewer with a good memory:
+
+- ~test/veritas/unit/version.scm~ compares every copy of the version — the RPM
+  spec, the Arch recipe, the manual page, the installation page and the newest
+  Debian changelog entry — with ~maak-version~. It found the Arch recipe two
+  releases behind and the changelog six.
+- ~test/veritas/unit/guide.scm~ resolves every ~file:~ link in the README, the
+  news and the pages under ~docs/~, checks that every ~::#anchor~ names a
+  ~CUSTOM_ID~ in the page it points at, and that every page under ~docs/~ is
+  linked from ~docs/index.org~. A page nobody lists is a page nobody finds.
+
 Three things are worth knowing when adding a test, because two of them fail quietly rather than loudly:
 
 - A case has to *evaluate to an assertion*, which is a procedure of one validation client. A bare ~assert-*~ call is one, and so is a ~let~ whose last form is one. A body that ends in ~(delete-file ...)~ is not: the case becomes no case at all, and the test passes without checking anything. Cleanup therefore belongs in a ~#:after~ hook, or in the ~after~ thunk of a ~dynamic-wind~ around the assertion, or before the assertion is built.
