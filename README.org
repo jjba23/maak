@@ -98,15 +98,65 @@ recorded in [[file:NEWS.org][NEWS.org]].
 
 * Who uses maak
 
-Projects that run their automation on maak (and make good reading if you want real Maak files to steal from):
+Forty-one projects run their automation on maak, and every one of them keeps a
+=maak.scm= worth reading if you want a real one to steal from. Six live on
+Codeberg, where their repository was born; the rest are on GitHub.
 
-- [[https://codeberg.org/jjba23/heks-linux][Heks GNU/Linux]] — the witches' GNU/Linux: modular, flexible, reproducible, powered by Lisp and Fedora/Debian + GNOME/Niri.
-- [[https://codeberg.org/jjba23/lucidplan][LucidPlan]] — project management (CMS) for everyone, free and open.
-- [[https://codeberg.org/jjba23/veritas][Veritas]] — unit, integration and black-box testing framework powered by Lisp (Guile Scheme).
-- [[https://codeberg.org/jjba23/mutastructura][Mutastructura]] — relational schema and database migrations powered by Lisp.
-- [[https://codeberg.org/jjba23/ggg][GGG (Guile Glyph Generator)]] — create SVG images, handy glyphs, org/markdown badges.
-- [[https://codeberg.org/jjba23/hygguile][Hygguile]] — a UI framework for cozy, professional user interfaces, with the power of Scheme.
+** Guile libraries and programs
+
+- [[https://github.com/jjba23/araneola][Araneola]] — a web crawler and sitemap generator, written purely in Lisp.
+- [[https://github.com/jjba23/bewaking][bewaking]] — authentication, authorisation and secure tokens in an expressive DSL.
+- [[https://github.com/jjba23/ggg][GGG (Guile Glyph Generator)]] — SVG images, handy glyphs and Org/Markdown badges.
+- [[https://github.com/jjba23/guile-openapi-generator][Guile OpenAPI Generator]] — turns an OpenAPI 3.x specification into Guile Scheme.
+- [[https://github.com/jjba23/hygguile][Hygguile]] — a UI framework for cozy, professional interfaces, with the power of Scheme.
+- [[https://codeberg.org/jjba23/kracht][kracht]] — utility methods and re-exports from Guile's standard library.
+- [[https://github.com/jjba23/mutastructura][Mutastructura]] — schema and database migrations in raw SQL, powered by Lisp.
+- [[https://github.com/jjba23/olive-css][Olive CSS]] — utility-class vanilla CSS in Tailwind's syntax, written in Lisp.
+- [[https://codeberg.org/jjba23/orgwebalchemy][OrgWebAlchemy]] — parses Org-mode with a PEG grammar and renders HTML, Markdown or SXML.
+- [[https://github.com/jjba23/scriba][scriba]] — structured logging: levelled, taggable and configurable.
+- [[https://github.com/jjba23/sift][sift]] — a Lisp, Scheme and Emacs Lisp formatter and linter.
 - [[https://codeberg.org/jjba23/sss][SSS (Supreme Sexp System)]] — a Lisp machine adventure where hacking culture is celebrated.
+- [[https://github.com/jjba23/veritas][Veritas]] — unit, integration and black-box testing framework powered by Lisp.
+- [[https://github.com/jjba23/iter-vitae][Iter Vitae]] — a résumé as code: the curriculum generator with a Lisp at its centre.
+
+** Programs with a life of their own
+
+- [[https://github.com/jjba23/byggsteg][Byggsteg]] — a CI/CD orchestrator written in Guile Scheme: a pipeline is a list.
+- [[https://github.com/jjba23/byggsteg-woodpecker][Byggsteg Woodpecker]] — the bridge between Woodpecker CI and Byggsteg pipelines.
+- [[https://github.com/jjba23/lambdock][lambdock]] — a Wayland-native desktop dock in C, Guile and GTK4, with a REPL.
+- [[https://codeberg.org/jjba23/lenkesamler][Lenkesamler]] — bookmarks kept in one Scheme file, written out as what browsers, Markdown, Org, CSV, JSON or XBEL read.
+- [[https://github.com/jjba23/lucidplan][LucidPlan]] — project management (CMS) for everyone, free and open.
+- [[https://github.com/jjba23/pingwing][PingWing]] — the free and open Lisp-powered notification nexus.
+- [[https://codeberg.org/jjba23/skapa][Skapa]] — project scaffolding and templating, as an interactive CLI wizard.
+- [[https://github.com/jjba23/symbanta][Symbanta]] — the web analytics API: privacy-friendly, free and open source.
+- [[https://github.com/jjba23/symbanta-dashboard][Symbanta Dashboard]] — its dashboard: a fast, frosted, single-page interface.
+- [[https://codeberg.org/jjba23/torikomi][Torikomi]] — a web service that sinks files from a URL into a directory.
+- [[https://github.com/jjba23/wikimusic][WikiMusic]] — a musical knowledge encyclopaedia and CMS, powered by Lisp.
+
+** Configurations, systems and clouds
+
+- [[https://github.com/jjba23/heks-linux][Heks GNU/Linux]] — the witches' GNU/Linux: modular, flexible, reproducible, powered by Lisp.
+- [[https://github.com/jjba23/heks-bash][Heks BASH]] — the declarative shell configuration that goes with it.
+- [[https://github.com/jjba23/heks-emacs][heks-emacs]] — the warlock's Emacs: modular, reproducible, built with Elpaca.
+- [[https://github.com/jjba23/guix-jointhefreeworld][guix-jointhefreeworld]] — a GNU Guix channel: a package collection Guix can pull.
+- [[https://github.com/jjba23/nix-jointhefreeworld][nix-jointhefreeworld]] — the same collection as a Nix flake and channel.
+- [[https://github.com/jjba23/wolk-jjba][wolk-jjba]] — a Lisp machine for the 21st century: a server and a personal cloud.
+
+** Editors
+
+- [[https://github.com/jjba23/maak.el][maak.el]] — maak's own Emacs front end: tasks, output and completion in the editor.
+- [[https://github.com/jjba23/modusregel][modusregel]] — a clean and beautiful Emacs mode line, built for performance.
+- [[https://github.com/jjba23/orpheus.el][orpheus.el]] — the Emacs music player that charms the streams.
+- [[https://github.com/jjba23/tekengrootte.el][tekengrootte.el]] — proportionally sized face sizes for Emacs.
+- [[https://github.com/jjba23/veritas.el][veritas.el]] — Veritas testing, understood and driven from Emacs.
+- [[https://github.com/jjba23/welkomscherm.el][welkomscherm.el]] — a small, calm, extensible welcome screen for Emacs.
+
+** Sites and assets
+
+- [[https://github.com/jjba23/jointhefreeworld][jointhefreeworld]] — a homepage, a blog and the movement's web site.
+- [[https://github.com/jjba23/carvoeiro-water-fun][Carvoeiro Water Fun]] — a boat cave tour rental site for Benagil and Lagoa.
+- [[https://github.com/jjba23/static-assets][static-assets]] — the fonts and images every project there shares.
+- [[https://github.com/jjba23/wip-site][wip-site]] — one status page for sites under construction, with no dependencies.
 
 Using maak in your project? Send a link and it can be listed here.
 
