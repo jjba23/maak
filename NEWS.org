@@ -14,6 +14,40 @@ Nothing yet.
 
 *[Released]*
 
+** v0.15.0 (2026-11-09)
+
+A packaging release: the Arch recipe builds, a release keeps every copy of the
+version in step, and two specs watch the things that used to rot in silence.
+
+*** Added
+
+- ~test/veritas/unit/version.scm~ compares every copy of the version — the RPM
+  spec, the Arch recipe, the manual page, the installation page and the newest
+  Debian changelog entry — with ~maak-version~, so a release whose copies were
+  not rewritten fails the suite instead of shipping a package two versions old.
+- ~test/veritas/unit/guide.scm~ resolves every ~file:~ link in the README, the
+  news and the pages under ~docs/~, checks each ~::#anchor~ against the
+  ~CUSTOM_ID~s of the page it points at, and checks that every page under
+  ~docs/~ is linked from the index.
+- The Arch page of the guide says how to build the package now, instead of
+  asking for a patch.
+
+*** Fixed
+
+- ~packaging/arch/PKGBUILD~ unpacked into the wrong directory: ~makepkg~
+  extracts the tag's archive as ~maak-VERSION~, and the recipe changed into
+  ~maak~, so it could not have built at all. Its ~pkgver~ said 0.12.2 and its
+  checksum was that archive's, and it fetched from a host the release tags are
+  not pushed to.
+- ~packaging/debian/changelog~ was six releases behind, at 0.8.3.
+
+*** Changed
+
+- ~maak sync-version~ writes the Arch ~pkgver~ as well, so the recipe follows a
+  release like the RPM spec and the manual page do. The changelog entry and the
+  Arch checksum stay in a person's hands, and
+  [[file:docs/project.org::#releasing][the releasing page]] says why.
+
 ** v0.14.1 (2026-11-08)
 
 A housekeeping release: the licence, the pipeline and the documentation are
