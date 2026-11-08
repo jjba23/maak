@@ -1,0 +1,57 @@
+#+title: Editors, shells and the REPL
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+* Shell completions
+
+maak ships completions for Bash, Zsh and Fish. In a directory with a Maak file, type ~maak~, a space, then TAB, and the task names appear. The completion scripts read the current Maak file and extract task names from it.
+
+The scripts live in ~scripts/~ and, in most situations, are installed for you. If you installed by hand, load them yourself — these variables are handy if you run Guix:
+
+#+begin_export html
+<details>
+  <summary>See a Bash example of manual completion load</summary>
+#+end_export
+
+#+begin_src shell
+#!/usr/bin/env bash
+maak_bin_install_dir=$(which maak)
+maak_install_dir=$(realpath "${maak_bin_install_dir}")
+maak_bin=$(dirname "${maak_install_dir}")
+maak_store=$(dirname "${maak_bin}")
+maak_completions="${maak_store}/share/bash-completion/completions/maak"
+
+# Load Maak auto-completions
+if [[ -f "${maak_completions}" ]]; then
+  source "${maak_completions}" || true
+fi
+#+end_src
+
+#+begin_export html
+</details>
+#+end_export
+
+* Emacs
+
+There is an Emacs integration, [[https://codeberg.org/jjba23/maak.el][maak.el]]:
+
+#+attr_html: :width 640px
+[[https://jointhefreeworld.org/static-assets/maak/maak-in-emacs.png]]
+
+maak also plays nicely with the AREI/Ares nREPL server (see the ~repl~ task in this repository), which is how the author drives tasks straight from Emacs.
+
+* The REPL workflow
+
+A REPL is an interactive environment connected to your console, your running application, your compiler — and it gives you superpowers as an engineer 🦸🏼. Lisp dialects, and Guile in particular, have excellent support for this. The author's own setup is [[https://guix.gnu.org/][Guix]], [[https://www.gnu.org/software/emacs/][Emacs]], [[https://git.sr.ht/~abcdw/emacs-arei][Arei/Ares]] and [[https://github.com/vspinu/sesman][sesman]]: an infinitely extensible editor experience, miles ahead of traditional IDEs 🐂.
+
+It fundamentally changes the development workflow by eliminating the slow /edit, save, compile, run/ cycle:
+
+- *Incremental development.* Write, test, inspect and evaluate one function — or one line — at a time, with immediate feedback and no full rebuild.
+- *Powerful debugging.* Forget ~print~ statements and restarts: pause, inspect objects, change values, redefine a broken function on the fly, in any environment.
+- *Fast prototyping.* Load a library and call its functions to learn it, which is much faster than reading documentation alone.
+
+Integrated into your editor, you can execute any piece of code (a line, a selection, a file) with a keyboard shortcut and see the result instantly.

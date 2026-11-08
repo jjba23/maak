@@ -1,0 +1,43 @@
+#+title: maak documentation
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:../README.org][← Project README]]
+
+maak runs the tasks of a =maak.scm= file, and a task is an ordinary Guile Scheme
+procedure. The guide is split by topic; each page links onward where a topic
+continues.
+
+| Document | What it covers |
+|----------+----------------|
+| [[file:features.org][Features]] | The whole list, in one page, from shell-free commands to the REPL. |
+| [[file:installation.org][Installing maak]] | Guix, Nix, container and distribution routes, the dependencies, and the check that it works. |
+| [[file:quick-start.org][Quick start]] | Your first Maak file: eight steps from a module to a dry run. |
+| [[file:tasks.org][Tasks]] | How a function becomes a task, what exports hide, how arguments arrive, and how =--list= lays them out. |
+| [[file:cli.org][The command line]] | Every option, the task-and-argument grammar, running several tasks, environment files and load paths. |
+| [[file:configuration.org][Configuration]] | The environment variables, and the Scheme parameters behind dry-run, quiet, the banner and escalation. |
+| [[file:builtins.org][The built-in toolkit]] | =run=, pipelines, jobs, file helpers, =task-error=, string helpers and the gettext workflow. |
+| [[file:guix-and-nix.org][Guix, Nix and reproducibility]] | The Guix and Nix helpers, and why a pin is a value a task can ask for. |
+| [[file:git-and-archives.org][Git, tar and zip]] | The release chores: committing, tagging and packing a commit. |
+| [[file:containers.org][Containers and Compose]] | Podman and Docker through one interface, Compose through either. |
+| [[file:niri.org][niri]] | Querying and driving the niri session from a task. |
+| [[file:downloads.org][Downloads with curl and wget]] | Fetching, reading and mirroring through one set of procedures. |
+| [[file:why-maak.org][Why maak, and why Lisp]] | What Make cannot do, what Scheme changes, and the table of Make flags that did carry over. |
+| [[file:editors.org][Editors, shells and the REPL]] | Completions for Bash, Zsh and fish, maak.el, and the REPL workflow. |
+| [[file:project.org][This repository's own automation]] | The tasks this checkout defines, and how a release is cut. |
+| [[file:development.org][Hacking on maak]] | The suite and the traps a spec can fall into, the API documentation, the man page. |
+| [[file:community.org][Community, contributing and conduct]] | Where to ask, how to send a patch, the AI policy and the code of conduct. |
+
+The everyday tools have modules of their own, so a Maak file can import just the
+one it needs: [[file:git-and-archives.org][=(maak git)= and =(maak archive)=]],
+[[file:containers.org][=(maak container)=]], [[file:niri.org][=(maak niri)=]] and
+[[file:downloads.org][=(maak net)=]]. Every procedure has a matching =-argv=
+builder where the command line has options worth inspecting; the builder is what
+the procedure feeds to =run=, what =--dry-run= prints, and what a test can
+assert without the tool installed.
+
+Start with [[file:installation.org][installation]] and the
+[[file:quick-start.org][quick start]] if you are new to the project, or go straight
+to [[file:tasks.org][tasks]] if you already have a =maak.scm= to run.

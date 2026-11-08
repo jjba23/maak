@@ -1,0 +1,100 @@
+#+title: Quick start: your first Maak file
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+* 1. Create ~maak.scm~
+
+In the root of your project, create a file named ~maak.scm~. The module must be named ~(maak)~, and importing ~(maak maak)~ is what puts ~run~, ~log-info~, ~task-error~ and the rest of the toolkit in scope:
+
+#+begin_src scheme
+(define-module (maak)
+  #:declarative? #t
+  #:use-module (maak maak))
+#+end_src
+
+* 2. Add a task
+
+Any function with or without arguments is a task:
+
+#+begin_src scheme
+(define (hello)
+  "Say hello from Maak!"
+  (log-info "Hello from Maak!"))
+#+end_src
+
+* 3. Run it
+
+#+begin_src shell
+maak hello
+#+end_src
+
+* 4. Give it arguments
+
+Arguments arrive as strings, because they come from a command line. Convert them explicitly:
+
+#+begin_src scheme
+(define (quick-math x-arg y-arg)
+  "Add two numbers given on the command line."
+  (let ((x (string->number x-arg))
+        (y (string->number y-arg)))
+    (format #t "~a + ~a = ~a\n" x y (+ x y))))
+#+end_src
+
+#+begin_src shell
+maak quick-math 23 42
+#+end_src
+
+* 5. See what there is
+
+~maak --list~ prints every task, with its docstring as documentation:
+
+#+begin_src shell
+maak --list
+#+end_src
+
+* 6. Define a default
+
+With no task named, maak runs ~default~:
+
+#+begin_src scheme
+(define (default)
+  "With no task named, list what there is."
+  (list-tasks))
+#+end_src
+
+* 7. Do something real
+
+Tasks build command lines out of ordinary strings. Here ~build~ makes a directory and shells out, and ~publish~ refuses politely when there is nothing to ship:
+
+#+begin_src scheme
+(define (build)
+  "Build the project into ./build."
+  (mkdir-p "build")
+  (run (list "guix" "build" "-f" "guix.scm")))
+
+(define (publish)
+  "Copy the built site to the server."
+  (unless (file-exists? "build/index.html")
+    (task-error "nothing to publish"
+                #:hint "Run `maak build' first."))
+  (run (list "rsync" "-av" "build/" "server:/srv/www")))
+#+end_src
+
+* 8. Look before you leap
+
+~-n~ / ~--dry-run~ prints the commands instead of running them, and ~-q~ / ~--quiet~ strips the decoration:
+
+#+begin_src shell
+maak -n build
+#+end_src
+
+#+begin_src
+[DRY-RUN]: mkdir -pv build
+[DRY-RUN]: guix build -f guix.scm
+#+end_src
+
+You now know ninety percent of maak. The rest of this document is the other ten percent, and it is where the fun lives.

@@ -1,0 +1,28 @@
+#+title: niri, from a task
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+~(maak niri)~ wraps ~niri msg~, both the queries and the actions. The queries can ask for JSON, and ~niri-capture~ returns the output as a string for the task to parse:
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak niri))
+
+(define (focus-web)
+  "Put the browser on workspace 2 and start it."
+  (niri-focus-workspace 2)
+  (niri-spawn '("firefox")))
+
+(define (screens)
+  "Show the outputs as niri describes them."
+  (niri-outputs #:json? #t))
+#+end_src
+
+- Queries: ~niri-version~, ~niri-outputs~, ~niri-workspaces~, ~niri-windows~, ~niri-layers~, ~niri-keyboard-layouts~, ~niri-focused-output~, ~niri-focused-window~, ~niri-pick-window~, ~niri-pick-color~, ~niri-overview-state~, ~niri-casts~, ~niri-request-error~.
+- Actions: ~niri-focus-workspace~, ~niri-focus-column~, ~niri-focus-monitor~, ~niri-focus-window~, ~niri-close-window~, ~niri-fullscreen-window~, ~niri-toggle-windowed-fullscreen~, ~niri-toggle-overview~, ~niri-spawn~, ~niri-spawn-sh~, ~niri-quit~, the three screenshot actions, the monitor power actions, the move-to-workspace and move-to-monitor actions, ~niri-set-window-width~, ~niri-set-column-width~, ~niri-set-workspace-name~ and ~niri-unset-workspace-name~.
+- Outputs: ~niri-output~ for a generic change, and ~niri-output-on~, ~niri-output-off~, ~niri-output-mode~, ~niri-output-scale~, ~niri-output-transform~, ~niri-output-position~ for the common ones.
+- ~niri~, ~niri-argv~, ~niri-action~, ~niri-action-argv~, ~niri-output-argv~ and ~niri-capture~ are the building blocks when a subcommand or flag has no wrapper.

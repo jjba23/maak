@@ -1,0 +1,156 @@
+#+title: The command line
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+* The command line
+
+** Options
+
+| Short | Long                   | Argument | Description                                                                    |
+|-------+------------------------+----------+--------------------------------------------------------------------------------|
+| ~-f~  | ~--file~               | ~FILE~   | Maak file to load (defaults to ~./maak.scm~).                                   |
+| ~-C~  | ~--directory~          | ~DIR~    | Change to ~DIR~ before the Maak file is read (repeatable; ~:~-separated allowed). |
+| ~-e~  | ~--env-file~           | ~FILE~   | Read ~NAME=VALUE~ assignments from ~FILE~ (repeatable; ~:~-separated allowed).   |
+|       | ~--no-env-file~        | None     | Read no environment file at all, whatever the environment says.                |
+| ~-h~  | ~--help~               | None     | Display the help screen and exit.                                              |
+| ~-i~  | ~--ignore-errors~      | None     | Keep going after a failure, and let the run succeed anyway.                    |
+| ~-j~  | ~--jobs~               | ~N~      | Run up to ~N~ tasks at the same time, keeping each task's output together.       |
+| ~-k~  | ~--keep-going~         | None     | A task that fails does not stop the tasks after it.                            |
+| ~-l~  | ~--list~               | None     | List every available task in the loaded Maak file.                             |
+| ~-t~  | ~--tasks~              | ~LIST~   | Run the tasks in ~LIST~ (comma separated), leaving every other word as an argument. |
+| ~-L~  | ~--load-path~          | ~DIR~    | Add ~DIR~ to Guile's load path (repeatable; ~:~-separated allowed).              |
+| ~-n~  | ~--dry-run~            | None     | Print shell commands instead of executing them.                                |
+|       | ~--no-print-directory~ | None     | Do not report the directories ~-C~ changes to.                                  |
+| ~-q~  | ~--quiet~              | None     | Quiet mode: no logging, banner or headers.                                     |
+| ~-v~  | ~--version~            | None     | Display the maak version and exit.                                             |
+|       | ~--banner~             | None     | Print the greeting banner (the default; overrides ~MAAK_NO_BANNER~).            |
+|       | ~--no-banner~          | None     | Skip the greeting banner, keeping everything else.                             |
+|       | ~--debug~              | None     | Print the Guile backtrace on error (same as ~MAAK_DEBUG=1~).                     |
+
+A manual page is installed with the program, so ~man maak~ shows the same options without leaving the terminal. In a checkout, ~maak man~ previews ~man/maak.1~.
+
+The greeting banner is printed by default. ~--no-banner~ keeps a run's output free of decoration, which is what a script wants, and ~MAAK_NO_BANNER=1~ does the same from the environment. ~--banner~ turns it back on, which is handy when the variable lives in a shell profile.
+
+** Naming tasks and passing arguments
+
+A run names the tasks it is to run, and the words that follow a task are passed to it as its arguments. A double-dash decides what the words around it are:
+
+#+begin_src shell
+# One task, given the arguments it takes
+maak quick-math 23 42
+
+# The same run, with -- setting the arguments apart.  This is how an argument
+# that begins with a dash gets through, unread as an option of maak's own
+maak quick-math -- -23 42
+
+# Two tasks, as one comma separated word, dry-run and quiet
+maak -n -q clean,build
+
+# The same two tasks, one word each: a -- before the first task word begins the
+# task list, and every word up to a further -- names a task
+maak -n -q -- clean build
+
+# Tasks named one word each, given arguments of their own after that further --
+maak -- clean build -- -v
+#+end_src
+
+A ~--~ *after* a task word does not change which words are tasks: everything that follows the first task word is an argument, whether or not it is set apart. So ~maak deploy production~ and ~maak deploy -- production~ are the same run — the task ~deploy~, given the word ~production~ — while ~maak -- deploy production~ names two tasks, ~deploy~ and ~production~. Name the tasks with ~-t LIST~ / ~--tasks LIST~ instead, and every other word of the line is an argument.
+
+That is the whole of the grammar, and the two spellings are the only two: a word never names a task and an argument at once, and a word that happens to name a task is still an argument when it is not the task list or one of the words a ~--~ introduces.
+
+When that is what happened, the run says so. A task handed a word it cannot take fails with Guile's complaint about arity, and when one of those words names a task of the same Maak file the failure carries a hint naming both spellings of the run that was probably meant:
+
+#+begin_src shell
+$ maak alpha beta
+maak: error: Wrong number of arguments to #<procedure alpha ()>
+        hint: `beta' names a task of this Maak file, so alpha received it as an argument.  To run several tasks, name them in one comma separated list (`maak alpha,beta') or one word each after `--' (`maak -- alpha beta'); a task's arguments are the words that follow its name.
+#+end_src
+
+** Running several tasks, and from another directory
+
+Four of maak's switches are Make's, because the situations they answer come up in any project and not only in a build:
+
+- ~-j~ / ~--jobs N~ runs up to N tasks at the same time. Each task gets a worker of its own, and its standard output and standard error are printed as one block, in the order the tasks were named, so a parallel run stays readable. A task that fails stops nothing — every named task has already been started, so ~-j~ has ~--keep-going~ for free — and the run fails at the end with the tasks that did not succeed. A task that changes the environment or the working directory changes its worker's copy, not its neighbours'.
+- ~-k~ / ~--keep-going~ keeps going after a task fails. Every failure is reported where it happened, naming the task that raised it, and the run fails at the end with the list of tasks that did not succeed. Without it the first failure ends the run, which is what a pipeline of tasks usually wants.
+- ~-i~ / ~--ignore-errors~ is the same run with a different verdict: the failures are warnings and the run still succeeds. It is what exercises the rest of a pipeline while one step is known to be broken.
+- ~-C~ / ~--directory~ changes directory before anything else — before the Maak file is found, before a ~.env~ beside it is read, and before any task runs — and says which directory it entered.
+
+#+begin_src shell
+# Run every task of the pipeline, and see all of the failures at once
+maak -k -- fmt,lint,test
+
+# Run the independent ones four at a time, each task's output kept in one block
+maak -j 4 -- fmt,lint,test
+
+# Run the tasks of another checkout's Maak file
+maak -C ../other-project -- build
+#+end_src
+
+~-C~ may be repeated, and the directories are entered in the order given, so ~maak -C build -C signatures -- sign~ runs from ~build/signatures~. A directory that is not there is an error rather than a quiet fallback, because a task must never run somewhere it was not asked to.
+
+The directory a run enters is reported, which is what Make's ~-w~ prints; ~--no-print-directory~ is the switch that leaves those lines out, for a run whose output is read by something other than a person. ~-q~ asks for that silence too, along with the rest of what the run would say.
+
+* Environment files
+
+Settings and credentials often live in a file rather than in the environment. maak reads one before it loads the Maak file, so the names are already in place for every task:
+
+1. ~-e FILE~ / ~--env-file FILE~ names a file. Repeat the flag, or separate several files with ~:~, to read more than one:
+   #+begin_src shell
+   maak -e .env -e .env.local -- deploy
+   #+end_src
+2. ~MAAK_ENV_FILE~ is read when no flag is given, with the same ~:~-separated shape:
+   #+begin_src shell
+   MAAK_ENV_FILE=".env:.env.local" maak deploy
+   #+end_src
+3. failing both, the ~.env~ file beside the Maak file is read when it exists.
+4. ~--no-env-file~ reads none of them.
+
+The file is a list of ~NAME=VALUE~ lines:
+
+#+begin_src shell
+# Comments and blank lines are skipped, and a line without a = is ignored.
+DATABASE_URL=postgres://localhost/dev
+QUOTED="a value with spaces"
+SINGLE='single quoted'
+#+end_src
+
+Surrounding quotes are removed, so ~QUOTED~ above holds ~a value with spaces~, and the rest of the line is taken as it stands: a value keeps its ~=~, its ~#~ and its inner spaces.
+
+A name the environment already has wins, so a file can hold a sensible default and a one-off ~DATABASE_URL=... maak deploy~ can still point a single run somewhere else. Every file that is read is reported, so a run says where its values came from.
+
+From Scheme, ~load-env-file~ reads one itself and returns the names it set (~#:override? #t~ when the file should win over the environment), and ~env-file-entries~ reads one without touching the environment at all.
+
+* Load paths: requiring your own modules
+
+A Maak file can be a thin front end over modules that live beside it. maak puts the directory of the Maak file itself on Guile's load path, and lets you add more from three angles:
+
+1. the ~-L~ / ~--load-path~ flag, repeatable or ~:~-separated:
+   #+begin_src shell
+   maak -L ./lib -L ./src -- build
+   #+end_src
+2. the ~MAAK_LOAD_PATH~ environment variable, a ~:~-separated list:
+   #+begin_src shell
+   MAAK_LOAD_PATH="./lib:./src" maak build
+   #+end_src
+3. from Scheme, inside a task or at the top of the Maak file:
+   #+begin_src scheme
+   (add-load-path! "./lib")            ;; for the rest of the run
+   (with-load-path '("./lib" "./src")  ;; only for the thunk
+     (lambda () (use-modules (mylib util))))
+   #+end_src
+
+All three feed Guile's own ~%load-path~, so they compose with whatever ~GUILE_LOAD_PATH~ is already set. ~with-load-path~ restores the path even when the thunk raises.
+
+One trap worth knowing: whether it is on the load path or not, a ~use-modules~ written *inside a task body* has no effect — it is expanded where it stands, not when the task runs. Import at the top level of the Maak file, as above, or load a module by name from inside a task:
+
+#+begin_src scheme
+(define (report)
+  (with-load-path '("./lib")
+    (lambda ()
+      (let ((util (resolve-module '(mylib util))))
+        (log-info "~a\n" ((module-ref util 'format-row) '(1 2 3)))))))
+#+end_src

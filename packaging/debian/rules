@@ -51,6 +51,18 @@ override_dh_auto_install:
 		install -m 0644 resources/help.txt debian/maak/usr/share/resources/help.txt; \
 	fi
 
+	# Documentation
+	mkdir -p debian/maak/usr/share/doc/maak
+	if [ -f "README.org" ]; then \
+		install -m 0644 README.org debian/maak/usr/share/doc/maak/README.org; \
+	fi
+	if [ -f "NEWS.org" ]; then \
+		install -m 0644 NEWS.org debian/maak/usr/share/doc/maak/NEWS.org; \
+	fi
+	if [ -d "docs" ]; then \
+		cp -r docs debian/maak/usr/share/doc/maak/docs; \
+	fi
+
 	# Shell completions
 	mkdir -p debian/maak/usr/share/bash-completion/completions
 	mkdir -p debian/maak/usr/share/fish/vendor_completions.d

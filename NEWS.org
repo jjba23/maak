@@ -1,0 +1,49 @@
+#+title: Changelog and News 📰
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+
+All notable changes to this project are documented in this file, one section per
+release tag. The version itself is written once, in =src/maak/version.scm=.
+
+This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic Versioning]].
+
+*[Unreleased]*
+
+Nothing yet.
+
+*[Released]*
+
+** v0.14.1 (2026-11-08)
+
+A housekeeping release: the licence, the pipeline and the documentation are
+brought in line with the sibling projects, and a release is no longer published
+from a floppy disk.
+
+*** Changed
+
+- The project is licensed under the *MIT License*, the same terms as =ggg=,
+  =iter-vitae=, =veritas= and =bewaking=. =COPYING= became =LICENSE=, every
+  source, script, test and packaging file carries an
+  =SPDX-License-Identifier: MIT= header, and the licence fields of the Nix
+  derivation, the Guix package, the RPM spec, the PKGBUILD and the Debian
+  copyright file all say MIT.
+- =maak --version= prints =License: MIT=, so a script that reads that line sees
+  the same answer the files give.
+- The README is a landing page now: it leads with the point that a task is a λ,
+  and the manual moved into =docs/=, one topic per page, indexed by
+  =docs/index.org=. Every page keeps the text it had; only the headings moved.
+- CI is a GitHub Actions workflow that calls the same Byggsteg pipeline the other
+  projects use, so =.woodpecker/byggsteg.yaml= is gone.
+- =maak sync-version= writes the version into =docs/installation.org= rather than
+  the README, which no longer carries a copy of it.
+
+*** Removed
+
+- =resources/maak-icon.png=, the floppy-disk mascot, and the copy of it embedded
+  in =resources/maak-banner.svg=. The banner keeps its terminal window, wordmark
+  and prompt.
+
+*** Added
+
+- =NEWS.org=, this file.

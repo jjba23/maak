@@ -1,0 +1,148 @@
+#+title: Installing maak
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+* Requirements
+
+- *GNU Guile 3.0 or newer* — maak is written in Guile Scheme and runs wherever Guile 3.0 runs.
+- *~bash~, ~coreutils~ and ~util-linux~* — for the ~scripts/maak~ launcher
+- *Tested on GNU/Linux but works anywhere Guile works* — the library itself is portable Scheme, but GNU/Linux is where it is built, packaged and exercised.
+- *Optional:* [[https://guix.gnu.org/][GNU Guix]] for reproducible environments (heartily recommended), or [[https://nixos.org/][Nix]] if that is your house.
+- *Optional tool modules:* ~git~, ~tar~ and ~zip~/ ~unzip~ for ~(maak git)~ and ~(maak archive)~; ~curl~ or ~wget~ for ~(maak net)~; ~podman~ or ~docker~ (and a Compose implementation) for ~(maak container)~; ~niri~ for ~(maak niri)~. Only the module that calls one needs it, and a missing program is reported as a missing program.
+- *Root escalation:* ~sudo~ or ~doas~, whichever the machine has, is used by ~#:sudo?~; neither is required unless a task asks for root.
+
+* On Guix (recommended)
+
+maak is Guix-first: the repository ships ~guix.scm~ (the package), ~manifest.scm~ (the development environment) and ~channels.scm~ (the pinned Guix revision), so you can install or try it without leaving the functional world.
+
+Install the current checkout into your profile:
+
+#+begin_src shell
+guix install -f ./guix.scm
+#+end_src
+
+Enter an environment with maak available, pinned to the channels this project was tested with:
+
+#+begin_src shell
+guix time-machine --channels=channels.scm -- shell -f guix.scm
+#+end_src
+
+Chain a command to it:
+
+#+begin_src shell
+guix time-machine --channels=channels.scm -- \
+     shell -f guix.scm -- \
+     maak --help
+#+end_src
+
+Or use the development manifest, which is how this repository itself runs its tasks:
+
+#+begin_src shell
+guix time-machine --channels=channels.scm -- \
+     shell -m manifest.scm -- \
+     guile -L ./src -c '((@(maak main) main))' --list
+#+end_src
+
+maak is also available *upstream in Guix* as ~maak~, in ~(gnu packages build-tools)~:
+
+#+begin_src shell
+guix install maak
+#+end_src
+
+Upstream currently carries an older release than this checkout; ~guix install -f ./guix.scm~ builds the tree in front of you.
+
+* On Nix
+
+The repository ships both a legacy ~default.nix~ and a flake:
+
+#+begin_src shell
+# Building via legacy Nix
+nix-build default.nix
+
+# Testing the result
+./result/bin/maak --help
+
+# Building via Nix Flakes
+nix build
+./result/bin/maak --list
+#+end_src
+
+* In a container (Podman / Docker)
+
+Prebuilt images live on Docker Hub:
+
+https://hub.docker.com/repository/docker/jjba23/maak/general
+
+You can also build one yourself with ~guix pack~ — see the ~package-docker~ task in ~maak.scm~ — and load the tarball with ~podman load < my.tar.gz~.
+
+Run maak from the container, binding your filesystem so your Maak file is visible:
+
+#+begin_src shell
+docker container run -v /home/joe:/home/joe \
+    docker.io/jjba23/maak:latest \
+    maak -f /home/joe/hacking/maak/maak.scm --list
+#+end_src
+
+* openSUSE and other RPM distributions
+
+~maak~ is packaged on OBS: https://build.opensuse.org/package/show/devel:tools:building/maak — download it there, or add the Zypper repository.
+
+To build the RPM locally on Tumbleweed, install the packaging tools and set up the developer directories (see also the ~rpm-build~ task):
+
+#+begin_src shell
+sudo zypper install rpm-build rpmdevtools osc rpmlint
+rpmdev-setuptree
+#+end_src
+
+Create the source tarball with ~git archive~ (or by copying the directory and running ~tar -cvzf~) and place it in =~/rpmbuild/SOURCES/=, then build:
+
+#+begin_src shell
+cp packaging/opensuse/maak.spec ~/rpmbuild/SPECS/
+rpmbuild -ba ~/rpmbuild/SPECS/maak.spec
+#+end_src
+
+You should end up with:
+
+#+begin_src shell
+~/rpmbuild/RPMS/x86_64/maak-0.14.0-0.x86_64.rpm
+~/rpmbuild/SRPMS/maak-0.14.0-0.src.rpm
+#+end_src
+
+Install and run it:
+
+#+begin_src shell
+sudo zypper install ~/rpmbuild/RPMS/x86_64/maak-0.14.0-0.x86_64.rpm
+maak --help
+#+end_src
+
+* Debian and Ubuntu (experimental) 🧪
+
+Install the build tools and compile the package (see also the ~deb-build~ task):
+
+#+begin_src shell
+sudo apt update
+sudo apt install build-essential debhelper devscripts cme lintian guile-3.0-dev
+
+# Unsigned binary build; copy packaging/debian/* to the root of the repo first
+debuild -b -uc -us
+#+end_src
+
+* Arch Linux 🧪
+
+TODO 🚧 — patches welcome, see [[file:community.org::#contributing][Contributing]].
+
+* Check the installation
+
+#+begin_src shell
+maak --version
+#+end_src
+
+#+begin_src
+maak 0.14.0
+License: MIT
+Homepage: https://codeberg.org/jjba23/maak
+#+end_src

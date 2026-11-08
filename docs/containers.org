@@ -1,0 +1,34 @@
+#+title: Containers and Compose
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+~(maak container)~ treats Podman and Docker as one interface. The engine is detected once (~podman~ when it is installed, then ~docker~), and ~MAAK_CONTAINER_ENGINE~ or the ~container-engine~ parameter chooses another:
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak container))
+
+(define (db-up)
+  "Start a throw-away PostgreSQL and wait until it answers."
+  (container-run "postgres:16" #:name "maak-db" #:detach? #t
+                 #:publish '("5432:5432")
+                 #:env '("POSTGRES_PASSWORD=secret"))
+  (container-exec "maak-db" '("pg_isready")))
+
+(define (stack-up)
+  "Bring the compose project up, rebuilding first."
+  (compose-up '()
+              #:file "compose.yml"
+              #:project "maak"
+              #:build? #t))
+#+end_src
+
+- Container commands: ~container-run~, ~container-build~, ~container-ps~, ~container-images~, ~container-stop~, ~container-rm~, ~container-exec~, ~container-logs~, ~container-pull~, ~container-push~, ~container-tag~, ~container-inspect~, plus ~container~ for anything else.
+- Compose commands: ~compose-up~, ~compose-down~, ~compose-build~, ~compose-logs~, ~compose-ps~, ~compose-exec~, ~compose-run~, ~compose-pull~, ~compose-restart~, ~compose-config~, plus ~run-compose~ for the rest.
+- ~container-argv~, ~container-run-argv~, ~container-build-argv~, the other ~-argv~ builders, ~compose-argv~ and the ~compose-*-argv~ builders expose the argument lists; ~container-output~ and ~compose-output~ read a command's output.
+- The Compose program is detected too: ~podman-compose~ when it is installed, otherwise ~podman compose~; Docker always uses ~docker compose~. ~MAAK_COMPOSE~ or ~container-compose-command~ overrides it.
+- ~container-available?~ and ~compose-available?~ answer whether the chosen program is on ~PATH~, so a task can give one clear error rather than a 127.

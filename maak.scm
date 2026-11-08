@@ -1,19 +1,7 @@
 ;; maak
-
+;;
+;; SPDX-License-Identifier: MIT
 ;; Copyright © Josep Bigorra <jjbigorra@gmail.com>
-
-;; maak is free software: you can redistribute it and/or modify
-;; it under the terms of the GNU General Public License as published by
-;; the Free Software Foundation, either version 3 of the License, or
-;; (at your option) any later version.
-
-;; maak is distributed in the hope that it will be useful,
-;; but WITHOUT ANY WARRANTY; without even the implied warranty of
-;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-;; GNU General Public License for more details.
-
-;; You should have received a copy of the GNU General Public License
-;; along with maak.  If not, see <https://www.gnu.org/licenses/>.
 
 (define-module (maak)
   #:declarative? #t
@@ -66,8 +54,8 @@
 ;; ====== The version's copies ======
 ;;
 ;; The version is written by hand once, in src/maak/version.scm.  The RPM spec,
-;; the manual page and the README cannot read a Scheme module, so they carry
-;; copies, and `sync-version' rewrites them from that file.
+;; the manual page and the installation page cannot read a Scheme module, so
+;; they carry copies, and `sync-version' rewrites them from that file.
 ;;
 ;; Which files carry a copy is this Maak file's business rather than the
 ;; library's, and the version is read from the working tree rather than from the
@@ -83,16 +71,16 @@
 ;; Each site is a file and a regular expression matching one place in it where
 ;; the version is written, with the version itself as the first group.  Only
 ;; that group is replaced, so the field's alignment, the `.TH' quoting and the
-;; wording of the README's sample output stay the file's business rather than
-;; this list's.
+;; wording of the installation page's sample output stay the file's business
+;; rather than this list's.
 (define version-sites
   '(("packaging/opensuse/maak.spec"
      . "Version:[ \t]+([0-9]+\\.[0-9]+\\.[0-9]+)")
     ("man/maak.1"
      . "maak ([0-9]+\\.[0-9]+\\.[0-9]+)")
-    ("README.org"
+    ("docs/installation.org"
      . "maak-([0-9]+\\.[0-9]+\\.[0-9]+)")
-    ("README.org"
+    ("docs/installation.org"
      . "maak ([0-9]+\\.[0-9]+\\.[0-9]+)")))
 
 (define* (sync-version #:optional (directory "."))
@@ -101,8 +89,9 @@ commit and tag the release.
 
 The version is written by hand once, in src/maak/version.scm, which is what
 `maak --version' prints and what default.nix reads while it evaluates the
-derivation.  The RPM spec, the manual page and the README cannot read a Scheme
-module, so they carry copies, and this task rewrites them from that file.
+derivation.  The RPM spec, the manual page and the installation page cannot
+read a Scheme module, so they carry copies, and this task rewrites them from
+that file.
 
 A release is then the whole ritual in one command: the copies are made to agree,
 everything tracked that changed is committed as `chore: Release vX.Y.Z', and
@@ -119,7 +108,8 @@ maak or by an older one already installed.
 
 Each copy is found by a regular expression over the file and only the version
 inside the match is replaced, so everything around it -- the spec's alignment,
-the manual page's quoting, the README's wording -- is left exactly as it was."
+the manual page's quoting, the installation page's wording -- is left exactly
+as it was."
   (define repo
     (if (string=? directory ".") "." directory))
 
@@ -515,7 +505,7 @@ A bare push does not send tags that are not annotated; `maak git-push --
 ;; last is read.  Both pass silently, so neither the exit status nor a count of
 ;; tests catches either one; what shows them is the report, where a test with no
 ;; case under it ran nothing at all.  That is why the suite is kept to one
-;; assertion per case and why the rules are written down in the README.
+;; assertion per case and why the rules are written down in docs/development.org.
 (define (test)
   "Run the project's unit test suite with Veritas.
 

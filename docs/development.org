@@ -1,0 +1,66 @@
+#+title: Hacking on maak
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+In systems where ~maak~ is already installed, a good way to compile from source and test all program functionality is a pure shell:
+
+#+begin_src shell
+guix shell --pure -f guix.scm \
+     bash coreutils util-linux-with-udev guile -- \
+     maak --list
+
+# Run the project tests
+guix time-machine --channels=channels.scm -- \
+     shell -f guix.scm --pure -- \
+     maak test
+#+end_src
+
+Before anything is installed, the launcher under ~scripts~ runs this checkout's own sources inside the environment ~manifest.scm~ declares:
+
+#+begin_src shell
+guix shell -m manifest.scm -- ./scripts/maak --list
+guix shell -m manifest.scm -- ./scripts/maak test
+guix shell -m manifest.scm -- ./scripts/maak man
+#+end_src
+
+* Tests
+
+The tests live under ~test/veritas/unit~ and are written with [[https://codeberg.org/jjba23/veritas][Veritas]]. ~maak test~ runs them; the same run by hand is:
+
+#+begin_src shell
+VERITAS_TEST_MODULE=veritas VERITAS_TEST_TOP_DIR=test \
+  VERITAS_TEST_TYPE=unit VERITAS_RUN_BENCHMARKS=false \
+  guix shell -m manifest.scm -- \
+  guile -L ./src -L ./test -c '((@ (veritas runner) run-tests))'
+#+end_src
+
+That has to be *this* checkout's maak, not the one an installed ~maak~ was built with. The Maak file beside it may ask for modules a released library does not have, and the mismatch shows up as ~no code for module (maak ...)~, which reads like a missing file rather than as a version problem. The launcher under ~scripts~ falls back to the sources beside it, so the checkout's own maak is one command away, inside the environment ~manifest.scm~ declares.
+
+Two kinds of spec sit in that directory, and the difference is what each one can see. Most of them call ~main~ in process with the output ports captured, which is how a test asserts on what a user reads while keeping a run cheap. What that cannot show is anything that belongs to the process rather than to the call: the exit status an operating system sees, which of the two streams a line went to, and the argument grammar of ~scripts/maak~ itself, which is what turns a command line into the Guile invocation ~main~ is handed. Those are what ~test/veritas/unit/integration.scm~ is for, running the launcher as a real subprocess. A suite run is the two together; nothing else starts the launcher, and nothing else reads the library the way a caller does.
+
+The fixtures those tests use — a module with exports and one without, a Maak file with failing tasks for the keep-going flags, and a directory holding a Maak file of its own — live under ~test/maak/fixtures~ and are deliberately kept out of the directory the runner scans.
+
+Three things are worth knowing when adding a test, because two of them fail quietly rather than loudly:
+
+- A case has to *evaluate to an assertion*, which is a procedure of one validation client. A bare ~assert-*~ call is one, and so is a ~let~ whose last form is one. A body that ends in ~(delete-file ...)~ is not: the case becomes no case at all, and the test passes without checking anything. Cleanup therefore belongs in a ~#:after~ hook, or in the ~after~ thunk of a ~dynamic-wind~ around the assertion, or before the assertion is built.
+- One assertion per case. A case is the value a form evaluates to, so an assertion wrapped in a body of several forms — a ~let~ around five ~assert-*~ calls, say — is evaluated while the file loads and then dropped: only the *last* form of the body is the case that runs and can fail. The four before it still run, but nothing reads their verdict, so they cannot fail the run. Write one assertion per form and give each one the setup it needs; a run of the CLI costs milliseconds, which is cheaper than a test that cannot fail.
+- Anything left directly in a ~suite~, outside any ~test~, is treated as a case of the suite, and its result is read as though it were an assertion: the run then dies with "could not read assertion success from unknown type". A parenthesis that closes a ~test~ a line too early is enough to do it.
+
+The first two fail quietly, and nothing catches them for you: the run exits 0 and a test that asserted nothing passes exactly where one that asserts does. The only sign is in the report, which prints the value of every case under the test it belongs to — a test with no line under it ran no case at all, and a case showing one value where two assertions were written means one of them was never read. Read the report, and prefer a test that can fail to a count of tests that passed.
+
+* Documentation
+
+The guide is the pages under ~docs/~: one topic each, linked from the
+[[file:index.org][documentation index]], with the whole set written in Org. The
+page that owns a feature is the page a change to it edits, and a flag or an
+environment variable is also written into the manual page.
+
+The technical Guile API documentation is generated from the sources with ~maak docs~ and published here:
+
+https://jointhefreeworld.org/api-docs/maak/API.html
+
+The manual page lives in ~man/maak.1~, is installed with the program, and is previewed by ~maak man~. ~maak --help~ and ~resources/help.txt~ carry the same option reference.

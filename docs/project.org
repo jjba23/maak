@@ -1,0 +1,72 @@
+#+title: This repository's own automation
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+The repository's automation is written in maak itself — read [[file:../maak.scm][maak.scm]] for the full source. Run ~maak --list~ (or ~./scripts/maak --list~ from a checkout) to see them with their docstrings.
+
+| Task                                   | What it does                                                     |
+|----------------------------------------+------------------------------------------------------------------|
+| ~default~                              | List the available tasks.                                        |
+| ~help~                                 | Display the program's help screen.                               |
+| ~man~                                  | Preview ~man/maak.1~ without installing anything.                |
+| ~version~                              | Print the version, license and homepage.                         |
+| ~sync-version~                         | Sync the version's copies, commit the release and tag it.        |
+| ~test~                                 | Run the unit test suite with Veritas.                            |
+| ~container~                            | Run the same suite inside a networkless Guix container.          |
+| ~repl~                                 | Development REPL (Ares nREPL server).                            |
+| ~dev~, ~hr~, ~hot-reload~              | Watch the tree and re-list tasks on every change.                |
+| ~pure-dev~                             | Pure, isolated development shell.                                |
+| ~nix-dev~, ~flake-check~               | Enter the Nix shell; validate the flake's outputs.               |
+| ~fmt~                                  | Format Scheme sources with ~guix style~.                         |
+| ~docs~                                 | Generate the API documentation.                                  |
+| ~deploy~                               | Generate and publish the documentation.                          |
+| ~package-docker~                       | Build a Docker image with ~guix pack~.                           |
+| ~git-*~                                | Thin wrappers around git: init, status, add, commit, tag, ...    |
+| ~package-tar~, ~package-zip~           | Write the last commit as a source tarball or zip.                |
+| ~push-docker-latest~, ~push-docker-tag~ | Push that image to Docker Hub.                                   |
+| ~deb-build~, ~rpm-build~               | Build the Debian and RPM packages.                               |
+| ~test-playground~                      | Play with temporary files and dry-run scopes.                    |
+| ~arithmetics~, ~vars~, ~quick-math~    | Small demonstrations of what a task can be.                      |
+
+* Git and source archives
+
+The ~git-*~ tasks are thin wrappers around the command of the same name: ~git-init~, ~git-status~, ~git-add~, ~git-commit~, ~git-tag~, ~git-branch~, ~git-switch~, ~git-pull~, ~git-push~ and ~git-log~. Each takes the arguments its command takes, so ~maak git-commit "feat: ..."~ runs ~git commit -am "feat: ..."~. The arguments reach git as a list rather than through a shell, so spaces and quotes in a message stay in one argument.
+
+~package-tar~ and ~package-zip~ write the last commit as ~maak-VERSION.tar.gz~ and ~maak-VERSION.zip~, under a ~maak-VERSION/~ prefix. They use ~git archive~, so the archive holds what git tracks in that commit: no ~.git~, no untracked files, and the single top-level directory the RPM spec's ~%autosetup~ expects.
+
+The wrappers live in [[file:../src/maak/git.scm][src/maak/git.scm]] as the module ~(maak git)~, so another project can import them and name its own tasks:
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak git))
+
+(define (save message)
+  "Commit every tracked change."
+  (git-commit message))
+#+end_src
+
+It also provides ~git~ itself for the commands without a wrapper and ~git-archive~, ~git-archive-tar~ and ~git-archive-zip~ for the archives, along with the wider set described under [[file:git-and-archives.org::#git][Git]] above -- fetch, merge, rebase, reset, stash, diff, remotes, and the ~git-output~ queries. This project's tasks reach the module when a task runs rather than importing it at the top of [[file:../maak.scm][maak.scm]], so the Maak file still loads under a maak too old to have it; such a task then says which maak it needs instead of failing on an unbound name.
+
+* Releasing
+
+The version is written by hand in one place: ~maak-version~ in [[file:../src/maak/version.scm][src/maak/version.scm]], which is what ~maak --version~ prints. Everything else follows it.
+
+- ~default.nix~ reads that file while it evaluates the derivation, so a Nix build cannot fall behind the program. There is no second copy there to remember.
+- The RPM spec, the manual page and [[file:installation.org][the installation page]] carry copies, because an RPM spec is parsed before its source is unpacked and a manual page is roff. ~maak sync-version~ rewrites those copies from that file.
+- The task is a few lines of plain Guile in [[file:../maak.scm][maak.scm]] rather than a module of the library, so it starts under any installed maak. It reads the version from the tree rather than from the library it is running under, so it writes the checkout's version even when an older maak is the one running it. ~maak sync-version DIR~ does the same for another checkout.
+- Each copy is found by a regular expression and only the version inside the match is replaced, so the spec's alignment and the installation page's wording stay the file's business.
+- The task finishes the release: it commits everything tracked that changed as ~chore: Release vX.Y.Z~ and tags that commit ~vX.Y.Z~. The commit is ~git commit -am~, so other modifications in the tree ride along; commit unrelated work first if it should not. A version whose tag already exists is refused rather than re-released, and a tree with nothing left to commit is tagged where it stands.
+
+A release is then one edit and one command:
+
+#+begin_src shell
+$EDITOR src/maak/version.scm   # the only place the version is written by hand
+maak sync-version              # rewrite the copies, commit, and tag
+maak test                      # verify the released tree with the rest of the suite
+#+end_src
+
+Because the tag is cut before the suite runs, a failure afterwards means the release exists already: fix the tree, bump the version, and release again, rather than moving a tag that has been published.

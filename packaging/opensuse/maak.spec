@@ -19,7 +19,7 @@ Name:           maak
 Version:        0.14.0
 Release:        0
 Summary:        Command runner à la Make using Guile Scheme
-License:        GPL-3.0-or-later
+License:        MIT
 URL:            https://codeberg.org/jjba23/maak
 Source0:        %{name}-%{version}.tar.gz
 BuildRequires:  bash-completion
@@ -78,8 +78,8 @@ install -D -m 0755 scripts/maak-completion.zsh %{buildroot}%{_datadir}/zsh/site-
 install -D -m 0644 man/maak.1 %{buildroot}%{_mandir}/man1/maak.1
 
 %files
-%license COPYING
-%doc README.org
+%license LICENSE
+%doc README.org NEWS.org docs
 %{_bindir}/maak
 %dir %{_datadir}/guile
 %dir %{_datadir}/guile/site

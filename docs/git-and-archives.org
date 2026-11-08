@@ -1,0 +1,58 @@
+#+title: Git, tar and zip
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+* Git
+:PROPERTIES:
+:CUSTOM_ID: git
+:END:
+
+~(maak git)~ wraps the commands a release or a check actually uses. The wrappers that take a subcommand of their own accept it as trailing arguments, so a new git subcommand does not need a new wrapper:
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak git))
+
+(define (save message)
+  "Commit every tracked change and show the result."
+  (git-add)
+  (git-commit message)
+  (git-log "-5"))
+
+(define (release-tag version)
+  "Tag the release, then push the tag."
+  (git-tag version #:message version)
+  (git-push "--follow-tags"))
+#+end_src
+
+- ~git-init~, ~git-clone~, ~git-status~, ~git-add~, ~git-commit~, ~git-tag~, ~git-branch~, ~git-switch~, ~git-checkout~, ~git-fetch~, ~git-pull~, ~git-push~, ~git-log~.
+- ~git-diff~, ~git-show~, ~git-merge~, ~git-rebase~, ~git-reset~, ~git-restore~, ~git-stash~, ~git-clean~, ~git-cherry-pick~, ~git-revert~, ~git-remote~, ~git-submodule~, ~git-config~, ~git-rev-parse~, ~git-describe~ — each takes the command's own flags.
+- ~git~ is the escape hatch: ~(git '("fetch" "--all"))~, and ~#:directory~ names another checkout.
+- ~git-output~ runs the same commands and *returns* what git printed, which is what a decision needs: ~git-current-branch~, ~git-current-revision~, ~git-describe-tag~, ~git-remote-url~, ~git-tags~, ~git-remotes~, ~git-dirty?~ are built on it.
+- ~git-archive~, ~git-archive-tar~ and ~git-archive-zip~ pack a commit -- what git tracks, with no ~.git~ and nothing untracked.
+
+* Tar and zip
+
+~(maak archive)~ builds the two archive formats a release usually ships. The arguments are a list of paths, a directory to read them from, and the options the format needs:
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak archive))
+
+(define (dist)
+  "Write the source tarball and zip beside the build."
+  (tar-create "maak-1.0.tar.gz" '("src" "README.org" "LICENSE")
+              #:directory "."
+              #:exclude '("*.go" "*.o"))
+  (zip-create "maak-1.0.zip" '("src" "README.org" "LICENSE")
+              #:directory "."
+              #:exclude '("*.go" "*.o")))
+#+end_src
+
+- ~tar-create~, ~tar-extract~, ~tar-list~ — the compressor follows the output's extension (~.tar.gz~, ~.tar.bz2~, ~.tar.xz~, ~.tar.zst~, or plain ~.tar~) unless ~#:compression~ names one. Extraction can ~#:strip-components~ and unpack into ~#:directory~.
+- ~zip-create~, ~zip-extract~, ~zip-list~ — ~#:recursive?~, ~#:exclude~, ~#:junk-paths?~ and ~#:overwrite?~ cover the usual cases. The zip is written beside the task's directory even when ~#:directory~ names the tree to read.
+- ~tar-create-argv~, ~tar-extract-argv~, ~tar-list-argv~, ~zip-create-argv~, ~zip-extract-argv~, ~zip-list-argv~ and ~tar-compression-option~ expose the command line for tests or logging.

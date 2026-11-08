@@ -1,0 +1,53 @@
+#+title: Configuration
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+maak is configured three ways, in increasing order of precision: command-line flags, environment variables, and Scheme parameters you set lexically inside a task.
+
+* Environment variables
+
+| Variable          | What it does                                                        |
+|-------------------+---------------------------------------------------------------------|
+| ~MAAK_ENV_FILE~   | Environment file(s) to read, ~:~-separated, when ~-e~ is not given.  |
+| ~MAAK_LOAD_PATH~  | Extra Guile load path entries, ~:~-separated.                        |
+| ~MAAK_NO_BANNER~  | Set to ~1~ to skip the greeting banner.                             |
+| ~MAAK_DEBUG~      | Set to ~1~ to print the Guile backtrace on error.                   |
+| ~MAAK_ELEVATE~    | The program that answers ~#:sudo?~: ~doas~, ~sudo~, or one with options. |
+| ~MAAK_CONTAINER_ENGINE~ | The container engine: ~podman~ or ~docker~.                  |
+| ~MAAK_COMPOSE~    | The Compose program, for example ~podman-compose~ or ~docker compose~. |
+| ~MAAK_FETCH~      | The downloader ~download~ uses: ~curl~ or ~wget~.                   |
+
+#+begin_src shell
+MAAK_ENV_FILE=".env:.env.local" MAAK_NO_BANNER=1 maak -- build
+#+end_src
+
+* Parameters: dry-run, quiet, banner, escalation
+
+Dry-run and quietness can be set globally with ~-n~ / ~-q~, but they are also Scheme parameters that can be overridden in lexical scope. That gives you precise control, and it is what makes destructive code safe to exercise in tests:
+
+#+begin_src scheme
+(define (fmt)
+  "Format Scheme source files according to the Guix style guide."
+  (syscall "ls") ;; this will run
+  ;; this will not
+  (parameterize ((dry-run? #t)
+                 (quiet? #f))
+    (delete-file-recursively "tmp")
+    ($ '("find . -maxdepth 8 -name '*.scm'"
+         "-type f -exec guix style -f {} \\;")
+       #:verbose? #t)))
+;; it will print instead of running
+;; [DRY-RUN]: rm -rfv tmp
+;; [DRY-RUN]: find . -maxdepth 8 -name '*.scm' -type f -exec guix style -f {} \;
+#+end_src
+
+~elevation-command~ is the same kind of parameter. It holds the program ~#:sudo?~ runs — detected as ~doas~ or ~sudo~ when maak starts — and can be pinned for one call, which is how a test keeps its expected command line independent of the machine:
+
+#+begin_src scheme
+(parameterize ((elevation-command "doas -n"))
+  ($ '("install -d /var/lib/maak") #:sudo? #t))
+#+end_src

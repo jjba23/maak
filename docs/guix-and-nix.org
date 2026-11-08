@@ -1,0 +1,85 @@
+#+title: Guix, Nix and reproducibility
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+* Guix
+
+The helpers come in two families. The first builds command lines — the
+environment, the container, the pack — and the second asks Guix for values, so
+a task can decide on what a pin actually contains.
+
+- ~manifest-shell~, ~program-shell~ and their ~time-machine-~ variants.
+- ~time-machine~ — any command, run by a Guix pinned to ~channels.scm~.
+- ~guix-shell~ — a shell described by a package list.
+- ~guix-container~ — ~guix shell --container~, optionally with ~--network~, ~-S~ shares and ~-E~ exposures.
+- ~guix-pack~ — build a ~guix pack~ (docker, squashfs, tarball).
+- ~guix-available?~ — whether a ~guix~ program is on ~PATH~.
+- ~guix-channels~ — the pins ~channels.scm~ names, as a ~(name . commit)~ alist.
+- ~guix-derivation~ — the derivation of a package at those pins; nothing is built.
+- ~guix-build~ — the same, built, answered with its store directory.
+- ~guix-program~ — run a program out of that directory, with the decorations ~run~ takes.
+- ~guix-derivation-at~, ~guix-build-at~, ~guix-program-at~ — the same against one Guix revision, without a ~channels.scm~ and without ~guix time-machine~.
+
+The command-line helpers take the same ~#:env~, ~#:sudo?~, ~#:dev-null?~,
+~#:allow-failure?~ and ~#:async?~ keywords as ~$~, and pass them to the command
+they build. The value helpers return Scheme data instead:
+
+#+begin_src scheme
+(define (report-pin)
+  "Show what channels.scm pins hello to, then run that hello."
+  (log-info "pinned: ~a\n" (cdr (assoc "guix" (guix-channels))))
+  (log-info "hello at that pin: ~a\n" (guix-build "hello"))
+  (guix-program "hello" '("--version"))
+
+  ;; one old tool, for one step, without touching the project's channels
+  (guix-program-at "0fb918d61609f3aadc2d8ecc212926b3bdfabb4c"
+                   "hello" '("--version")))
+#+end_src
+
+~guix-build~ hands back the store path rather than printing it,
+~guix-derivation~ stops one step earlier and names the recipe,
+~guix-program~ runs the binary that pin produced instead of whatever the
+machine has installed, and ~guix-channels~ reads the pins into a list a task
+can compare against. A package the pin does not have is a sentence about the
+name, not a Guix backtrace: ~no package named foo in that Guix revision~, with
+a hint. ~#:system~ selects a target system for a cross build, and
+~guix-program~ takes ~#:program~ when the binary is not named after the
+package (~~(guix-program "coreutils" '("-l" "/gnu/store") #:program "ls")~~).
+
+The dependency is loose on purpose. Nothing in maak imports a ~(guix ...)~
+module: the asking happens in ~guix repl~, Guix's own Guile, and the answer
+comes back as Scheme data. maak therefore builds and runs on a machine with no
+Guix at all, and only a task that calls one of these helpers gets a one-line
+error with a hint saying so. The price is a process per query — about a third
+of a second, plus the store connection — so ask when the answer matters rather
+than in a loop; ~cached-channel-instance~ makes the second question about the
+same pins cheap, and a channels file that has never been fetched is fetched
+here, with the network and the wait that takes. The query file is removed after
+it runs, except when Guix refuses to answer: then it is kept and the error
+names it, so the program can be run by hand to read what Guix itself said.
+
+* Nix
+
+Mirroring the Guix helpers, for machines that use Nix:
+
+- ~nix-shell~ (classic, ~shell.nix~), ~nix-develop~ (flakes), ~nix-build~, ~nix-flake-build~, ~nix-flake-check~, ~nix-run~.
+
+They take the same decorations as the Guix helpers and as ~$~.
+
+* On reproducibility: why GNU Guix?
+
+A build should never fail because "it worked on my machine." Reliable software development requires explicit, bit-for-bit reproducibility and a functional approach to package management and system deployment.
+
+[[https://jointhefreeworld.org/ggg/dist/gnu-guix.svg]]
+
+- *Declarative build graphs.* Packages are pure functions of their inputs, with no implicit system state.
+- *Programmable with Guile.* Full system and package configurations in [[https://www.gnu.org/software/guile/][Guile Scheme]] rather than rigid DSLs or static files.
+- *Time travel.* Rebuild the exact system state from any point in git history with ~guix time-machine~.
+- *Atomic operations.* Upgrade or roll back environments without orphaned dependencies or broken states.
+- *Unified tooling.* One tool manages development shells, isolated containers, package builds and full system configurations.
+
+maak inherits all of that for free, because a Maak file is just another Scheme file that Guix can evaluate — and because the same pin in ~channels.scm~ can drive the shell, the tests and the release. The pin is also readable from a task: ~guix-build~ and ~guix-program~ turn it into a store path and a program to run, which is what ~guix time-machine~ would otherwise have to be started for.

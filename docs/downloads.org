@@ -1,0 +1,37 @@
+#+title: Downloads with curl and wget
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+~(maak net)~ wraps the requests a task makes: download a file, read a URL into a string, check a status code, post JSON, upload an artefact, or mirror a documentation site. The defaults are the unattended ones -- redirects followed, HTTP errors raised, progress output silenced -- and every option is a keyword rather than a shell word:
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak net))
+
+(define (fetch-release version)
+  "Download the release tarball, resuming a partial file."
+  (download (string-append "https://example.org/maak-" version ".tar.gz")
+            #:output (string-append "maak-" version ".tar.gz")
+            #:continue? #t))
+
+(define (api-ok?)
+  "Ask the API for a record, and fail clearly when it is not there."
+  (= 200 (curl-status "https://example.org/api/health")))
+
+(define (publish-artifact path)
+  "Upload a build artefact with a bearer token."
+  (curl-upload "https://example.org/artifacts" path
+               #:headers (list (string-append "Authorization: Bearer "
+                                             (getenv "TOKEN")))))
+#+end_src
+
+- ~curl-get~, ~curl-text~, ~curl-head~, ~curl-status~, ~curl-post~, ~curl-download~ and ~curl-upload~ — the common curl requests. ~curl-get~ writes the body where curl normally does, ~curl-text~ returns it as a string, and ~curl-status~ answers with the HTTP code as a number.
+- ~wget-download~, ~wget-mirror~ and ~wget-text~ — the same jobs through wget, including ~#:continue?~, ~#:timestamping?~, ~#:no-clobber?~ and the recursive mirror options (~#:page-requisites?~, ~#:convert-links?~, ~#:cut-dirs~).
+- ~download~ chooses curl when it is installed, wget otherwise, or whatever ~MAAK_FETCH~ or the ~fetch-command~ parameter names. It takes the options both programs share, so a task does not have to know which one is present.
+- ~curl~ and ~wget~ are the escape hatches: ~(curl '("--http2" "-sS" url))~, with ~curl-output~ and ~wget-output~ returning what they printed.
+- ~curl-argv~, ~curl-get-argv~, ~curl-text-argv~, ~curl-head-argv~, ~curl-status-argv~, ~curl-post-argv~, ~curl-download-argv~, ~curl-upload-argv~, ~wget-argv~, ~wget-download-argv~, ~wget-mirror-argv~ and ~wget-text-argv~ expose the command line for tests or logging.
+- ~fetch-command~, ~detect-fetch-command~ and ~fetch-available?~ answer which downloader is in use, and whether it is on ~PATH~.

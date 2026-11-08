@@ -1,0 +1,62 @@
+#+title: Why maak, and why Lisp
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+* Coming from Make
+
+maak shares Make's command line wherever the two answer the same question, so a ~make~ habit usually lands:
+
+| ~make~                       | maak                                                              |
+|------------------------------+-------------------------------------------------------------------|
+| ~-f FILE~                     | ~-f/--file FILE~, and ~./maak.scm~ when it is not given            |
+| ~-C DIR~                      | ~-C/--directory DIR~, which also prints the directory it entered   |
+| ~-n/--dry-run~                | ~-n/--dry-run~                                                     |
+| ~-s/--silent~                 | ~-q/--quiet~ (Make's own ~-q~ asks a different question)            |
+| ~-k/--keep-going~             | ~-k/--keep-going~                                                  |
+| ~-i/--ignore-errors~          | ~-i/--ignore-errors~                                               |
+| ~-I DIR~                      | ~-L/--load-path DIR~                                               |
+| ~-h~, ~-v~                    | ~-h/--help~, ~-v/--version~                                        |
+| ~-w/--print-directory~        | the default with ~-C~; ~--no-print-directory~ leaves it out         |
+| ~-p/--print-data-base~        | ~--list~                                                           |
+| ~--debug~                     | ~--debug~ (the Guile backtrace of the error)                       |
+| ~-e/--environment-overrides~  | the environment already beats a ~.env~ file; ~-e~ is ~--env-file~ here |
+| ~.DEFAULT_GOAL~               | the ~default~ task, and a clear error when there is none            |
+| ~.PHONY~                      | nothing: every task runs when it is asked to                        |
+| ~MAKEFLAGS~, ~MFLAGS~         | ~MAAK_ENV_FILE~, ~MAAK_LOAD_PATH~, ~MAAK_NO_BANNER~, ~MAAK_DEBUG~   |
+| ~$(shell ...)~, ~$(wildcard ...)~ | any Scheme: ~run~, ~capture~, ~$~, ~file-exists?~               |
+| ~include other.mk~            | ~use-modules~, or ~load~ from a Maak file                           |
+
+Three families of Make options have no counterpart, and each is a design decision rather than an omission:
+
+- *File targets and timestamps.* Make decides whether to run a recipe by comparing the timestamps of files (~-B~, ~-t~, ~-o~, ~-W~, pattern rules, ~VPATH~, implicit rules). maak has no targets to compare and runs the task it was asked for; a task that wants to skip work says so itself, in Scheme, where the condition can be anything — a hash, a row in a database, a check over the network — and not only the age of a file.
+- *Parallel jobs.* maak's ~-j/--jobs N~ runs up to N tasks at once, each in a forked worker whose output is printed as one block in the order the tasks were named; a task that wants to do several things inside itself uses Guile's own concurrency, as the test suite here does with ~VERITAS_JOBS~. Make's jobserver machinery and the refinements of job control (~-l~, ~-S~, ~--output-sync~, ~--trace~) have no counterpart: the block is the output synchronisation, and the number of jobs is the only control.
+- *The Makefile language itself.* Variables, ~$(...)~ expansion and the recipe prefixes ~@~, ~-~ and ~+~ have nothing to do here: a Maak file is Scheme, and a task's commands are the strings it builds. ~-r~, ~-R~ and ~--warn-undefined-variables~ exist to tame built-in rules and variables that maak does not have; an unbound variable is already an error with a hint.
+
+* Why maak?
+
+** The trouble with Make
+
+Have you ever found Makefile to be repetitive, lacking expressiveness and having a weird, limited syntax and unexpected arcane behaviour?
+
+Many developers find GNU Make and related tooling frustrating despite its power. Makefiles often contain repetitive code, particularly when dealing with similar targets or file types: you may have to write a separate rule for every output file, even when the process is exactly the same. The limited syntax makes it hard to abstract that logic into reusable functions or macros, which leads to copy-paste.
+
+Make's syntax is a Domain-Specific Language, not a general-purpose programming language. It is powerful for managing dependencies and terrible for anything else. Defining variables, using conditionals, or looping over a list of items is surprisingly clunky and often requires arcane, non-standard constructs. And Make has many gotchas that trip up even experienced users.
+
+** What maak does differently
+
+maak gives you Scheme. You are not restricted to a limited, weird syntax: you can define functions to avoid repetition, create complex data structures, use control flow, and write data-driven builds that would be unthinkable in a Makefile. A loop over your source files replaces a rule per file.
+
+That also means you do not have to learn a new language to automate your project. Your existing Lisp knowledge transfers directly, and the code is easier to read, write and maintain because it is just code.
+
+maak is designed to be your central control plane. While Make focuses on building software from source, maak is a general-purpose command runner: tests, deployments, environment management, release chores, database migrations, documentation, whatever your project needs. It is a more flexible and more powerful alternative for all of your automation.
+
+** The philosophy of maak
+
+- *Lisp as the language of tasks.* Every build rule, every script, is a first-class Scheme function, so your automation is composable, readable and hackable.
+- *Purity and reproducibility.* maak believes in deterministic environments, which is why it integrates so well with GNU Guix 🐂.
+- *Small is beautiful.* No YAML, HOCON or INI, no hidden logic, no magic — just clean Scheme. Every part of maak can be read, understood and extended within a good afternoon of hacking ☕.
+- *Free as in freedom.* maak is free software under the MIT License, built to encourage curiosity, learning and contribution. You own your build logic; you can read it, change it and share it freely.

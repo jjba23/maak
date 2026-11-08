@@ -1,0 +1,67 @@
+#+title: Community, contributing and conduct
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+* Community and support
+
+Join the ~maak~ community to ask questions, discuss development, share configurations and screenshots, report issues, or just hang out:
+
+- *Issues and development:* [[https://codeberg.org/jjba23/maak][the Codeberg repository]].
+- *Chat, support, discussion, announcements:* [[https://jointhefreeworld.zulipchat.com/#narrow/channel/632494-maak][the maak Zulip community]].
+
+If you are unsure where to start, Zulip is recommended. Codeberg issues are also a good place for ideas, bugs and improvements. The backlog and Kanban boards live at https://lucidplan.jointhefreeworld.org/tickets/maak.
+
+If you like this work, you can [[https://bmc.link/jjbigorra][buy me a cup of coffee ☕]] so I can keep going with a lot of motivation.
+
+* Contributing
+:PROPERTIES:
+:CUSTOM_ID: contributing
+:END:
+
+Contributing to free software is a uniquely beautiful act: it embodies generosity, collaboration and empowerment.
+
+We welcome everyone to the maak project, and encourage contribution in all its forms — code, documentation, translations, bug reports, a well-argued complaint about an error message, or a Maak file from your own project that we can learn from. Feel free to contact the maintainer at <jjbigorra@gmail.com> to chat, discuss or give feedback.
+
+maak embodies the spirit of GNU: simplicity, freedom and curiosity. It is both a tool and a playground for learning Lisp-based automation. As you grow comfortable, extend it — define your own DSLs, orchestrate builds, automate your projects in elegant Scheme.
+
+** Reporting bugs and asking for features
+
+Open an issue on [[https://codeberg.org/jjba23/maak/issues][Codeberg]]. A useful report includes:
+
+- what you ran (the exact command line, including flags),
+- what you expected and what happened,
+- the maak version (~maak --version~) and how it was installed,
+- the smallest Maak file that still shows the problem, if there is one.
+
+** Sending patches
+
+1. Fork the repository and create a topic branch.
+2. Make the smallest change that solves the problem, in the style of the surrounding code.
+3. Run ~maak fmt~ to format Scheme sources the way the project does.
+4. Run the suite: ~guix shell -m manifest.scm -- ./scripts/maak test~. Everything must pass.
+5. If you changed behaviour, say so in the commit message *and* in the documentation (the page under =docs/=, the man page, or the docstring — whichever is closest to the change).
+6. Open a pull request on Codeberg, or mail a patch to <jjbigorra@gmail.com>.
+
+New tasks in this repository's own ~maak.scm~ always get a docstring, because that docstring is what ~maak --list~ shows to the next person.
+
+** AI policy
+
+This project adheres to the [[https://jointhefreeworld.org/blog/articles/personal/jointhefreeworld-ai-policy/index.html][jointhefreeworld AI (Artificial Intelligence) policy]].
+
+Our core principle is simple: *AI should assist human creativity and problem-solving, never replace human reasoning.*
+
+While tools like Large Language Models (LLMs) and interactive chatbots can be beneficial for reviewing, refactoring small functions, or acting as a sounding board, they should be used with moderation.
+
+We require a human in the loop for all contributions.
+
+** Code of conduct
+
+This project adheres to the jointhefreeworld code of conduct, available here:
+
+https://jointhefreeworld.org/blog/articles/personal/jointhefreeworld-code-of-conduct/index.html
+
+In summary, we foster an inclusive, respectful and cooperative environment for all contributors and users of this free software project. Inspired by the ideals of the GNU Project, we strive to uphold freedom, equality and community as guiding principles. We believe that collaboration in a community of mutual respect is essential to creating excellent free software.

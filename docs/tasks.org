@@ -1,0 +1,122 @@
+#+title: Tasks: how they work
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+* How tasks work
+
+** Any function is a task
+
+Every function you define in the Maak file becomes a runnable task, with or without arguments. There is no registration step and no table to keep in sync.
+
+Tasks can:
+
+- Run shell commands with ~run~, ~$~ and ~run-pipeline~.
+- Print logs with ~log-info~, ~log-error~ and ~log-separator~.
+- Call other maak tasks as plain function calls.
+- Use any Guile function you define, or import from a library.
+- Reach for the Guix helpers such as ~manifest-shell~, ~program-shell~, ~time-machine-manifest-shell~ and friends.
+
+You extend maak the same way you extend any Scheme program: by writing more Scheme.
+
+** Exports decide what is runnable
+
+- *Open fallback (no exports).* If you do not write an ~#:export~ directive in your module, or leave it empty, maak is "open season": every procedure in the file is a task.
+- *Strict lock (with exports).* If you export anything — say ~#:export (quick-math)~ — then only the exported procedures are tasks. Everything else becomes a private helper, hidden from the CLI and from ~--list~.
+
+That second rule is the quiet superpower: export four tasks, keep forty helpers, and your command line stays a menu rather than a dump.
+
+#+begin_src scheme
+(define-module (maak)
+  #:declarative? #t
+  #:use-module (maak maak)
+  #:export (build test deploy))
+
+(define (build)
+  "Build everything."
+  (run (list "make" "all")))
+
+(define (test)
+  "Run the tests."
+  (run (list "make" "check")))
+
+(define (deploy)
+  "Ship the tarball that `maak build' produced."
+  (run (list "scp" (artefact "app") "server:/srv/releases")))
+
+;; Not exported: a helper, invisible to `maak --list'
+(define (artefact name)
+  (string-append "build/" name ".tar.gz"))
+#+end_src
+
+** The default task
+
+If no task is named on the command line, maak runs ~default~. If there is no ~default~, you get a clear error rather than silence.
+
+#+begin_src scheme
+(define (default)
+  "The task `maak' runs with no arguments."
+  (list-tasks))
+#+end_src
+
+** Arguments are strings
+
+Task arguments always arrive as strings, because that is what a command line is. Convert them where they enter the task:
+
+#+begin_src scheme
+(define (scale factor)
+  "Multiply every number in ./data by FACTOR."
+  (let ((factor (string->number factor)))
+    (for-each (lambda (line)
+                (log-info "~a" (* factor (string->number line))))
+              (string-lines (read-file "data/numbers.txt")))))
+#+end_src
+
+** Do not shadow the built-ins
+
+Avoid task names that collide with names maak or Guile already provide — ~format~, ~display~, ~run~, ~test~ is fine but ~list~ is asking for trouble. Pick something specific: ~fmt~, ~lint~, ~check~, ~ship~.
+
+** Tasks calling tasks
+
+A task is a procedure, so calling one is a function call. No subprocess, no shell, no new interpreter:
+
+#+begin_src scheme
+(define (ci)
+  "Everything CI does, in order."
+  (fmt)
+  (lint)
+  (test))
+#+end_src
+
+When you *do* want a separate process — a clean environment, a different working directory, an exit status of its own — use ~run~ or ~$~.
+
+* How ~--list~ lays out docstrings
+
+The docstring of a task is its documentation. ~maak --list~ prints it in a way that stays readable no matter how long it is:
+
+- one line prints inline after the name:
+
+  #+begin_src
+  build: Compile the project.
+  #+end_src
+
+- two lines start inline and align the continuation under the documentation:
+
+  #+begin_src
+  build: Compile the project.
+         The result lands in ./target.
+  #+end_src
+
+- three or more lines become a block, with the name on its own line and every line of documentation indented to the same column:
+
+  #+begin_src
+  release:
+           Bump the version, tag the tree,
+           upload the artefacts and then
+           push the tag.
+  #+end_src
+
+Common source indentation is removed first, so a docstring written inside an indented procedure still reads flush left.
