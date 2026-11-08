@@ -14,6 +14,18 @@ Nothing yet.
 
 *[Released]*
 
+** v0.16.1 (2026-11-09)
+
+A wording release: the list of projects keeps the projects and loses the
+paragraph that counted them.
+
+*** Changed
+
+- The paragraph above the list is gone. The names, the groups and the closing
+  invitation to send a link stay; nothing on the page now says how many
+  projects there are, which is a number that was stale the moment it was
+  written.
+
 ** v0.16.0 (2026-11-09)
 
 The front page tells the truth about who this is for: the projects that run on

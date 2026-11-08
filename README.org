@@ -98,10 +98,6 @@ recorded in [[file:NEWS.org][NEWS.org]].
 
 * Who uses maak
 
-Forty-one projects run their automation on maak, and every one of them keeps a
-=maak.scm= worth reading if you want a real one to steal from. Six live on
-Codeberg, where their repository was born; the rest are on GitHub.
-
 ** Guile libraries and programs
 
 - [[https://github.com/jjba23/araneola][Araneola]] — a web crawler and sitemap generator, written purely in Lisp.

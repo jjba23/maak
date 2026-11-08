@@ -1,3 +1,10 @@
+maak (0.16.1-1) unstable; urgency=medium
+
+  * The list of projects that run on maak no longer opens with a paragraph
+    counting them.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Mon, 09 Nov 2026 00:32:00 +0100
+
 maak (0.16.0-1) unstable; urgency=medium
 
   * The README lists the forty-one projects that run their automation on maak,

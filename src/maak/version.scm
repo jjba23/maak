@@ -29,7 +29,7 @@
                          print-version))
 
 (define maak-version
-  "0.16.0")
+  "0.16.1")
 
 (define maak-homepage
   "https://codeberg.org/jjba23/maak")
