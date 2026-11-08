@@ -1,19 +1,7 @@
 ;; maak
-
+;;
+;; SPDX-License-Identifier: MIT
 ;; Copyright © Josep Bigorra <jjbigorra@gmail.com>
-
-;; maak is free software: you can redistribute it and/or modify
-;; it under the terms of the GNU General Public License as published by
-;; the Free Software Foundation, either version 3 of the License, or
-;; (at your option) any later version.
-
-;; maak is distributed in the hope that it will be useful,
-;; but WITHOUT ANY WARRANTY; without even the implied warranty of
-;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-;; GNU General Public License for more details.
-
-;; You should have received a copy of the GNU General Public License
-;; along with maak.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 ;;
@@ -170,7 +158,7 @@ tar is reading.  Passing an absolute OUTPUT that points inside the packed tree
 does, and tar then fails with \"file changed as we read it\".
 
 @example
-(tar-create \"maak-1.0.tar.gz\" (list \"src\" \"README.org\" \"COPYING\")
+(tar-create \"maak-1.0.tar.gz\" (list \"src\" \"README.org\" \"LICENSE\")
             #:exclude (list \"*.o\" \"*.go\"))
 (tar-create \"maak-1.0.tar.xz\" (list \".\") #:compression \"xz\")
 @end example"

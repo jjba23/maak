@@ -1,28 +1,16 @@
 ;; maak
-
+;;
+;; SPDX-License-Identifier: MIT
 ;; Copyright © Josep Bigorra <jjbigorra@gmail.com>
-
-;; maak is free software: you can redistribute it and/or modify
-;; it under the terms of the GNU General Public License as published by
-;; the Free Software Foundation, either version 3 of the License, or
-;; (at your option) any later version.
-
-;; maak is distributed in the hope that it will be useful,
-;; but WITHOUT ANY WARRANTY; without even the implied warranty of
-;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-;; GNU General Public License for more details.
-
-;; You should have received a copy of the GNU General Public License
-;; along with maak.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 ;;
 ;; The single place the program's version is written by hand, together with the
 ;; handful of facts the CLI reports about itself.  `--version' prints it, the
 ;; Nix derivation reads this file while it evaluates, and the copies that cannot
-;; read Scheme -- the RPM spec, the manual page and the README -- are rewritten
-;; from it by the `sync-version' task, which reads this file rather than the
-;; library it happens to be running under.  A release is therefore one edit,
+;; read Scheme -- the RPM spec, the manual page and the installation page --
+;; are rewritten from it by the `sync-version' task, which reads this file
+;; rather than the library it happens to be running under.  A release is therefore one edit,
 ;; not a search of the tree, and the suite fails while any copy disagrees with
 ;; this one.
 
@@ -47,7 +35,7 @@
   "https://codeberg.org/jjba23/maak")
 
 (define maak-license
-  "GPL-3.0-or-later")
+  "MIT")
 
 (define (maak-version-string)
   "Return the one-line version banner printed by `maak --version'."

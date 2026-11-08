@@ -1,19 +1,7 @@
 ;; maak
-
+;;
+;; SPDX-License-Identifier: MIT
 ;; Copyright © Josep Bigorra <jjbigorra@gmail.com>
-
-;; maak is free software: you can redistribute it and/or modify
-;; it under the terms of the GNU General Public License as published by
-;; the Free Software Foundation, either version 3 of the License, or
-;; (at your option) any later version.
-
-;; maak is distributed in the hope that it will be useful,
-;; but WITHOUT ANY WARRANTY; without even the implied warranty of
-;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-;; GNU General Public License for more details.
-
-;; You should have received a copy of the GNU General Public License
-;; along with maak.  If not, see <https://www.gnu.org/licenses/>.
 
 (define-module (maak maak)
   #:declarative? #t
@@ -379,7 +367,7 @@
 
 When the module declares exports, only those are considered; otherwise every
 procedure the module defines counts as a task.  See the export rules in the
-README."
+Tasks page of the documentation, docs/tasks.org."
   (let* ((mod (resolve-module module-name))
          (public-mod (module-public-interface mod))
          ;; Check if a public interface exists AND contains at least one export.
@@ -603,7 +591,8 @@ Args:
 
 Returns the value of the task procedure.  Raises a maak error when TASK does
 not name a runnable task, either because it is missing or because it exists but
-is not visible as a task (see the export rules in the README)."
+is not visible as a task (see the export rules in the Tasks page,
+docs/tasks.org)."
   (let* ((proc (get-module-var task))
          (proc-doc (and (maak-proc? proc) (procedure-documentation proc)))
          (valid-tasks (resolve-maak-tasks)))

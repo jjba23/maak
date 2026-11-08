@@ -10,7 +10,7 @@
 
 
     See more at: https://codeberg.org/jjba23/maak
-    License: GNU GPL v3 or newer
+    License: MIT
 
 Usage: maak [OPTIONS] [TASKS] [TASK_ARGS]...
        maak [OPTIONS] -- TASK [TASK...] [-- TASK_ARGS]...

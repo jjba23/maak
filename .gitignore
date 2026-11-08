@@ -1,6 +1,4 @@
 *.png
-# ... except the mascot the README and the banner show
-!resources/maak-icon.png
 .nrepl-port
 doc/
 tmp/

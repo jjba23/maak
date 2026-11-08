@@ -1,19 +1,7 @@
 ;; maak
-
+;;
+;; SPDX-License-Identifier: MIT
 ;; Copyright © Josep Bigorra <jjbigorra@gmail.com>
-
-;; maak is free software: you can redistribute it and/or modify
-;; it under the terms of the GNU General Public License as published by
-;; the Free Software Foundation, either version 3 of the License, or
-;; (at your option) any later version.
-
-;; maak is distributed in the hope that it will be useful,
-;; but WITHOUT ANY WARRANTY; without even the implied warranty of
-;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-;; GNU General Public License for more details.
-
-;; You should have received a copy of the GNU General Public License
-;; along with maak.  If not, see <https://www.gnu.org/licenses/>.
 
 (use-modules (guix gexp)
              (guix packages)
@@ -100,6 +88,6 @@ your tasks, build steps, repetitive tasks or other automation.
 With Maak you can easily call external shell commands and integrate with
 your existing scripts and tools.  It is inspired by the GNU Make utility
 but it does away with a lot of the complexity that comes with its history.")
-    (license license:gpl3+)))
+    (license license:expat)))
 
 maak

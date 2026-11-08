@@ -1,19 +1,7 @@
 ;; maak
-
+;;
+;; SPDX-License-Identifier: MIT
 ;; Copyright © Josep Bigorra <jjbigorra@gmail.com>
-
-;; maak is free software: you can redistribute it and/or modify
-;; it under the terms of the GNU General Public License as published by
-;; the Free Software Foundation, either version 3 of the License, or
-;; (at your option) any later version.
-
-;; maak is distributed in the hope that it will be useful,
-;; but WITHOUT ANY WARRANTY; without even the implied warranty of
-;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-;; GNU General Public License for more details.
-
-;; You should have received a copy of the GNU General Public License
-;; along with maak.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 ;;
@@ -28,7 +16,7 @@
 ;; sequentially rather than as fibers.
 ;;
 ;; Two rules shape how these tests are written, and breaking either one makes a
-;; test that cannot fail (see the Tests section of the README):
+;; test that cannot fail (see docs/development.org):
 ;;
 ;; - Every assertion is a case of its own, so it has to be a form of its own.
 ;;   A case is the value a form evaluates to, so a `let' that wrapped five
@@ -43,7 +31,7 @@
 ;;   and unset around the assertion rather than inside a hook.
 ;;
 ;; The fixture paths are relative to the project root, which is where the test
-;; runner is started from (see the Tests section of the README).
+;; runner is started from (see docs/development.org).
 
 ;;; Code:
 
