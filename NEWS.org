@@ -14,6 +14,20 @@ Nothing yet.
 
 *[Released]*
 
+** v0.16.0 (2026-11-09)
+
+The front page tells the truth about who this is for: the projects that run on
+maak are listed as a scan of the tree finds them, not as memory had them.
+
+*** Added
+
+- Forty-one projects, in five groups — libraries and programs, programs with a
+  life of their own, configurations and systems, editors, and sites — each with
+  a line saying what it is and a link to where its repository lives. Thirty-five
+  are on GitHub and six on Codeberg, which is what a scan of the checkouts, of
+  =gh repo view= and of the two hosts says; the seven that were listed before
+  were the ones that came to mind.
+
 ** v0.15.0 (2026-11-09)
 
 A packaging release: the Arch recipe builds, a release keeps every copy of the

@@ -1,3 +1,10 @@
+maak (0.16.0-1) unstable; urgency=medium
+
+  * The README lists the forty-one projects that run their automation on maak,
+    with a line about each and a link to its repository.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Mon, 09 Nov 2026 00:25:00 +0100
+
 maak (0.15.0-1) unstable; urgency=medium
 
   * The Arch recipe builds: it unpacks the directory makepkg creates, fetches
