@@ -14,6 +14,14 @@ Nothing yet.
 
 *[Released]*
 
+** v0.18.2 (2026-11-10)
+
+*** Added
+
+- The repository carries =.github/FUNDING.yml=, which points at
+  [[https://buymeacoffee.com/jjbigorra][Buy Me a Coffee]], so GitHub shows a
+  Sponsor button on the repository.
+
 ** v0.18.1 (2026-11-10)
 
 Editor support got a section of its own in the README, Emacs is named as the
