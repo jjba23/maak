@@ -1,3 +1,12 @@
+maak (0.18.0-1) unstable; urgency=medium
+
+  * The generated Zed task file is kept in step with the Maak file:
+    contrib/zed/maak-zed sync writes it after an edit and watch writes it
+    whenever the file changes.  The generated file carries the watch as a task
+    of its own.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Tue, 10 Nov 2026 19:05:00 +0100
+
 maak (0.17.0-1) unstable; urgency=medium
 
   * Editor integrations under contrib/, for Neovim, Vim, VS Code, Helix,

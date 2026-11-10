@@ -119,10 +119,13 @@ file is read, not evaluated, so no task runs.")
                (and (not (string=? parent dir)) (loop parent))))))))
 
 (define (read-forms path)
-  "Return the top-level forms of PATH.
+  "Return the top-level forms of PATH, or leave with an error.
 
-A file being edited may be unbalanced, and the tasks before the mistake are
-still worth showing, so the first form that cannot be read ends the walk."
+The file is read, not evaluated.  A file that cannot be read to the end is not
+half a task list: maak would refuse to load it too, and the tasks before the
+mistake are exactly the ones an editor would then show as if they were all of
+them.  That matters most for `--zed', whose output is written to a file: a
+half-typed Maak file must not overwrite a good task file with a short one."
   (call-with-input-file path
     (lambda (port)
       (let loop ((forms '()))
@@ -130,7 +133,8 @@ still worth showing, so the first form that cannot be read ends the walk."
           (lambda ()
             (let ((form (read port)))
               (if (eof-object? form) (reverse forms) (loop (cons form forms)))))
-          (lambda (key . args) (reverse forms)))))))
+          (lambda (key . args)
+            (die "~a does not read to the end, so its tasks are unknown" path)))))))
 
 (define (form-line form)
   "Return the line FORM starts on, or 0 when the reader did not say.
@@ -359,25 +363,46 @@ one maak binds."
          (cons "arguments"
                (json-array (map argument-json (list-ref task 2)))))))
 
+(define (zed-watch-task)
+  "Return the Zed task that keeps this file's generated list current.
+
+The generated tasks are a snapshot: they are stale the moment the Maak file
+changes, and Zed has no hook that could ask again.  `maak-zed watch' rewrites
+the task file when the Maak file changes, and Zed reloads that file, so
+starting this task once is what keeps the spawn list current while the editor
+is open."
+  (json-object
+   (list (cons "label" (json-string "maak: watch tasks"))
+         (cons "command" (json-string "maak-zed"))
+         (cons "args" (json-array (list (json-string "watch"))))
+         (cons "cwd" (json-string "$ZED_WORKTREE_ROOT"))
+         (cons "tags" (json-array (list (json-string "maak"))))
+         ;; A watch runs until it is stopped, so it wants a terminal of its
+         ;; own instead of the one the last task left behind.
+         (cons "use_new_terminal" "true"))))
+
 (define (zed-json tasks)
   "Return the tasks as the .zed/tasks.json Zed reads.
 
 Zed has no discovery hook: it reads a static tasks file, so this is generated
-once and generated again when the Maak file changes."
+by `maak-tasks --zed', and kept current by `maak-zed watch', which is the last
+entry in the list."
   (json-array
-   (map (lambda (task)
-          (let ((summary (first-line (list-ref task 1))))
-            (json-object
-             (list (cons "label"
-                         (json-string
-                          (if (string=? summary "")
-                              (format #f "maak: ~a" (car task))
-                              (format #f "maak: ~a — ~a" (car task) summary))))
-                   (cons "command" (json-string "maak"))
-                   (cons "args" (json-array (list (json-string (car task)))))
-                   (cons "cwd" (json-string "$ZED_WORKTREE_ROOT"))
-                   (cons "tags" (json-array (list (json-string "maak"))))))))
-        tasks)))
+   (append
+    (map (lambda (task)
+           (let ((summary (first-line (list-ref task 1))))
+             (json-object
+              (list (cons "label"
+                          (json-string
+                           (if (string=? summary "")
+                               (format #f "maak: ~a" (car task))
+                               (format #f "maak: ~a — ~a" (car task) summary))))
+                    (cons "command" (json-string "maak"))
+                    (cons "args" (json-array (list (json-string (car task)))))
+                    (cons "cwd" (json-string "$ZED_WORKTREE_ROOT"))
+                    (cons "tags" (json-array (list (json-string "maak"))))))))
+         tasks)
+    (list (zed-watch-task)))))
 
 (define (tasks-json path tasks)
   (json-object

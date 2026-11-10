@@ -80,4 +80,15 @@ check "zed runs the task in the worktree root" \
 found="$(cd "$(dirname "$fixture")" && "$helper" --names)"
 check "the nearest maak.scm is found upward" "$found" '^deploy$'
 
+# A file that cannot be read to the end is refused, not half listed: an editor
+# would otherwise show a list that is quietly short, and the Zed writer would
+# overwrite a good task file with it.
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+printf '(define (build "unterminated\n' >"$work/broken.scm"
+status=0
+output=$("$helper" --file "$work/broken.scm" 2>&1) || status=$?
+check "a file that does not read is refused" "$status" '^2$'
+check "the refusal names the file" "$output" 'broken\.scm does not read to the end'
+
 printf 'ok: %d checks passed\n' "$pass"

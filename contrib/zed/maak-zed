@@ -1,0 +1,177 @@
+#!/bin/sh
+# maak-zed -- keep .zed/tasks.json in step with maak.scm
+#
+# SPDX-License-Identifier: MIT
+# Copyright © Josep Bigorra <jjbigorra@gmail.com>
+#
+#; Commentary:
+#
+# Zed reads its tasks from .zed/tasks.json and has no hook that could ask for
+# them at runtime, so `maak-tasks --zed' writes that file.  This keeps it
+# written: `sync' for after an edit, `watch' for not having to remember to run
+# sync at all.
+#
+# A file whose content is already right is left alone, mtime and all, because
+# Zed reloads the task list when the file changes and a rewrite for nothing is
+# a reload for nothing.
+
+set -eu
+
+program=$(basename -- "$0")
+helper=${MAAK_TASKS:-maak-tasks}
+file=
+interval=1
+target=
+
+usage() {
+  cat <<'EOF'
+usage: maak-zed sync  [--file FILE] [--helper PATH]
+       maak-zed watch [--interval SECONDS] [--file FILE] [--helper PATH]
+
+sync  writes the .zed/tasks.json that Zed reads, next to the Maak file, and
+      says whether it had to write it.
+watch does that once, then again whenever the Maak file changes.  Zed reloads
+      the task list when the file appears, so one watch keeps the spawn list
+      current for as long as it runs.
+
+  --file FILE         the Maak file to read; by default the nearest maak.scm in
+                      this directory or above
+  --helper PATH       the maak-tasks script; by default maak-tasks on PATH
+  --interval SECONDS  how often watch looks; 1 second by default
+  -h, --help          this text
+EOF
+}
+
+die() {
+  printf '%s: %s\n' "$program" "$*" >&2
+  exit 2
+}
+
+stamp_of() {
+  # cksum is POSIX, unlike stat's mtime formatting, and a change of either the
+  # size or the bytes is what we are watching for.
+  if [ -f "$file" ]; then
+    cksum -- "$file"
+  else
+    printf 'missing\n'
+  fi
+}
+
+sync_tasks() {
+  directory=$(dirname -- "$file")
+  target=$directory/.zed/tasks.json
+  scratch=$target.scratch.$$
+
+  mkdir -p -- "$directory/.zed"
+
+  if ! "$helper" --file "$file" --zed >"$scratch"; then
+    rm -f -- "$scratch"
+    printf '%s: %s could not be read, so %s was left alone\n' \
+      "$program" "$file" "$target" >&2
+    return 1
+  fi
+
+  if [ -f "$target" ] && cmp -s -- "$scratch" "$target"; then
+    rm -f -- "$scratch"
+    printf '%s: %s is up to date\n' "$program" "$target"
+    return 0
+  fi
+
+  mv -- "$scratch" "$target"
+
+  # The JSON is one line per entry, not one line per file, so count the entries
+  # rather than the lines, and leave out the watch task this adds itself.
+  entries=$(grep -o -- '"label"' "$target" | wc -l | tr -d ' ')
+  printf '%s: wrote %s (%s tasks)\n' "$program" "$target" \
+    "$((entries - 1))"
+}
+
+watch_tasks() {
+  sync_tasks || true
+
+  stamp=$(stamp_of)
+  # stderr, so the line is not held in a pipe's buffer until the watch ends.
+  printf '%s: watching %s every %s s for changes; Ctrl-C stops\n' \
+    "$program" "$file" "$interval" >&2
+
+  trap 'printf "\n%s: stopped\n" "$program" >&2; exit 0' INT TERM
+
+  while :; do
+    sleep "$interval"
+    current=$(stamp_of)
+    # A deleted .zed/tasks.json counts as a change, or the watch would keep
+    # running with nothing for Zed to read.
+    if [ "$current" != "$stamp" ] || [ ! -f "$target" ]; then
+      stamp=$current
+      sync_tasks || true
+    fi
+  done
+}
+
+case ${1:-} in
+  sync | watch) command=$1 ;;
+  -h | --help | help)
+    usage
+    exit 0
+    ;;
+  '') die "name a command: sync or watch" ;;
+  *) die "unknown command $1; try --help" ;;
+esac
+shift
+
+while [ $# -gt 0 ]; do
+  case $1 in
+    --file)
+      [ $# -ge 2 ] || die "--file needs a path"
+      file=$2
+      shift 2
+      ;;
+    --helper)
+      [ $# -ge 2 ] || die "--helper needs a path"
+      helper=$2
+      shift 2
+      ;;
+    --interval)
+      [ $# -ge 2 ] || die "--interval needs a number of seconds"
+      interval=$2
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *) die "unknown option $1; try --help" ;;
+  esac
+done
+
+# Name the helper before a task is written with it: a recipe that fails once per
+# save is worse than a line now.
+case $helper in
+  */*) [ -x "$helper" ] || die "no executable at $helper" ;;
+  *) command -v "$helper" >/dev/null 2>&1 ||
+    die "no $helper on PATH; install contrib/bin/maak-tasks or pass --helper" ;;
+esac
+
+if [ -z "$file" ]; then
+  directory=$(pwd -P)
+  while :; do
+    if [ -f "$directory/maak.scm" ]; then
+      file=$directory/maak.scm
+      break
+    fi
+    [ "$directory" = / ] && die "no maak.scm here or above; --file names one"
+    directory=$(dirname -- "$directory")
+  done
+else
+  [ -f "$file" ] || die "no such file: $file"
+  case $file in
+    /*) ;;
+    *) file=$(pwd -P)/$file ;;
+  esac
+fi
+
+if [ "$command" = watch ]; then
+  watch_tasks
+else
+  sync_tasks || exit 1
+fi

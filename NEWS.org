@@ -14,6 +14,33 @@ Nothing yet.
 
 *[Released]*
 
+** v0.18.0 (2026-11-10)
+
+Zed's task list stops being a snapshot: =maak-zed= writes it again when the
+Maak file changes, and the generated file carries the task that does the
+writing.
+
+*** Added
+
+- =contrib/zed/maak-zed=: =sync= writes =.zed/tasks.json= beside the nearest
+  =maak.scm=, and =watch= writes it again whenever that file changes.  Neither
+  rewrites a file whose content is already right, so Zed is not made to reload
+  its task list for nothing.
+- The generated Zed file ends with a =maak: watch tasks= task, which runs that
+  watch in a terminal of its own: start it once and the spawn list follows the
+  Maak file for as long as the editor is open.
+- =contrib/test/maak-zed.sh= covers syncing from a subdirectory, the no-op
+  rewrite, regeneration after an edit, a Maak file that does not read, and the
+  watch, including a task file deleted underneath it.
+
+*** Changed
+
+- =maak-tasks= refuses a Maak file that does not read to the end instead of
+  listing the tasks before the mistake.  A file looks like that halfway
+  through an edit, and the short list was worth showing only until something
+  wrote it out; =maak-zed= now leaves the task file it wrote alone until the
+  Maak file reads again.
+
 ** v0.17.0 (2026-11-10)
 
 Seven editors, one reader of the Maak file: the integrations in =contrib/= now

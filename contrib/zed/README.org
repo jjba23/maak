@@ -4,15 +4,18 @@
 
 Zed reads its tasks from a file rather than discovering them, so the integration
 is a generated =tasks.json=: one Zed task per maak task, each labelled with the
-first line of the task's docstring and run in the worktree root.
+first line of the task's docstring and run in the worktree root.  Because the
+file is generated, it is also kept generated: =maak-zed= rewrites it when the
+Maak file changes, so the spawn list does not go stale under you.
 
 * Requirements
 
 - Zed, with tasks enabled (they are in stable Zed).
 - Guile, which maak itself needs.
-- [[../bin/maak-tasks][=maak-tasks=]] next to your shell, or given as a path:
+- [[../bin/maak-tasks][=maak-tasks=]] and [[maak-zed][=maak-zed=]] next to your shell, or given as paths:
   #+begin_src shell
   install -m 755 contrib/bin/maak-tasks ~/.local/bin/maak-tasks
+  install -m 755 contrib/zed/maak-zed     ~/.local/bin/maak-zed
   #+end_src
 
 * Generate the tasks file
@@ -20,12 +23,14 @@ first line of the task's docstring and run in the worktree root.
 From the root of the project — the directory that holds =maak.scm=:
 
 #+begin_src shell
-mkdir -p .zed
-maak-tasks --zed > .zed/tasks.json
+maak-zed sync
 #+end_src
 
 Then *tasks: spawn* (=alt-t=) lists them: =maak: build — Compile everything.=,
-=maak: deploy — Ship the build to the server.= and so on.
+=maak: deploy — Ship the build.= and so on.  =maak-zed sync= finds the
+=maak.scm= in this directory or above and writes =.zed/tasks.json= beside it, so
+it works from anywhere in the project.  (=mkdir -p .zed && maak-tasks --zed >
+.zed/tasks.json= is the same thing without the convenience.)
 
 The generated file looks like this:
 
@@ -37,8 +42,51 @@ The generated file looks like this:
     "args": ["build"],
     "cwd": "$ZED_WORKTREE_ROOT",
     "tags": ["maak"]
+  },
+  {
+    "label": "maak: watch tasks",
+    "command": "maak-zed",
+    "args": ["watch"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "tags": ["maak"],
+    "use_new_terminal": true
   }
 ]
+#+end_src
+
+* Keeping it up to date
+
+A generated file is a snapshot, and editing =maak.scm= makes it one that is
+wrong.  Two ways to keep it right:
+
+#+begin_src shell
+maak-zed sync     # after an edit
+maak-zed watch    # or: for as long as it runs
+#+end_src
+
+=maak-zed sync= compares before it writes.  A file whose content is already
+right is left alone, mtime and all, because Zed reloads the task list when the
+file changes and a rewrite for nothing is a reload for nothing.
+
+=maak-zed watch= syncs once and then polls the Maak file's checksum — every
+second, or =--interval SECONDS= — and rewrites the task file when it changes.
+Zed watches that file, so the spawn list follows the Maak file while the watch
+runs.  It survives a Maak file that does not read yet, which is what the file
+looks like halfway through an edit, and it runs until Ctrl-C.
+
+The last task in the generated list, =maak: watch tasks=, is that watch.  Start
+it once from *tasks: spawn*, leave it in its terminal, and the rest of the list
+stays current for the session.  Stop it with Ctrl-C in its terminal.
+
+Both commands take =--file= to name a Maak file, =--helper= to name the
+=maak-tasks= script, and =MAAK_TASKS= to do the latter from the environment.
+
+A project can also make syncing a task of its own:
+
+#+begin_src scheme
+(define (zed-tasks)
+  "Write .zed/tasks.json from this Maak file."
+  (run '("maak-zed" "sync")))
 #+end_src
 
 * Two things Zed cannot do
@@ -47,20 +95,7 @@ Zed's tasks are static, so two things the other integrations do have no
 counterpart here:
 
 - *Arguments are not prompted for.*  A task that needs one needs a task of its
-  own.  Write a wrapper task in =maak.scm= with the argument fixed, then
-  regenerate.
+  own.  Write a wrapper task in =maak.scm= with the argument fixed, then let the
+  watch rewrite the file.
 - *No dry run through the picker.*  Add ="-n"= to the =args= of the generated
   task by hand, or generate into a second file with a small edit.
-
-Regenerate after changing =maak.scm=; the labels and the list both come from the
-file.  A project can also keep the generator in its own =maak.scm=:
-
-#+begin_src scheme
-(define (zed-tasks)
-  "Write .zed/tasks.json from this Maak file."
-  (mkdir-p ".zed")
-  (run (list "maak-tasks" "--zed") #:redirect '("> .zed/tasks.json")))
-#+end_src
-
-(A redirection is what this needs; ~run~ passes an argument list, so a shell is
-the tool for it here.)

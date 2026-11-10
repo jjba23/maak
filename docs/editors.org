@@ -56,7 +56,7 @@ install -m 755 contrib/bin/maak-tasks ~/.local/bin/maak-tasks
 | Vim          | =:Maak= picks from a numbered menu and runs in a terminal tab.          | [[file:../contrib/vim/README.org][contrib/vim]]        |
 | VS Code      | The command palette, and =Tasks: Run Task=, running in a terminal.      | [[file:../contrib/vscode/README.org][contrib/vscode]]     |
 | IntelliJ     | *Tools → Run maak Task…*, output in the Run tool window.                | [[file:../contrib/intellij/README.org][contrib/intellij]]   |
-| Zed          | A generated =.zed/tasks.json=, because Zed reads tasks from a file.       | [[file:../contrib/zed/README.org][contrib/zed]]         |
+| Zed          | A generated =.zed/tasks.json=, kept current by =maak-zed= as you work.   | [[file:../contrib/zed/README.org][contrib/zed]]         |
 | Sublime Text | Quick panels, and the run in a Sublime build panel.                    | [[file:../contrib/sublime/README.org][contrib/sublime]]     |
 | Helix        | =maak-picker= for =:sh=: fzf, the argument prompts, and a terminal.      | [[file:../contrib/helix/README.org][contrib/helix]]       |
 

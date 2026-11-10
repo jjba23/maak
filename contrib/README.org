@@ -17,7 +17,7 @@ is the Emacs answer and lives in a repository of its own; the rest live here.
 | [[file:vim/README.org][Vim]]            | =:Maak= picks from a numbered menu, runs in a terminal tab.           |
 | [[file:vscode/README.org][VS Code]]        | The command palette and =Tasks: Run Task=, running in a terminal.     |
 | [[file:intellij/README.org][IntelliJ]]       | *Tools → Run maak Task…*, output in the Run tool window.              |
-| [[file:zed/README.org][Zed]]            | A generated =.zed/tasks.json=, because Zed reads tasks from a file.    |
+| [[file:zed/README.org][Zed]]            | A generated =.zed/tasks.json=, kept current by =maak-zed= as you work. |
 | [[file:sublime/README.org][Sublime Text]]   | Quick panels, and the run in a Sublime build panel.                  |
 | [[file:helix/README.org][Helix]]          | =maak-picker= for =:sh=: fzf, the argument prompts, and a terminal.    |
 
@@ -107,3 +107,7 @@ kind of extension surface — or no plugin API at all, as Helix, or a static tas
 file, as Zed — can call =maak-tasks --names=, =--fzf=, =--preview NAME=,
 =--words NAME= or =--zed= instead of reading JSON, and get the same answers in a
 shell.
+
+Zed is the one editor whose list has to be written down, so =contrib/zed/maak-zed=
+keeps the writing down up to date: =sync= after an edit, =watch= for as long as
+the editor is open.
