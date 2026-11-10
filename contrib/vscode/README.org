@@ -1,0 +1,74 @@
+#+title: maak for VS Code
+
+[[../../docs/editors.org][Editor integrations]]
+
+The tasks of a =maak.scm= in the command palette, with the arguments maak's
+grammar allows, run in a terminal — and the same tasks in =Tasks: Run Task=.
+
+* Requirements
+
+- VS Code 1.75 or newer.
+- Guile, which maak itself needs.
+- [[../bin/maak-tasks][=maak-tasks=]] on your =$PATH=, or its path in the =maak.helper= setting:
+  #+begin_src shell
+  install -m 755 contrib/bin/maak-tasks ~/.local/bin/maak-tasks
+  #+end_src
+
+* Build and install
+
+The extension is TypeScript, so it is compiled once before VS Code can load it:
+
+#+begin_src shell
+cd contrib/vscode
+npm install
+npm run compile
+code --install-extension .   # or: npx @vscode/vsce package && code --install-extension maak-vscode-*.vsix
+#+end_src
+
+For development, open this directory in VS Code and press =F5=, which starts an
+Extension Development Host with the extension loaded.
+
+* Commands
+
+| Command               | What it does                                              |
+|-----------------------+-----------------------------------------------------------|
+| =Maak: Run Task=      | Pick a task, answer its arguments, run it in a terminal.  |
+| =Maak: Dry Run Task=  | The same pick, with =maak -n=: the commands, not the run.  |
+| =Maak: Run Last Task= | Repeat the last run exactly, without the picker.          |
+| =Maak: Go to Task=    | Pick a task and open its definition in =maak.scm=.         |
+| =Maak: List Tasks=    | Write every task, with its arguments, to the Maak output. |
+
+* Tasks
+
+Every task is also a VS Code task of type =maak=, so =Tasks: Run Task= lists
+them and =tasks.json= can name one:
+
+#+begin_src json
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "type": "maak", "task": "test", "args": ["--suite", "unit"], "group": "test" }
+  ]
+}
+#+end_src
+
+* Settings
+
+| Setting           | Default        | What it is                                          |
+|-------------------+----------------+-----------------------------------------------------|
+| =maak.executable= | =maak=         | The maak a task runs with.                          |
+| =maak.helper=     | =maak-tasks=   | The helper that reads the Maak file.                |
+
+* Arguments
+
+The prompts follow the lambda list of the task, the way maak.el does:
+
+- a required argument must be answered;
+- an optional argument left blank is not passed at all, and neither is anything
+  after it, so the task's own default applies;
+- a rest argument takes any number of space separated words;
+- a keyword argument is never asked for, because maak's command line cannot pass
+  one.  A keyword argument with no default is an error, said before the run.
+
+An argument that begins with a dash is set apart with =--=, as in
+=maak quick-math -- -23 42=.

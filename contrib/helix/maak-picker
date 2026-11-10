@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# Pick a maak task with fzf, answer its arguments and run it.
+#
+# SPDX-License-Identifier: MIT
+#
+# Usage: maak-picker [-n|--dry-run] [DIRECTORY]
+#
+# Helix has no plugin API: a command runs in a shell and its output belongs to
+# the editor, so this is the integration.  Bind it in config.toml:
+#
+#   [keys.normal]
+#   "space" = { m = { r = ":sh maak-picker" } }
+#
+# `:sh' gives the command no terminal, so set MAAK_TERMINAL to the terminal you
+# want the task to run in -- `foot -e', `alacritty -e', `kitty', `xterm -e' -- and
+# a task gets a real one.
+
+set -euo pipefail
+
+script_directory=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+
+dry_run=0
+root=
+while (($#)); do
+  case $1 in
+    -n | --dry-run) dry_run=1 ;;
+    -h | --help)
+      sed -n '2,20p' "$0"
+      exit 0
+      ;;
+    *) root=$1 ;;
+  esac
+  shift
+done
+
+helper=${MAAK_TASKS:-maak-tasks}
+if ! command -v "$helper" >/dev/null 2>&1; then
+  helper="$script_directory/../bin/maak-tasks"
+fi
+if [[ ! -x $helper ]]; then
+  echo "maak-picker: cannot find maak-tasks; put it on \$PATH or set MAAK_TASKS" >&2
+  exit 1
+fi
+
+# The Maak file of the directory Helix was started in, as `:sh' runs there.
+root=${root:-$PWD}
+while [[ $root != "/" && ! -f $root/maak.scm ]]; do
+  root=$(dirname -- "$root")
+done
+if [[ ! -f $root/maak.scm ]]; then
+  echo "maak-picker: no maak.scm in $PWD or its parents" >&2
+  exit 1
+fi
+
+selection=$(
+  "$helper" --directory "$root" --fzf |
+    fzf --delimiter='\t' --with-nth=1,2 --reverse --height=60% \
+      --prompt='maak task> ' \
+      --preview="'$helper' --directory '$root' --preview {1}" \
+      --preview-window=down:60%
+)
+
+[[ -n $selection ]] || exit 0
+
+task=${selection%%$'\t'*}
+
+# The prompts follow the task's lambda list: a keyword argument is never asked
+# for (maak's command line passes positional strings), and leaving an optional
+# argument blank leaves out everything after it, so the task's own default
+# applies.
+arguments=()
+stopped=0
+while IFS=$'\t' read -r kind name default has_default; do
+  case $kind in
+    key)
+      if [[ $has_default != 1 ]]; then
+        echo "maak-picker: $task needs keyword $name, which maak cannot pass; give it a default in the Maak file" >&2
+        exit 1
+      fi
+      ;;
+    required)
+      read -r -p "Argument <$name>: " answer
+      if [[ -z ${answer//[[:space:]]/} ]]; then
+        echo "maak-picker: $task needs a value for <$name>" >&2
+        exit 1
+      fi
+      arguments+=("$answer")
+      ;;
+    optional)
+      if ((stopped)); then
+        continue
+      fi
+      read -r -p "Argument <$name> (RET to omit${has_default:+: $default}): " answer
+      if [[ -z ${answer//[[:space:]]/} ]]; then
+        stopped=1
+      else
+        arguments+=("$answer")
+      fi
+      ;;
+    rest)
+      if ((stopped)); then
+        continue
+      fi
+      read -r -p "Arguments <$name> (space separated, RET for none): " answer
+      read -r -a words <<<"$answer"
+      arguments+=("${words[@]}")
+      ;;
+  esac
+done < <("$helper" --directory "$root" --words "$task")
+
+command=(maak)
+if ((dry_run)); then
+  command+=(-n)
+fi
+command+=("$task")
+for argument in "${arguments[@]}"; do
+  if [[ $argument == -* ]]; then
+    command+=(--)
+    break
+  fi
+done
+command+=("${arguments[@]}")
+
+if [[ -n ${MAAK_TERMINAL:-} ]]; then
+  # Word splitting is what makes `foot -e' two words.
+  # shellcheck disable=SC2086
+  exec $MAAK_TERMINAL "${command[@]}"
+fi
+
+cd "$root"
+exec "${command[@]}"

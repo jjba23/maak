@@ -1,0 +1,460 @@
+#!/usr/bin/env -S guile --no-auto-compile -s
+!#
+;;; maak-tasks --- print a Maak file's tasks, for editor integrations
+;;
+;; SPDX-License-Identifier: MIT
+;; Copyright © Josep Bigorra <jjbigorra@gmail.com>
+;;
+;;; Commentary:
+;;
+;; A Maak file is a Guile module, and this reads it the way maak and maak.el
+;; read it: a task is a top-level procedure definition, the `#:export' list
+;; decides which ones are visible, and the docstring is the documentation.  The
+;; file is read, never evaluated, so asking for the task list costs one Guile
+;; start and nothing else.
+;;
+;; The output is JSON, because that is what an editor can consume whatever it is
+;; written in:
+;;
+;;   {"file": "/p/maak.scm", "root": "/p",
+;;    "tasks": [{"name": "build", "doc": "Compile.", "line": 7,
+;;               "arguments": [{"name": "target", "kind": "required",
+;;                              "default": "", "hasDefault": false,
+;;                              "keyword": ""}]}]}
+;;
+;; `kind' is one of required, optional, key or rest, and `default' is the
+;; default expression as it is written in the file.  A keyword argument cannot
+;; be passed by maak's command line at all, so an integration shows it and never
+;; asks for it.
+;;
+;; The other modes exist so a shell integration never has to parse JSON:
+;; `--names' prints one task per line, `--preview NAME' the description fzf
+;; shows, and `--words NAME' one tab separated line per argument.
+;;
+;;; Code:
+
+(use-modules (ice-9 format)
+             (ice-9 pretty-print)
+             (srfi srfi-1)
+             (srfi srfi-13))
+
+;; Line numbers come from the reader rather than from a second scan of the text.
+(read-enable 'positions)
+
+(define program-name "maak-tasks")
+
+(define (warn fmt . args)
+  (format (current-error-port) "~a: " program-name)
+  (apply format (current-error-port) fmt args)
+  (newline (current-error-port)))
+
+(define (die fmt . args)
+  (apply warn fmt args)
+  (exit 2))
+
+(define usage
+  "Usage: maak-tasks [OPTION]...
+
+Print the tasks of a Maak file, as JSON.
+
+  -f, --file FILE        read FILE instead of looking for maak.scm
+  -C, --directory DIR    look for maak.scm in DIR and its parents
+      --names            print one task name per line, in file order
+      --fzf              print name, signature and first docstring line, tab
+                         separated, for a picker
+      --zed              print a Zed tasks.json for the file's tasks
+      --preview NAME     print the description of task NAME
+      --words NAME       print NAME's arguments, one tab separated line each:
+                         kind, name, default, and 1 when it has a default
+  -h, --help             print this help and exit
+
+The Maak file is found in DIR (or the current directory) and its parents.  The
+file is read, not evaluated, so no task runs.")
+
+;;; JSON
+;;
+;; Written by hand: Guile's `(json)' module is not in every build, and the
+;; strings here are names, docstrings and Scheme expressions.
+
+(define (json-string text)
+  (call-with-output-string
+    (lambda (port)
+      (write-char #\" port)
+      (string-for-each
+       (lambda (char)
+         (case char
+           ((#\") (display "\\\"" port))
+           ((#\\) (display "\\\\" port))
+           ((#\newline) (display "\\n" port))
+           ((#\return) (display "\\r" port))
+           ((#\tab) (display "\\t" port))
+           (else
+            (if (< (char->integer char) 32)
+                (format port "\\u~4,'0x" (char->integer char))
+                (write-char char port)))))
+       text)
+      (write-char #\" port))))
+
+(define (json-object pairs)
+  (string-append "{"
+                 (string-join
+                  (map (lambda (pair)
+                         (string-append (json-string (car pair)) ":" (cdr pair)))
+                       pairs)
+                  ",")
+                 "}"))
+
+(define (json-array items)
+  (string-append "[" (string-join items ",") "]"))
+
+;;; Reading the Maak file
+
+(define (maak-file-in directory)
+  "Return the path of the maak.scm in DIRECTORY or its parents, or #f."
+  (let loop ((dir directory))
+    (let ((candidate (in-vicinity dir "maak.scm")))
+      (cond ((file-exists? candidate) candidate)
+            (else
+             (let ((parent (dirname dir)))
+               (and (not (string=? parent dir)) (loop parent))))))))
+
+(define (read-forms path)
+  "Return the top-level forms of PATH.
+
+A file being edited may be unbalanced, and the tasks before the mistake are
+still worth showing, so the first form that cannot be read ends the walk."
+  (call-with-input-file path
+    (lambda (port)
+      (let loop ((forms '()))
+        (catch #t
+          (lambda ()
+            (let ((form (read port)))
+              (if (eof-object? form) (reverse forms) (loop (cons form forms)))))
+          (lambda (key . args) (reverse forms)))))))
+
+(define (form-line form)
+  "Return the line FORM starts on, or 0 when the reader did not say.
+
+The reader counts lines from zero; an editor counts them from one."
+  (if (pair? form)
+      (1+ (or (assq-ref (source-properties form) 'line) 0))
+      0))
+
+(define (docstring body)
+  "Return the docstring at the head of BODY, or the empty string."
+  (if (and (pair? body) (string? (car body))) (car body) ""))
+
+;;; Arguments
+;;
+;; Every form Guile accepts in a lambda list is understood: a bare name, a
+;; `(name default)' pair, `#:optional', `#:key', `#:rest', a dotted tail, and
+;; `((#:keyword name) default)'.  An argument is
+;;
+;;   (NAME KIND DEFAULT HAS-DEFAULT? KEYWORD)
+
+(define (keyword-name keyword)
+  (string-append "#:" (symbol->string (keyword->symbol keyword))))
+
+(define (argument name kind keyword default has-default?)
+  (list name kind
+        (if has-default? (object->string default) "")
+        has-default?
+        (or keyword "")))
+
+(define (argument-of item kind)
+  "Return ITEM as an argument of KIND, or #f when it is not a name."
+  (cond
+   ((symbol? item)
+    (argument (symbol->string item) kind
+              (and (eq? kind 'key) (string-append "#:" (symbol->string item)))
+              #f #f))
+   ((pair? item)
+    (let* ((head (car item))
+           (has-default? (pair? (cdr item)))
+           (default (and has-default? (cadr item)))
+           (explicit (and (pair? head) (keyword? (car head)) (car head)))
+           (name (cond ((symbol? head) (symbol->string head))
+                       ((and (pair? head) (symbol? (cadr head)))
+                        (symbol->string (cadr head)))
+                       (else #f))))
+      (and name
+           (argument name kind
+                     (cond (explicit (keyword-name explicit))
+                           ((eq? kind 'key) (string-append "#:" name))
+                           (else #f))
+                     default has-default?))))
+   (else #f)))
+
+(define (lambda-list-arguments params)
+  "Return the arguments of the lambda list PARAMS, in order."
+  (let walk ((rest params) (section 'required) (found '()))
+    (cond
+     ((null? rest) (reverse found))
+     ((pair? rest)
+      (let ((item (car rest)))
+        (cond
+         ((eq? item #:optional) (walk (cdr rest) 'optional found))
+         ((eq? item #:key) (walk (cdr rest) 'key found))
+         ((eq? item #:rest) (walk (cdr rest) 'rest found))
+         ;; `#:allow-other-keys' and any other keyword are flags, not names.
+         ((keyword? item) (walk (cdr rest) section found))
+         (else
+          (walk (cdr rest) section
+                (let ((found-argument (argument-of item section)))
+                  (if found-argument
+                      (cons found-argument found)
+                      found)))))))
+     ;; A dotted tail, `(define (echo . words) ...)'.
+     ((symbol? rest)
+      (reverse (cons (argument (symbol->string rest) 'rest #f #f #f) found)))
+     (else (reverse found)))))
+
+;;; Tasks
+
+(define (task-of form)
+  "Return (NAME DOC ARGUMENTS LINE) when FORM defines a task, else #f.
+
+Only a procedure is a task, spelled either as the shorthand
+`(define (name arg ...) body)' -- or `define*' -- or as a name bound to a
+`lambda' or `lambda*'.  A curried definition `(define ((f a) b) ...)' and a
+value definition define no task."
+  (and (pair? form)
+       (memq (car form) '(define define*))
+       (let ((parts (cdr form)))
+         (cond
+          ((and (pair? parts) (pair? (car parts)) (symbol? (car (car parts))))
+           (let ((signature (car parts)))              (list (symbol->string (car signature))
+                    (docstring (cdr parts))
+                   (lambda-list-arguments (cdr signature))
+                   (form-line form))))
+          ((and (pair? parts)
+                (symbol? (car parts))
+                (pair? (cdr parts))
+                (pair? (cadr parts))
+                (memq (car (cadr parts)) '(lambda lambda*))
+                (pair? (cdr (cadr parts)))
+                (list? (cadr (cadr parts))))
+           (let ((procedure (cadr parts)))
+             (list (symbol->string (car parts))
+                   (docstring (cddr procedure))
+                   (lambda-list-arguments (cadr procedure))
+                   (form-line form))))
+          (else #f)))))
+
+(define (module-exports forms)
+  "Return the names the module clause of FORMS exports, or #f when it exports none."
+  (let ((module (find (lambda (form)
+                        (and (pair? form) (eq? (car form) 'define-module)))
+                      forms)))
+    (and module
+         (let walk ((clauses (cdr module)) (exports '()) (exported? #f))
+           (cond
+            ((null? clauses) (and exported? exports))
+            ((and (eq? (car clauses) #:export) (pair? (cdr clauses)))
+             (walk (cddr clauses)
+                   (append exports
+                           (filter-map (lambda (item)
+                                         (and (symbol? item) (symbol->string item)))
+                                       (let ((names (cadr clauses)))
+                                         (if (list? names) names '()))))
+                   #t))
+            (else (walk (cdr clauses) exports exported?)))))))
+
+(define (tasks-of forms)
+  "Return the tasks FORMS defines, in file order, honouring the exports.
+
+When a name is defined more than once the last definition wins, which is the
+one maak binds."
+  (let* ((exports (module-exports forms))
+         (tasks (fold (lambda (form tasks)
+                        (let ((task (task-of form)))
+                          (if task
+                              (cons task
+                                    (remove (lambda (other)
+                                              (string=? (car other) (car task)))
+                                            tasks))
+                              tasks)))
+                      '()
+                      forms))
+         (tasks (reverse tasks)))
+    (if (and exports (pair? exports))
+        (filter (lambda (task) (member (car task) exports)) tasks)
+        tasks)))
+
+;;; Printing
+
+(define (argument-display found-argument)
+  "Return the command-line spelling of FOUND-ARGUMENT."
+  (let ((name (list-ref found-argument 0))
+        (kind (list-ref found-argument 1))
+        (default (list-ref found-argument 2))
+        (has-default? (list-ref found-argument 3))
+        (keyword (list-ref found-argument 4)))
+    (case kind
+      ((required) name)
+      ((optional) (if has-default?
+                      (format #f "[~a=~a]" name default)
+                      (format #f "[~a]" name)))
+      ((key) (if has-default? (format #f "~a=~a" keyword default) keyword))
+      ((rest) (format #f "...~a" name))
+      (else name))))
+
+(define (task-signature task)
+  (string-join (map argument-display (list-ref task 2)) " "))
+
+(define (argument-line found-argument)
+  (let ((name (list-ref found-argument 0))
+        (kind (list-ref found-argument 1))
+        (default (list-ref found-argument 2))
+        (has-default? (list-ref found-argument 3))
+        (keyword (list-ref found-argument 4)))
+    (format #f "  ~a ~a~a~a"
+            (if (string=? keyword "") name keyword)
+            (case kind
+              ((required) "required")
+              ((optional) (if has-default? "optional" "optional, left out when blank"))
+              ((key) (if has-default? "keyword" "keyword, which maak cannot pass"))
+              ((rest) "rest")
+              (else "argument"))
+            (if has-default? " -- default: " "")
+            (if has-default? default ""))))
+
+(define (first-line text)
+  "Return TEXT up to its first newline."
+  (substring text 0 (or (string-index text #\newline) (string-length text))))
+
+(define (task-preview task)
+  "Return the description of TASK, for `--preview'."
+  (let ((name (list-ref task 0))
+        (doc (list-ref task 1))
+        (arguments (list-ref task 2))
+        (signature (task-signature task)))
+    (string-append
+     name (if (string=? signature "") "" (string-append " " signature)) "\n\n"
+     (if (string=? doc "") ""
+         (string-append
+          (string-join (map (lambda (line) (string-append "  " line))
+                            (string-split doc #\newline))
+                       "\n")
+          "\n\n"))
+     (if (null? arguments) ""
+         (string-append
+          (string-join (map argument-line arguments) "\n")
+          "\n")))))
+
+(define (argument-json found-argument)
+  (json-object
+   (list (cons "name" (json-string (list-ref found-argument 0)))
+         (cons "kind" (json-string
+                       (symbol->string (list-ref found-argument 1))))
+         (cons "default" (json-string (list-ref found-argument 2)))
+         (cons "hasDefault" (if (list-ref found-argument 3) "true" "false"))
+         (cons "keyword" (json-string (list-ref found-argument 4))))))
+
+(define (task-json task)
+  (json-object
+   (list (cons "name" (json-string (list-ref task 0)))
+         (cons "doc" (json-string (list-ref task 1)))
+         (cons "line" (number->string (list-ref task 3)))
+         (cons "arguments"
+               (json-array (map argument-json (list-ref task 2)))))))
+
+(define (zed-json tasks)
+  "Return the tasks as the .zed/tasks.json Zed reads.
+
+Zed has no discovery hook: it reads a static tasks file, so this is generated
+once and generated again when the Maak file changes."
+  (json-array
+   (map (lambda (task)
+          (let ((summary (first-line (list-ref task 1))))
+            (json-object
+             (list (cons "label"
+                         (json-string
+                          (if (string=? summary "")
+                              (format #f "maak: ~a" (car task))
+                              (format #f "maak: ~a — ~a" (car task) summary))))
+                   (cons "command" (json-string "maak"))
+                   (cons "args" (json-array (list (json-string (car task)))))
+                   (cons "cwd" (json-string "$ZED_WORKTREE_ROOT"))
+                   (cons "tags" (json-array (list (json-string "maak"))))))))
+        tasks)))
+
+(define (tasks-json path tasks)
+  (json-object
+   (list (cons "file" (json-string path))
+         (cons "root" (json-string (dirname path)))
+         (cons "tasks" (json-array (map task-json tasks))))))
+
+;;; The command line
+
+(define (option-value arguments)
+  (if (null? (cdr arguments))
+      (die "~a needs a value" (car arguments))
+      (cadr arguments)))
+
+(define (main arguments)
+  (let loop ((arguments arguments)
+             (file #f)
+             (directory #f)
+             (mode 'json)
+             (task-name #f))
+    (cond
+     ((null? arguments)
+      (let* ((path (cond (file file)
+                         (directory
+                          (let ((path (and (file-exists? directory)
+                                           (maak-file-in (canonicalize-path directory)))))
+                            (or path
+                                (die "no maak.scm in ~a or its parents" directory))))
+                         (else
+                          (or (maak-file-in (getcwd))
+                              (die "no maak.scm in ~a or its parents" (getcwd))))))
+             (tasks #f))
+        (unless (file-exists? path) (die "~a is not a file" path))
+        (set! tasks (tasks-of (read-forms path)))
+        (case mode
+          ((json) (display (tasks-json path tasks)) (newline))
+          ((names) (for-each (lambda (task) (display (car task)) (newline)) tasks))
+          ((fzf)
+           (for-each (lambda (task)
+                       (format #t "~a\t~a\t~a~%"
+                               (car task)
+                               (task-signature task)
+                               (first-line (list-ref task 1))))
+                     tasks))
+          ((zed) (display (zed-json tasks)) (newline))
+          ((preview words)
+           (let ((task (find (lambda (task) (string=? (car task) task-name)) tasks)))
+             (unless task (die "~a defines no task called ~a" path task-name))
+             (if (eq? mode 'preview)
+                 (display (task-preview task))
+                 (for-each (lambda (found-argument)
+                             (format #t "~a\t~a\t~a\t~a~%"
+                                     (list-ref found-argument 1)
+                                     (list-ref found-argument 0)
+                                     (list-ref found-argument 2)
+                                     (if (list-ref found-argument 3) 1 0)))
+                           (list-ref task 2))))))))
+     ((member (car arguments) '("-h" "--help"))
+      (display usage) (newline) (exit 0))
+     ((member (car arguments) '("-f" "--file"))
+      (loop (cddr arguments) (option-value arguments) directory mode task-name))
+     ((member (car arguments) '("-C" "--directory"))
+      (loop (cddr arguments) file (option-value arguments) mode task-name))
+     ((string=? (car arguments) "--names")
+      (loop (cdr arguments) file directory 'names task-name))
+     ((string=? (car arguments) "--fzf")
+      (loop (cdr arguments) file directory 'fzf task-name))
+     ((string=? (car arguments) "--zed")
+      (loop (cdr arguments) file directory 'zed task-name))
+     ((string=? (car arguments) "--preview")
+      (loop (cddr arguments) file directory 'preview (option-value arguments)))
+     ((string=? (car arguments) "--words")
+      (loop (cddr arguments) file directory 'words (option-value arguments)))
+     ((string-prefix? "--file=" (car arguments))
+      (loop (cdr arguments) (substring (car arguments) 7) directory mode task-name))
+     ((string-prefix? "--directory=" (car arguments))
+      (loop (cdr arguments) file (substring (car arguments) 12) mode task-name))
+     (else (die "unknown option ~a (see --help)" (car arguments))))))
+
+(main (cdr (command-line)))

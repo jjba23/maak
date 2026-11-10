@@ -1,0 +1,66 @@
+#+title: maak for Zed
+
+[[../../docs/editors.org][Editor integrations]]
+
+Zed reads its tasks from a file rather than discovering them, so the integration
+is a generated =tasks.json=: one Zed task per maak task, each labelled with the
+first line of the task's docstring and run in the worktree root.
+
+* Requirements
+
+- Zed, with tasks enabled (they are in stable Zed).
+- Guile, which maak itself needs.
+- [[../bin/maak-tasks][=maak-tasks=]] next to your shell, or given as a path:
+  #+begin_src shell
+  install -m 755 contrib/bin/maak-tasks ~/.local/bin/maak-tasks
+  #+end_src
+
+* Generate the tasks file
+
+From the root of the project — the directory that holds =maak.scm=:
+
+#+begin_src shell
+mkdir -p .zed
+maak-tasks --zed > .zed/tasks.json
+#+end_src
+
+Then *tasks: spawn* (=alt-t=) lists them: =maak: build — Compile everything.=,
+=maak: deploy — Ship the build to the server.= and so on.
+
+The generated file looks like this:
+
+#+begin_src json
+[
+  {
+    "label": "maak: build — Compile everything.",
+    "command": "maak",
+    "args": ["build"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "tags": ["maak"]
+  }
+]
+#+end_src
+
+* Two things Zed cannot do
+
+Zed's tasks are static, so two things the other integrations do have no
+counterpart here:
+
+- *Arguments are not prompted for.*  A task that needs one needs a task of its
+  own.  Write a wrapper task in =maak.scm= with the argument fixed, then
+  regenerate.
+- *No dry run through the picker.*  Add ="-n"= to the =args= of the generated
+  task by hand, or generate into a second file with a small edit.
+
+Regenerate after changing =maak.scm=; the labels and the list both come from the
+file.  A project can also keep the generator in its own =maak.scm=:
+
+#+begin_src scheme
+(define (zed-tasks)
+  "Write .zed/tasks.json from this Maak file."
+  (mkdir-p ".zed")
+  (run (list "maak-tasks" "--zed") #:redirect '("> .zed/tasks.json")))
+#+end_src
+
+(A redirection is what this needs; ~run~ passes an argument list, so a shell is
+the tool for it here.)

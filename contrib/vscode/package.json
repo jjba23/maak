@@ -1,0 +1,102 @@
+{
+  "name": "maak-vscode",
+  "displayName": "Maak",
+  "description": "Run the tasks of a maak.scm from VS Code.",
+  "version": "0.1.0",
+  "publisher": "jjba23",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://codeberg.org/jjba23/maak"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "maak",
+    "guile",
+    "scheme",
+    "task runner"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "workspaceContains:maak.scm"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "maak.runTask",
+        "title": "Run Task",
+        "category": "Maak"
+      },
+      {
+        "command": "maak.dryRunTask",
+        "title": "Dry Run Task",
+        "category": "Maak"
+      },
+      {
+        "command": "maak.runLastTask",
+        "title": "Run Last Task",
+        "category": "Maak"
+      },
+      {
+        "command": "maak.goToTask",
+        "title": "Go to Task",
+        "category": "Maak"
+      },
+      {
+        "command": "maak.listTasks",
+        "title": "List Tasks",
+        "category": "Maak"
+      }
+    ],
+    "configuration": {
+      "title": "Maak",
+      "properties": {
+        "maak.executable": {
+          "type": "string",
+          "default": "maak",
+          "description": "Name of, or path to, the maak executable."
+        },
+        "maak.helper": {
+          "type": "string",
+          "default": "maak-tasks",
+          "description": "Name of, or path to, the maak-tasks helper that reads the Maak file."
+        }
+      }
+    },
+    "taskDefinitions": [
+      {
+        "type": "maak",
+        "required": [
+          "task"
+        ],
+        "properties": {
+          "task": {
+            "type": "string",
+            "description": "The maak task to run."
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The words the task is given."
+          }
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.75.0",
+    "typescript": "^5.4.0"
+  }
+}

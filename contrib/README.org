@@ -1,0 +1,109 @@
+#+title: maak in your editor
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[../docs/index.org][Documentation index]]
+
+Every editor here answers the same three questions the way maak does: what tasks
+does this =maak.scm= define, what arguments does one take, and how do I run it
+where I can read the output?  [[https://codeberg.org/jjba23/maak.el][maak.el]]
+is the Emacs answer and lives in a repository of its own; the rest live here.
+
+| Editor         | What you get                                                        |
+|----------------+---------------------------------------------------------------------|
+| [[file:nvim/README.org][Neovim]]         | =:Maak= picks with =vim.ui.select=, runs in a terminal tab.           |
+| [[file:vim/README.org][Vim]]            | =:Maak= picks from a numbered menu, runs in a terminal tab.           |
+| [[file:vscode/README.org][VS Code]]        | The command palette and =Tasks: Run Task=, running in a terminal.     |
+| [[file:intellij/README.org][IntelliJ]]       | *Tools → Run maak Task…*, output in the Run tool window.              |
+| [[file:zed/README.org][Zed]]            | A generated =.zed/tasks.json=, because Zed reads tasks from a file.    |
+| [[file:sublime/README.org][Sublime Text]]   | Quick panels, and the run in a Sublime build panel.                  |
+| [[file:helix/README.org][Helix]]          | =maak-picker= for =:sh=: fzf, the argument prompts, and a terminal.    |
+
+* What they all do
+
+- *List the tasks the file defines.*  Only what =#:export= names, or every
+  procedure when it exports nothing.
+- *Show the documentation.*  The docstring is the task's documentation, so it is
+  what the picker shows.
+- *Prompt for the arguments the task takes*, in the order maak binds them.
+- *Run the task where its output belongs*: a terminal, a build panel, the Run
+  tool window.
+- *Go to the definition*, because the helper reports the line the procedure is
+  written on.
+- *Dry-run it*: every integration can pass =maak -n= and show the commands
+  instead of running them.
+- *Repeat the last run*, where the editor has somewhere to keep it.
+
+* One reader of the Maak file
+
+[[file:bin/maak-tasks][=contrib/bin/maak-tasks=]] is a small Guile script every
+integration runs.  It reads the Maak file and prints its tasks as JSON:
+
+#+begin_src shell
+$ contrib/bin/maak-tasks --preview deploy
+deploy target [env="dev"]
+
+  Ship the build to the server.
+
+  target required
+  env optional -- default: "dev"
+  #:jobs keyword -- default: 1
+  extra rest
+#+end_src
+
+Reading the file this way — rather than regexing it or asking =maak --list= —
+is what lets every editor offer the same thing maak.el does:
+
+- only the procedures the =#:export= list names, or every procedure when the
+  file exports nothing;
+- the docstring, which is the task's documentation;
+- the lambda list, so a required argument is asked for, an optional one shows
+  its default, a rest argument takes several words, and a keyword argument is
+  shown but never asked for, because maak's command line cannot pass one;
+- the line the definition starts on, so a task can be visited where it is
+  written.
+
+The file is read, never evaluated: asking for the task list runs nothing.
+
+=maak-tasks= needs Guile, which maak needs anyway.  Install it where your
+shell finds it:
+
+#+begin_src shell
+install -m 755 contrib/bin/maak-tasks ~/.local/bin/maak-tasks
+#+end_src
+
+Each integration takes the helper's path as a setting — =g:maak_helper=,
+=maak.helper=, the =Maak.sublime-settings= file, =MAAK_TASKS= for the Helix
+picker — so a checkout works without installing anything.
+~contrib/test/maak-tasks.sh~ checks the helper against a fixture that holds one
+task of every shape:
+
+#+begin_src shell
+./contrib/test/maak-tasks.sh
+#+end_src
+
+* Arguments, the way maak binds them
+
+The prompts are the same in every editor, and they are maak.el's:
+
+- a required argument must be answered, because maak passes the empty string
+  otherwise and a task almost never means that;
+- an optional argument answered with a blank line is not passed at all, and
+  neither is anything after it — maak binds positional words in order, so a
+  later word would fill the earlier slot;
+- a rest argument takes any number of space separated words;
+- a keyword argument is never asked for: =maak= passes strings, and a string
+  never becomes a keyword.  One without a default is an error, said before the
+  run rather than from inside Guile;
+- an argument that begins with a dash is set apart with =--=, as in
+  =maak quick-math -- -23 42=.
+
+* Extending
+
+The helper is the contract, not these seven plugins.  An editor with a different
+kind of extension surface — or no plugin API at all, as Helix, or a static task
+file, as Zed — can call =maak-tasks --names=, =--fzf=, =--preview NAME=,
+=--words NAME= or =--zed= instead of reading JSON, and get the same answers in a
+shell.

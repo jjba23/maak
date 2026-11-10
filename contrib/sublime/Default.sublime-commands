@@ -1,0 +1,18 @@
+[
+  {
+    "caption": "Maak: Run Task",
+    "command": "maak_run"
+  },
+  {
+    "caption": "Maak: Dry Run Task",
+    "command": "maak_run_dry"
+  },
+  {
+    "caption": "Maak: List Tasks",
+    "command": "maak_list"
+  },
+  {
+    "caption": "Maak: Go to Task",
+    "command": "maak_goto"
+  }
+]

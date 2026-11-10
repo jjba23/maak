@@ -1,0 +1,6 @@
+{
+  // The helper every maak editor integration shares; see contrib/README.org.
+  "helper": "maak-tasks",
+  // The maak a task runs with.
+  "executable": "maak"
+}

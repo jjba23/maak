@@ -1,0 +1,58 @@
+#+title: maak for Helix
+
+[[../../docs/editors.org][Editor integrations]]
+
+Helix has no plugin API.  A command runs in a shell and its output belongs to
+the editor, so the integration is a picker script and a keymap, not a plugin:
+=maak-picker= lists the tasks of the nearest =maak.scm= in
+[[https://github.com/junegunn/fzf][fzf]], shows the docstring and the arguments of
+the one under the cursor, prompts for the arguments the task takes, and runs it.
+
+* Requirements
+
+- Helix, and =fzf= for the picker.
+- Guile, which maak itself needs.
+- [[../bin/maak-tasks][=maak-tasks=]] next to =maak-picker=, on your =$PATH=, or named by =MAAK_TASKS=:
+  #+begin_src shell
+  install -m 755 contrib/bin/maak-tasks contrib/helix/maak-picker ~/.local/bin/
+  #+end_src
+
+* Install
+
+1. Put =maak-picker= and =maak-tasks= on your =$PATH=.
+2. Add the keymap from [[file:config.toml][=config.toml=]] to =~/.config/helix/config.toml=.
+3. Tell it where a task should run, because =:sh= gives it no terminal:
+
+#+begin_src toml
+[keys.normal]
+"space" = { m = { r = ":sh maak-picker" } }
+#+end_src
+
+#+begin_src shell
+export MAAK_TERMINAL='foot -e'   # or `alacritty -e', `kitty', `xterm -e'
+#+end_src
+
+With =MAAK_TERMINAL= set, the task runs in a terminal of its own.  Without it,
+maak runs where =:sh= puts it: inside the editor, which is fine for a dry run and
+poor for anything that expects a tty.
+
+* What it does
+
+- =space m r= — pick a task, answer its arguments, run it.
+- =space m n= — the same pick with =maak -n=: the commands, not the run.
+- =maak-picker --dry-run= on its own, if you prefer to type it.
+- The =fzf= preview pane holds the task's whole docstring and one line per
+  argument, including the keyword arguments maak cannot pass.
+
+* Arguments
+
+The prompts follow the lambda list of the task, the way maak.el does: a required
+argument must be answered, a blank optional one stops the prompts so the task's
+own default applies, a rest argument takes space separated words, and a keyword
+argument is shown but never asked for.
+
+* Why not a Helix plugin
+
+Helix's extension surface is =languages.toml= (how to start and query a language
+server) and =:sh=.  There is no hook that could render a task list inside the
+editor, so the smallest honest integration is a command Helix can run.

@@ -1,0 +1,39 @@
+<!-- SPDX-License-Identifier: MIT -->
+<idea-plugin>
+  <id>org.jointhefreeworld.maak</id>
+  <name>Maak</name>
+  <vendor url="https://jointhefreeworld.org">Josep Bigorra</vendor>
+
+  <description><![CDATA[
+    Run the tasks of a <code>maak.scm</code> from the IDE.
+
+    <p>Pick a task, answer the arguments its lambda list takes, and read its
+    output in the Run tool window.  The task list is read by
+    <code>maak-tasks</code>, the helper every maak editor integration shares,
+    which understands <code>#:export</code>, docstrings, optional, keyword and
+    rest arguments.</p>
+  ]]></description>
+
+  <depends>com.intellij.modules.platform</depends>
+
+  <actions>
+    <action id="Maak.RunTask"
+            class="org.jointhefreeworld.maak.MaakRunAction"
+            text="Run maak Task…"
+            description="Pick a task of the nearest maak.scm, answer its arguments and run it">
+      <add-to-group group-id="ToolsMenu" anchor="first"/>
+    </action>
+    <action id="Maak.DryRunTask"
+            class="org.jointhefreeworld.maak.MaakDryRunAction"
+            text="Dry-run maak Task…"
+            description="Pick a task and print the commands it would run, instead of running them">
+      <add-to-group group-id="ToolsMenu" anchor="after" relative-to-action="Maak.RunTask"/>
+    </action>
+    <action id="Maak.GoToTask"
+            class="org.jointhefreeworld.maak.MaakGoToTaskAction"
+            text="Go to maak Task…"
+            description="Open the procedure that defines a task">
+      <add-to-group group-id="ToolsMenu" anchor="after" relative-to-action="Maak.DryRunTask"/>
+    </action>
+  </actions>
+</idea-plugin>

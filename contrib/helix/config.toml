@@ -1,0 +1,10 @@
+# Maak in Helix: keymaps that run contrib/helix/maak-picker.
+#
+# SPDX-License-Identifier: MIT
+#
+# Merge this into ~/.config/helix/config.toml.  `:sh' gives the command no
+# terminal, so export MAAK_TERMINAL (`foot -e', `alacritty -e', ...) to give a
+# task one of its own; without it maak runs inside the editor.
+
+[keys.normal]
+"space" = { m = { r = ":sh maak-picker", n = ":sh maak-picker --dry-run" } }

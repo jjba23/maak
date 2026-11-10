@@ -1,0 +1,54 @@
+#+title: maak for Sublime Text
+
+[[../../docs/editors.org][Editor integrations]]
+
+The tasks of the nearest =maak.scm=, in a quick panel, with the arguments maak's
+grammar allows, run through Sublime's =exec= so the output lands in a build
+panel.
+
+* Requirements
+
+- Sublime Text 3 or 4.
+- Guile, which maak itself needs.
+- [[../bin/maak-tasks][=maak-tasks=]] on your =$PATH=, or its path in the settings:
+  #+begin_src shell
+  install -m 755 contrib/bin/maak-tasks ~/.local/bin/maak-tasks
+  #+end_src
+
+* Install
+
+Link this directory into the packages folder, under the name Sublime shows:
+
+#+begin_src shell
+ln -s ~/Hacking/maak/contrib/sublime \
+  ~/.config/sublime-text/Packages/Maak
+#+end_src
+
+(Use =~/.config/sublime-text-3/Packages= for Sublime Text 3.)  The plugin loads
+at once: the palette entries appear under *Maak*, and the settings live in
+=Preferences → Package Settings → Maak=.
+
+* Commands
+
+| Command                | What it does                                             |
+|------------------------+----------------------------------------------------------|
+| =Maak: Run Task=       | Pick a task, answer its arguments, run it.                |
+| =Maak: Dry Run Task=   | The same pick, with =maak -n=: the commands, not the run.  |
+| =Maak: List Tasks=     | Write every task, with its arguments, to a Maak panel.    |
+| =Maak: Go to Task=     | Pick a task and open its definition in =maak.scm=.         |
+
+* Settings
+
+#+begin_src json
+{
+  "helper": "maak-tasks",   // or a path to contrib/bin/maak-tasks
+  "executable": "maak"
+}
+#+end_src
+
+* Arguments
+
+The prompts follow the lambda list of the task, the way maak.el does: a required
+argument must be answered, a blank optional one stops the prompts so the task's
+own default applies, a rest argument takes space separated words, and a keyword
+argument is never asked for — maak's command line cannot pass one.

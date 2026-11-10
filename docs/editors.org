@@ -35,6 +35,35 @@ fi
 </details>
 #+end_export
 
+* Editor integrations
+
+Every editor that can run a process gets an integration, and they all read the same task list from the same helper. [[file:../contrib/README.org][=contrib/=]] holds them, and the helper they share is =contrib/bin/maak-tasks= — a small Guile script that reads the Maak file the way maak and maak.el do, and prints its tasks as JSON:
+
+- only what the =#:export= list names, or every procedure when it exports nothing;
+- each docstring, which is the task's documentation;
+- each lambda list, so an editor can ask for a required argument, show the default of an optional one, take several words for a rest argument and leave a keyword argument alone — maak's command line cannot pass one;
+- the line the definition starts on, so a task can be visited where it is written.
+
+The file is read, never evaluated.  Put the helper where your shell finds it, once, for every editor below:
+
+#+begin_src shell
+install -m 755 contrib/bin/maak-tasks ~/.local/bin/maak-tasks
+#+end_src
+
+| Editor       | What you get                                                          | Where                                    |
+|--------------+-----------------------------------------------------------------------+------------------------------------------|
+| Neovim       | =:Maak= picks with =vim.ui.select= and runs in a terminal tab.          | [[file:../contrib/nvim/README.org][contrib/nvim]]       |
+| Vim          | =:Maak= picks from a numbered menu and runs in a terminal tab.          | [[file:../contrib/vim/README.org][contrib/vim]]        |
+| VS Code      | The command palette, and =Tasks: Run Task=, running in a terminal.      | [[file:../contrib/vscode/README.org][contrib/vscode]]     |
+| IntelliJ     | *Tools → Run maak Task…*, output in the Run tool window.                | [[file:../contrib/intellij/README.org][contrib/intellij]]   |
+| Zed          | A generated =.zed/tasks.json=, because Zed reads tasks from a file.       | [[file:../contrib/zed/README.org][contrib/zed]]         |
+| Sublime Text | Quick panels, and the run in a Sublime build panel.                    | [[file:../contrib/sublime/README.org][contrib/sublime]]     |
+| Helix        | =maak-picker= for =:sh=: fzf, the argument prompts, and a terminal.      | [[file:../contrib/helix/README.org][contrib/helix]]       |
+
+They all list the tasks the file defines, show the docstring, prompt for the arguments, run the task where its output belongs, visit a definition, and dry-run one with =maak -n=.  Neovim, Vim and VS Code also repeat the last run, and Neovim and Vim complete task names for =:MaakRun=.
+
+The prompts are maak.el's, because they are what maak's grammar allows: a required argument is asked for, an optional one left blank is not passed at all (and neither is anything after it), a rest argument takes any number of words, and a keyword argument is never asked for because a string never becomes a keyword.
+
 * Emacs
 
 There is an Emacs integration, [[https://codeberg.org/jjba23/maak.el][maak.el]]:

@@ -1,0 +1,63 @@
+#+title: maak for Vim
+
+[[../../docs/editors.org][Editor integrations]]
+
+The tasks of the nearest =maak.scm=, in a numbered menu, with the arguments
+maak's grammar allows, run in a terminal tab — or dry-run, printed instead of
+run.
+
+* Requirements
+
+- Vim 8.0 or newer, built with =+terminal= (standard for most builds), because
+  the plugin calls =json_decode= and =term_start=.
+- Guile, which maak itself needs.
+- [[../bin/maak-tasks][=maak-tasks=]] on your =$PATH=, or its path in =g:maak_helper=:
+  #+begin_src shell
+  install -m 755 contrib/bin/maak-tasks ~/.local/bin/maak-tasks
+  #+end_src
+
+* Install
+
+With a plugin manager, from a checkout of maak:
+
+#+begin_src vim
+" vim-plug
+Plug '~/Hacking/maak/contrib/vim'
+
+" or plainly, in your vimrc
+set runtimepath+=~/Hacking/maak/contrib/vim
+#+end_src
+
+Two variables configure it, and both have working defaults:
+
+#+begin_src vim
+let g:maak_executable = 'maak'
+let g:maak_helper = 'maak-tasks'
+#+end_src
+
+* Commands
+
+| Command              | What it does                                              |
+|----------------------+-----------------------------------------------------------|
+| =:Maak=              | Pick a task by number, answer its arguments, run it.      |
+| =:MaakDryRun=        | The same pick, with =maak -n=: the commands, not the run.  |
+| =:MaakRun build -v=  | Run =build= with the words that follow, no prompts.       |
+| =:MaakLast=          | Run the task last run here again, with the same words.    |
+| =:MaakList=          | Put every task in the quickfix list, at its definition.   |
+| =:MaakGoto=          | Pick a task and jump to the procedure that defines it.    |
+
+=:MaakRun= completes task names with =<Tab>=, from the same Maak file.
+
+* Arguments
+
+The prompts follow the lambda list of the task, the way maak.el does:
+
+- a required argument must be answered;
+- an optional argument left blank is not passed at all, and neither is anything
+  after it, so the task's own default applies;
+- a rest argument takes any number of space separated words;
+- a keyword argument is never asked for, because maak's command line cannot pass
+  one.  A keyword argument with no default is an error, said before the run.
+
+An argument that begins with a dash is set apart with =--=, as in
+=maak quick-math -- -23 42=.

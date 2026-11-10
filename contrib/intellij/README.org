@@ -1,0 +1,60 @@
+#+title: maak for IntelliJ IDEA
+
+[[../../docs/editors.org][Editor integrations]]
+
+The tasks of the nearest =maak.scm= under *Tools*, with the arguments maak's
+grammar allows, run in the Run tool window — so a task's output is a Run
+console: searchable, kept per task, and closable.
+
+The plugin is built with JetBrains' Gradle plugin and uses only platform APIs, so
+it loads in IDEA Community and Ultimate, and in any IDE built on the same
+platform (CLion, GoLand, PyCharm, ...).
+
+* Requirements
+
+- IntelliJ Platform 2024.1 or newer.
+- Guile, which maak itself needs.
+- [[../bin/maak-tasks][=maak-tasks=]] on your =$PATH= — or its path in the =maak.helper= registry
+  value:
+  #+begin_src shell
+  install -m 755 contrib/bin/maak-tasks ~/.local/bin/maak-tasks
+  #+end_src
+
+* Build and install
+
+#+begin_src shell
+cd contrib/intellij
+gradle buildPlugin
+#+end_src
+
+Then *Settings → Plugins → ⚙ → Install Plugin from Disk…* and pick
+=build/distributions/maak-intellij-0.1.0.zip=.  For development, =gradle
+runIde= starts a sandbox IDE with the plugin loaded.
+
+* Actions
+
+| Action                | What it does                                              |
+|-----------------------+-----------------------------------------------------------|
+| =Run maak Task…=      | Pick a task, answer its arguments, run it.                 |
+| =Dry-run maak Task…=  | The same pick, with =maak -n=: the commands, not the run.   |
+| =Go to maak Task…=    | Pick a task and open its definition in =maak.scm=.          |
+
+Both live under *Tools*.
+
+* Settings
+
+The helper and the executable are read from IntelliJ's own registry values, so
+neither needs a settings page:
+
+| Registry value     | Default      | What it is                                |
+|--------------------+--------------+-------------------------------------------|
+| =maak.helper=      | =maak-tasks= | The helper that reads the Maak file.      |
+| =maak.executable=  | =maak=       | The maak a task runs with.                |
+
+* Arguments
+
+The prompts follow the lambda list of the task, the way maak.el does: a required
+argument must be answered, a blank optional one stops the prompts so the task's
+own default applies, a rest argument takes space separated words, and a keyword
+argument is never asked for — maak's command line cannot pass one, and one
+without a default is an error said before the run.

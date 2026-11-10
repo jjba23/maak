@@ -14,6 +14,39 @@ Nothing yet.
 
 *[Released]*
 
+** v0.17.0 (2026-11-10)
+
+Seven editors, one reader of the Maak file: the integrations in =contrib/= now
+cover Zed and Sublime Text as well, and every one of them got the commands that
+turn a task list into a working day — completion, dry runs and the last task
+run.
+
+*** Added
+
+- =contrib/=, a directory of maak integrations for Neovim, Vim, VS Code,
+  IntelliJ, Zed, Sublime Text and Helix.  They all read the task list from
+  =contrib/bin/maak-tasks=, a Guile script that reads a Maak file the way
+  maak.el does — =#:export=, docstrings and lambda lists — without evaluating
+  it, and prints it as JSON.  =contrib/README.org= says how to install one.
+- Dry runs wherever a command runs: =:MaakDryRun= in Neovim and Vim,
+  =Maak: Dry Run Task= in VS Code, =Tools → Dry-run maak Task…= in IntelliJ,
+  =--dry-run= for the Helix picker, and =maak -n= in the generated Zed tasks.
+- Task-name completion for =:MaakRun= in Neovim and Vim, from the same Maak
+  file the picker reads.
+- =:MaakLast= in Neovim and Vim, and =Maak: Run Last Task= in VS Code, which
+  repeat the last run without the picker or the prompts.
+- =maak-tasks --zed= writes the =.zed/tasks.json= Zed reads, because Zed has no
+  hook that could ask for a task list at runtime.
+- =contrib/test/maak-tasks.sh= checks the helper against a fixture with one
+  task of every shape: exports, docstrings, each argument kind, a redefined
+  task, and every output mode.
+
+*** Changed
+
+- =docs/editors.org= describes the seven integrations, the shared helper and
+  the prompts they have in common, instead of only Emacs and the shell
+  completions.
+
 ** v0.16.1 (2026-11-09)
 
 A wording release: the list of projects keeps the projects and loses the

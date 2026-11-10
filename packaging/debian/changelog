@@ -1,3 +1,12 @@
+maak (0.17.0-1) unstable; urgency=medium
+
+  * Editor integrations under contrib/, for Neovim, Vim, VS Code, Helix,
+    IntelliJ, Zed and Sublime Text, all reading the task list from one Guile
+    helper.  Every one of them can dry-run a task, and Neovim, Vim and VS Code
+    repeat the last run.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Tue, 10 Nov 2026 18:30:00 +0100
+
 maak (0.16.1-1) unstable; urgency=medium
 
   * The list of projects that run on maak no longer opens with a paragraph
