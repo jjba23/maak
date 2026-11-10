@@ -25,7 +25,8 @@ continues.
 | [[file:niri.org][niri]] | Querying and driving the niri session from a task. |
 | [[file:downloads.org][Downloads with curl and wget]] | Fetching, reading and mirroring through one set of procedures. |
 | [[file:why-maak.org][Why maak, and why Lisp]] | What Make cannot do, what Scheme changes, and the table of Make flags that did carry over. |
-| [[file:editors.org][Editors, shells and the REPL]] | Completions for Bash, Zsh and fish, integrations for Neovim, Vim, VS Code, Helix and IntelliJ, maak.el, and the REPL workflow. |
+| [[file:editors.org][Editors, shells and the REPL]] | maak.el as the canonical front end, integrations for seven other editors, completions for Bash, Zsh and fish, and the REPL workflow. |
+| [[file:who-uses-maak.org][Who uses maak]] | The forty-one projects that run their automation on maak, grouped, with a line about each. |
 | [[file:project.org][This repository's own automation]] | The tasks this checkout defines, and how a release is cut. |
 | [[file:development.org][Hacking on maak]] | The suite and the traps a spec can fall into, the API documentation, the man page. |
 | [[file:community.org][Community, contributing and conduct]] | Where to ask, how to send a patch, the AI policy and the code of conduct. |

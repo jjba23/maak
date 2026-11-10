@@ -8,11 +8,13 @@
 
 Every editor here answers the same three questions the way maak does: what tasks
 does this =maak.scm= define, what arguments does one take, and how do I run it
-where I can read the output?  [[https://codeberg.org/jjba23/maak.el][maak.el]]
-is the Emacs answer and lives in a repository of its own; the rest live here.
+where I can read the output?  [[https://github.com/jjba23/maak.el][maak.el]]
+is the canonical answer and the project's first-class editor integration, and it
+lives in a repository of its own; the rest live here.
 
 | Editor         | What you get                                                        |
 |----------------+---------------------------------------------------------------------|
+| [[https://github.com/jjba23/maak.el][Emacs]]        | =maak.el=: tasks, argument prompts, output and completion in Emacs. |
 | [[file:nvim/README.org][Neovim]]         | =:Maak= picks with =vim.ui.select=, runs in a terminal tab.           |
 | [[file:vim/README.org][Vim]]            | =:Maak= picks from a numbered menu, runs in a terminal tab.           |
 | [[file:vscode/README.org][VS Code]]        | The command palette and =Tasks: Run Task=, running in a terminal.     |

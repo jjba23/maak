@@ -6,6 +6,26 @@
 
 [[file:index.org][Documentation index]]
 
+Emacs is the first-class citizen: [[https://github.com/jjba23/maak.el][maak.el]]
+is maak's canonical front end, and the editor the project is developed in.  The
+seven integrations in [[file:../contrib/README.org][=contrib/=]] are how the other
+editors get the same thing, and they are first-class for their editors too: they
+read the same task list through the same helper, so they list the same tasks,
+show the same docstrings, ask for the same arguments and dry-run the same way.
+
+* Emacs (maak.el)
+
+[[https://github.com/jjba23/maak.el][maak.el]] is maak's own Emacs front end:
+pick a task, prompt for its arguments, watch the output, jump to the definition,
+all from Emacs, from the same =maak.scm= the command line runs.  It lives in a
+repository of its own.
+
+#+attr_html: :width 640px
+[[https://jointhefreeworld.org/static-assets/maak/maak-in-emacs.png]]
+
+maak also plays nicely with the AREI/Ares nREPL server (see the ~repl~ task in
+this repository), which is how the author drives tasks straight from Emacs.
+
 * Shell completions
 
 maak ships completions for Bash, Zsh and Fish. In a directory with a Maak file, type ~maak~, a space, then TAB, and the task names appear. The completion scripts read the current Maak file and extract task names from it.
@@ -52,6 +72,7 @@ install -m 755 contrib/bin/maak-tasks ~/.local/bin/maak-tasks
 
 | Editor       | What you get                                                          | Where                                    |
 |--------------+-----------------------------------------------------------------------+------------------------------------------|
+| Emacs        | =maak.el=: tasks, argument prompts, output and completion in Emacs.    | [[https://github.com/jjba23/maak.el][maak.el]]                                 |
 | Neovim       | =:Maak= picks with =vim.ui.select= and runs in a terminal tab.          | [[file:../contrib/nvim/README.org][contrib/nvim]]       |
 | Vim          | =:Maak= picks from a numbered menu and runs in a terminal tab.          | [[file:../contrib/vim/README.org][contrib/vim]]        |
 | VS Code      | The command palette, and =Tasks: Run Task=, running in a terminal.      | [[file:../contrib/vscode/README.org][contrib/vscode]]     |
@@ -63,15 +84,6 @@ install -m 755 contrib/bin/maak-tasks ~/.local/bin/maak-tasks
 They all list the tasks the file defines, show the docstring, prompt for the arguments, run the task where its output belongs, visit a definition, and dry-run one with =maak -n=.  Neovim, Vim and VS Code also repeat the last run, and Neovim and Vim complete task names for =:MaakRun=.
 
 The prompts are maak.el's, because they are what maak's grammar allows: a required argument is asked for, an optional one left blank is not passed at all (and neither is anything after it), a rest argument takes any number of words, and a keyword argument is never asked for because a string never becomes a keyword.
-
-* Emacs
-
-There is an Emacs integration, [[https://codeberg.org/jjba23/maak.el][maak.el]]:
-
-#+attr_html: :width 640px
-[[https://jointhefreeworld.org/static-assets/maak/maak-in-emacs.png]]
-
-maak also plays nicely with the AREI/Ares nREPL server (see the ~repl~ task in this repository), which is how the author drives tasks straight from Emacs.
 
 * The REPL workflow
 

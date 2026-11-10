@@ -14,6 +14,28 @@ Nothing yet.
 
 *[Released]*
 
+** v0.18.1 (2026-11-10)
+
+Editor support got a section of its own in the README, Emacs is named as the
+canonical front end everywhere, and the list of projects that run maak moved out
+of the README and into the guide.
+
+*** Added
+
+- [[file:docs/who-uses-maak.org][=docs/who-uses-maak.org=]], the forty-one projects that run their automation on
+  maak, grouped and with a line about each, as a page of the guide instead of a
+  section of the README.
+
+*** Changed
+
+- The README has an *Editor support* section, and its *Who uses maak* section is
+  now a paragraph pointing at the new page.
+- =docs/editors.org= leads with Emacs: =maak.el= is the canonical front end, a
+  first-class citizen, and it is listed in the integrations table beside the
+  seven editors that ship here.  The page links to it on GitHub.
+- =contrib/README.org= lists =maak.el= first, as the canonical answer, and links
+  to it on GitHub.
+
 ** v0.18.0 (2026-11-10)
 
 Zed's task list stops being a snapshot: =maak-zed= writes it again when the

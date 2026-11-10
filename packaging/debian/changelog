@@ -1,3 +1,12 @@
+maak (0.18.1-1) unstable; urgency=medium
+
+  * The README has an Editor support section, with maak.el named as the
+    canonical front end, and its list of projects that run maak moved to
+    docs/who-uses-maak.org.  docs/editors.org leads with Emacs and lists
+    maak.el beside the seven integrations that ship in contrib/.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Tue, 10 Nov 2026 19:40:00 +0100
+
 maak (0.18.0-1) unstable; urgency=medium
 
   * The generated Zed task file is kept in step with the Maak file:
