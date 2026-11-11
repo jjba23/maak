@@ -83,12 +83,11 @@ is maak's canonical front end: pick a task, prompt for its arguments, watch the
 output and jump to the definition, from inside Emacs, from the same =maak.scm=
 the command line runs.
 
-The other editors are welcome, and well served.  Neovim, Vim, VS Code, Helix,
+The other editors are also served.  Neovim, Vim, VS Code, Helix,
 IntelliJ, Zed and Sublime Text each have an integration in
-[[file:contrib/README.org][contrib/]], all reading one task list from one
-Guile helper — so they list the same tasks, show the same docstrings, ask for the
-same arguments and dry-run the same way.  [[file:docs/editors.org][Editors, shells and
-the REPL]] has the details, and every integration has a README of its own.
+[[file:contrib/README.org][contrib/]] .
+
+[[file:docs/editors.org][Editors, shells and the REPL]] has the details, and every integration has a README of its own.
 
 * Documentation
 
@@ -113,10 +112,7 @@ recorded in [[file:NEWS.org][NEWS.org]].
 
 * Who uses maak
 
-maak runs the build, release and site automation of forty-one projects: Guile
-libraries and programs, a CI orchestrator and several CMSs of their own, GNU/Linux
-distributions and cloud configurations, Emacs packages, and the sites of
-jointhefreeworld.  The list, with a line about each, is in
+maak runs the build, release and site automation of many projects, see a list in
 [[file:docs/who-uses-maak.org][Who uses maak]].
 
 Using maak in your project? Send a link and it can be listed there.
