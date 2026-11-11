@@ -60,11 +60,7 @@ Most build tools invent their own limited domain-specific language.  Maak embrac
 The full list — pipelines, background jobs, ~-j~, containers, niri, downloads,
 gettext — is in [[file:docs/features.org][Features]].
 
-* Install in one line
-
-#+begin_src shell
-guix install maak
-#+end_src
+* Installation
 
 Guix, Nix, the container image, the RPM and the Debian package are all in
 [[file:docs/installation.org][Installing maak]]. From a checkout, the launcher
