@@ -44,10 +44,8 @@ Most build tools invent their own limited domain-specific language.  Maak embrac
 /This also means your code is flexible, robust and reliable (+declarative) for at least the next 50 years./
 #+end_quote
 
-* What maak is, in fifteen seconds
-
-- *What it is.* A command runner and control plane. You write a file called ~maak.scm~ — a perfectly normal Guile module — and every function in it becomes a runnable task.
-- *Who it is for.* Lispers who want their automation to be as powerful as their editor, and everyone who is tired of Make's runes, shell-script glue, and YAML pipelines that cannot loop.
+- *What is it it.* A command runner and control plane. You write a file called ~maak.scm~ — a perfectly normal Guile module — and every function in it becomes a runnable task.
+- *Who is it for.* Lispers who want their automation to be as powerful as their editor, and everyone who is tired of Make's runes, shell-script glue, and YAML pipelines that cannot loop.
 - *Why it matters.* Tasks are real Scheme functions: composable, testable, declarative, dry-runnable, parallelisable, and reproducible.
 
 * Lisp all the way down
