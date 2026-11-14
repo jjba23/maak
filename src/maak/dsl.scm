@@ -1315,8 +1315,13 @@ are asked for together."
          (maak-proc? proc))))
 
 (define (maak-proc? x)
-  "Predicate that indicates whether a procedure is a valid maak proc."
-  (procedure? x))
+  "Predicate that indicates whether a procedure is a valid maak proc.
+
+A parameter is a procedure too -- `(define build-args (make-parameter '()))'
+returns one -- and it is a value a task reads rather than a task, so it is not a
+maak proc even though it can be called."
+  (and (procedure? x)
+       (not (parameter? x))))
 
 (define* (delete-file-recursively dir
                                   #:key (verbose? #f) (expand? #f))
