@@ -21,6 +21,7 @@
 | ~-j~  | ~--jobs~               | ~N~      | Run up to ~N~ tasks at the same time, keeping each task's output together.       |
 | ~-k~  | ~--keep-going~         | None     | A task that fails does not stop the tasks after it.                            |
 | ~-l~  | ~--list~               | None     | List every available task in the loaded Maak file.                             |
+|       | ~--json~               | None     | With ~--list~, print the listing as JSON, for an editor or another program.     |
 | ~-t~  | ~--tasks~              | ~LIST~   | Run the tasks in ~LIST~ (comma separated), leaving every other word as an argument. |
 | ~-L~  | ~--load-path~          | ~DIR~    | Add ~DIR~ to Guile's load path (repeatable; ~:~-separated allowed).              |
 | ~-n~  | ~--dry-run~            | None     | Print shell commands instead of executing them.                                |
@@ -93,6 +94,29 @@ maak -C ../other-project -- build
 ~-C~ may be repeated, and the directories are entered in the order given, so ~maak -C build -C signatures -- sign~ runs from ~build/signatures~. A directory that is not there is an error rather than a quiet fallback, because a task must never run somewhere it was not asked to.
 
 The directory a run enters is reported, which is what Make's ~-w~ prints; ~--no-print-directory~ is the switch that leaves those lines out, for a run whose output is read by something other than a person. ~-q~ asks for that silence too, along with the rest of what the run would say.
+
+** The listing a program reads
+
+~--list~ prints the tasks for a person. ~--list --json~ prints the same listing for a program — an editor, a CI job, an agent — so none of them has to parse either the file or the human listing:
+
+#+begin_src shell
+$ maak --list --json
+{"version":1,"file":"/p/maak.scm","root":"/p","tasks":[{"name":"deploy","doc":"Ship it.","line":12,"depends":["build"],"example":"maak deploy prod","arguments":[{"name":"target","kind":"required","default":"","hasDefault":false,"keyword":"","doc":"the host to ship to"}]}]}
+#+end_src
+
+One object, on one line, and nothing else on standard output: the banner and the log lines an interactive run prints are suppressed, so the JSON is the whole of what a reader gets. ~version~ is the shape's own version, and ~1~ is the only one there has been; a consumer that checks it can tell a description it understands from one written after it.
+
+Each task carries:
+
+- ~name~, ~doc~ and ~line~ — the name, the docstring as the file writes it, and the line the definition starts on;
+- ~depends~ and ~example~ — what ~task-metadata!~ declared (see [[file:tasks.org][the Tasks page]]), empty when it declared nothing;
+- ~arguments~, in the order maak binds them, each with ~name~, ~kind~ (~required~, ~optional~, ~key~ or ~rest~), ~default~ as the expression is written, ~hasDefault~, ~keyword~ for the spelling of a key argument, and ~doc~, the prose the docstring's ~Args:~ section gives it.
+
+The task set, the docstrings and the metadata come from the loaded Maak file, because that is what a run obeys: a task a macro defines, or one a used module brings in, is a task maak will run and therefore a task the listing names. The lambda list and the line come from the file itself, which is the only place they exist — Guile keeps neither in a compiled procedure — so a task the file does not spell out arrives with no arguments rather than with guessed ones.
+
+~--json~ on its own is an error, since it describes a listing rather than asking for one; write ~maak --list --json~.
+
+An editor that has to answer without loading the file — because it is halfway through an edit, or because the project's libraries are not installed — has ~contrib/bin/maak-tasks~, which prints the same object from the file alone (see [[file:editors.org][Editors]]).
 
 * Environment files
 

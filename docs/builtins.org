@@ -149,6 +149,26 @@ Guile has no heredoc, so a long message is a string spanning several source line
 (unlines '("a" "b"))          ;; join with newlines
 #+end_src
 
+* Declaring what a task is
+
+A docstring says what a task does. Three things about it are not prose, and ~task-metadata!~ records them, in a call of its own after the definition:
+
+#+begin_src scheme
+(define (push-docker-latest)
+  "Push the latest locally generated image to Dockerhub."
+  (container (list "push" "localhost/maak:latest" "docker.io/jjba23/maak:latest")))
+
+(task-metadata! push-docker-latest
+                #:depends '(package-docker)
+                #:example "maak push-docker-latest")
+#+end_src
+
+- ~#:depends~ is a quoted list of task names that must have finished before this one starts. It orders a run — sequential or ~-j~ — and decides nothing else: maak has no notion of up to date, so a task named on the command line runs whether or not what it needs has changed. A dependency that names no task, and a cycle, are errors before anything runs.
+- ~#:hidden?~ keeps the task out of the listings, the one a person reads and the one an editor reads, while leaving it runnable by name.
+- ~#:example~ is one invocation to show a reader, as a string.
+
+The vocabulary is those three fields and no more: a fourth would be a claim about what a task *is*, which is a decision for a release rather than a key a project adds. ~task-depends~, ~task-hidden?~ and ~task-example~ read the declaration back from a task procedure, which is what ~maak --list~ and ~maak --list --json~ do.
+
 * Internationalisation
 
 The gettext workflow, packaged so it does not have to be rewritten per project. The layout is the conventional one (~DIR/LANG/LC_MESSAGES/DOMAIN.po~):

@@ -18,15 +18,18 @@ world — `shell.scm`, `git.scm`, `archive.scm`, `guix.scm`, `nix.scm`,
 What works, concretely: a Maak file is loaded, its `maak-task?` variables are
 collected from the module's public interface, and each one is runnable by name
 with the words after it bound to its lambda list. `run` and `run-pipeline` take
-argv lists, never a shell string; a pipeline reports every failing stage, gives a
-stage its own environment or elevation, and can keep what each stage wrote. The
+argv lists, never a shell string; a pipeline reports every failing stage, gives
+a stage its own environment or elevation, and can keep what each stage wrote. The
 command line carries Make's flags (`-f`, `-C`, `-n`, `-k`, `-i`, `-j`, `-L`, `-e`)
 plus `--list`, `--tasks`, `--debug` and the banner controls. Parallel runs fork one
-worker per task and print each task's output as a block, in the order named. Seven
-editor integrations in `contrib/` read the task list through
-`contrib/bin/maak-tasks`, which parses the file without evaluating it and prints
-JSON. The suite runs under Veritas in `test/veritas/unit`, with a page of the
-guide for each feature area.
+worker per task and print each task's output as a block, in the order named. Tasks
+can declare what they need first, whether a listing should offer them and an
+example invocation, and both the sequential and the parallel runner order a run
+accordingly. `maak --list --json` prints the task description as one versioned
+JSON object, and the seven editor integrations in `contrib/` read the same
+description through `contrib/bin/maak-tasks`, which borrows maak's own reader and
+therefore asks the file rather than evaluating it. The suite runs under Veritas in
+`test/veritas/unit`, with a page of the guide for each feature area.
 
 Three decisions constrain everything that follows.
 
@@ -51,8 +54,11 @@ would be a rewrite, not a port.
 1. **One task description, many consumers.** A Maak file is read by maak, by
    `maak.el`, by seven other editors, by shell completions and by CI, and all of
    them agree because they consume the same machine-readable description emitted
-   by maak itself, versioned, with a schema. Today each consumer reimplements
-   part of the parse.
+   by maak itself, versioned, with a schema. `maak --list --json` is that
+   description, and `contrib/bin/maak-tasks` borrows its reader rather than
+   growing a second parse; what is still per-consumer is the rendering — the Zed
+   task file, the fzf columns — and the completion scripts, which read the file
+   themselves.
 
 2. **Tasks carry structure, not just a docstring.** A task can declare what it
    needs and what it produces as data — so `-j` can order rather than merely
@@ -75,21 +81,11 @@ would be a rewrite, not a port.
 
 ## Features that are in scope and not built yet
 
-- **A machine-readable task listing.** `contrib/bin/maak-tasks` exists precisely
-  because `maak --list` prints for humans only. The hard part is not JSON; it is
-  making a static reader and the real loader agree, character for character, on a
-  file that is valid Scheme but only partly evaluable — macros, conditionals,
-  tasks defined through `use-modules`.
-- **Task metadata beyond the docstring.** `maak-task?` is already a distinct
-  predicate rather than `procedure?`, so the seam exists. The hard part is a
-  vocabulary small enough to be non-negotiable: dependencies, a hidden flag, an
-  example invocation, nothing else.
-- **Argument descriptions editors can prompt for.** The lambda list and argument
-  kinds are already read statically; what is missing is the prose for what to
-  type, and a rule for where it lives without a second docstring format.
-- **Dependency-aware `-j`.** Parallel runs fan out across the tasks named on the
-  command line and print in name order. The hard part is a scheduler and a cycle
-  check that do not introduce a cache by the back door.
+- **Dependency-aware `-j` without a scheduler of its own.** A declared dependency
+  already gates a worker, so `-j` puts a task after the ones it needs. What is
+  missing is the rest of the ordering story: a `--plan` that shows the graph
+  before anything runs, and a rule for what a failed dependency means to the tasks
+  after it.
 - **A completion generator.** `scripts/maak-completion.bash`, `.zsh` and `.fish`
   are maintained by hand and read the Maak file themselves. The hard part is
   emitting all three from one description without making the scripts slower than
@@ -98,6 +94,8 @@ would be a rewrite, not a port.
   `PATH`, so a task that leaks a dependency on the developer's machine fails
   where it should — without contradicting `.env` loading or the parameterised
   `dry-run?`/`quiet?` semantics.
+- **A canonical printer.** `just --fmt` has no counterpart, and a Maak file is
+  Scheme, so a formatter is a convenience rather than a nicety.
 
 ## New features that would be worth having
 
@@ -119,23 +117,18 @@ would be a rewrite, not a port.
 
 ## Contributions that would move the needle
 
-1. **Promote `contrib/bin/maak-tasks` into `maak --list --json`.** Highest value
-   per hour here: one reader replacing seven integrations' worth of duplicated
-   parsing, with `contrib/test/maak-tasks.sh` already covering every task shape.
-2. **A Veritas spec that keeps `--list` and the docs in step.**
+1. **A Veritas spec that keeps `--list` and the docs in step.**
    `test/veritas/unit/guide.scm` already resolves every `file:` link and every
    `CUSTOM_ID`; the same technique applied to "every exported helper appears in
    `docs/builtins.org`" retires a whole class of silent rot.
-3. **Extract the completion scripts from one description.** Three files, one
+2. **Extract the completion scripts from one description.** Three files, one
    source of truth, and a shell-level test that compares generated output to the
    checked-in text.
-4. **Document the task metadata record before implementing it.** A paragraph in
-   the guide that argues for three fields and rejects the fourth is worth more
-   than the code, because it is the decision that is hard to reverse.
-5. **Startup benchmarks under `statprof`.** AGENTS.md asks for a measurement
+3. **Startup benchmarks under `statprof`.** AGENTS.md asks for a measurement
    before a speedup; nobody has published one, and module resolution is the
-   obvious place to look.
-6. **One more migration page, and one more spec.** `docs/why-maak.org` has the
+   obvious place to look — the static reader now borrows the library, which is
+   worth a number before anyone optimises it.
+4. **One more migration page, and one more spec.** `docs/why-maak.org` has the
    Make table; a page for `just` and Task users is where most newcomers actually
    come from, and a Veritas spec exercising engine detection against a fake
    container binary would harden `container.scm` cheaply.
@@ -156,9 +149,7 @@ What the others do that maak could still add: Task's declared input/output
 fingerprinting is the one genuinely good idea in the field that maak does not
 have, and it should arrive — if it ever does — as an opt-in record on a task
 rather than as default semantics. `just --fmt` has no counterpart, and a
-canonical printer for Maak files would be a real convenience. Mage's typed
-argument parsing is where the lambda-list-as-grammar approach is closest to
-winning outright, and the only missing piece is prose for the arguments.
+canonical printer for Maak files would be a real convenience.
 
 Where maak is ahead and should stay ahead: one language from task definition to
 error message; a dry run that is a Scheme parameter and therefore testable, rather

@@ -45,13 +45,15 @@ integration runs.  It reads the Maak file and prints its tasks as JSON:
 
 #+begin_src shell
 $ contrib/bin/maak-tasks --preview deploy
-deploy target [env="dev"]
+deploy target [env="dev"] #:jobs=1 ...extra
 
   Ship the build to the server.
 
-  target required
-  env optional -- default: "dev"
-  #:jobs keyword -- default: 1
+  needs: build
+  example: maak deploy prod.example.com
+  target required; the host to ship to, as HOST[:PORT].
+  env optional -- default: "dev"; which environment's .env file to read.
+  #:jobs keyword -- default: 1; how many uploads at once.
   extra rest
 #+end_src
 
@@ -64,13 +66,23 @@ is what lets every editor offer the same thing maak.el does:
 - the lambda list, so a required argument is asked for, an optional one shows
   its default, a rest argument takes several words, and a keyword argument is
   shown but never asked for, because maak's command line cannot pass one;
+- the prose for each argument, from the =Args:= section of the docstring;
+- what the task declares about itself with =task-metadata!=: the tasks it needs
+  first, whether a listing should offer it, and an example invocation;
 - the line the definition starts on, so a task can be visited where it is
   written.
 
-The file is read, never evaluated: asking for the task list runs nothing.
+The reading is maak's own =((maak tasks))= module, so a task is described once in
+this repository rather than once per integration.  =maak --list --json= answers
+from the same module after loading the file, and the two agree on a file whose
+tasks are all written out.  The helper only reads, which is why it can answer
+while the file is half-written and on a machine that has none of the project's
+libraries; =maak --list --json= loads, which is why it also knows the tasks a
+macro or a used module defines.
 
-=maak-tasks= needs Guile, which maak needs anyway.  Install it where your
-shell finds it:
+=maak-tasks= needs Guile, which maak needs anyway, and maak's libraries: it finds
+them beside itself in a checkout, or on the load path where an installed maak
+puts them.  Install it where your shell finds it:
 
 #+begin_src shell
 install -m 755 contrib/bin/maak-tasks ~/.local/bin/maak-tasks
@@ -80,7 +92,8 @@ Each integration takes the helper's path as a setting — =g:maak_helper=,
 =maak.helper=, the =Maak.sublime-settings= file, =MAAK_TASKS= for the Helix
 picker — so a checkout works without installing anything.
 ~contrib/test/maak-tasks.sh~ checks the helper against a fixture that holds one
-task of every shape:
+task of every shape, and checks that the helper and =maak --list --json= describe
+the same file with the same bytes:
 
 #+begin_src shell
 ./contrib/test/maak-tasks.sh

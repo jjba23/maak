@@ -1,3 +1,23 @@
+maak (0.19.0-1) unstable; urgency=medium
+
+  * The task description is data, and every consumer reads the same one.
+    `maak --list --json` prints it as one versioned JSON object: each task's
+    docstring, the line its definition starts on, what it needs first, an
+    example invocation, and each argument with its kind, default and prose.
+  * `task-metadata!` declares what a task is beyond its docstring, in exactly
+    three fields: `#:depends`, `#:hidden?` and `#:example`.  A dependency orders
+    a run, sequential or -j, and nothing else; nothing is remembered between
+    runs.
+  * Argument prose comes from an `Args:` section in the docstring, which is the
+    convention the library's own docstrings already kept.
+  * contrib/bin/maak-tasks is a front end for maak's own reader rather than a
+    second parser of the same file, so the helper and `maak --list --json`
+    agree byte for byte on a file whose tasks are written out.
+  * A parameter is no longer a task: `maak-proc?` no longer counts a value that
+    happens to be callable.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Sat, 14 Nov 2026 22:00:00 +0100
+
 maak (0.18.1-1) unstable; urgency=medium
 
   * The README has an Editor support section, with maak.el named as the

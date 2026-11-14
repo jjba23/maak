@@ -57,14 +57,18 @@ fi
 
 * Editor integrations
 
-Every editor that can run a process gets an integration, and they all read the same task list from the same helper. [[file:../contrib/README.org][=contrib/=]] holds them, and the helper they share is =contrib/bin/maak-tasks= — a small Guile script that reads the Maak file the way maak and maak.el do, and prints its tasks as JSON:
+Every editor that can run a process gets an integration, and they all read the same task list from the same helper. [[file:../contrib/README.org][=contrib/=]] holds them, and the helper they share is =contrib/bin/maak-tasks= — a small Guile script that reads the Maak file the way maak does, and prints its tasks as JSON:
 
 - only what the =#:export= list names, or every procedure when it exports nothing;
 - each docstring, which is the task's documentation;
 - each lambda list, so an editor can ask for a required argument, show the default of an optional one, take several words for a rest argument and leave a keyword argument alone — maak's command line cannot pass one;
+- the prose for each argument, from the ~Args:~ section of the docstring, which is what a prompt says when it can;
+- what the task declares about itself: the tasks it needs first, whether a listing should offer it, and an example invocation;
 - the line the definition starts on, so a task can be visited where it is written.
 
-The file is read, never evaluated.  Put the helper where your shell finds it, once, for every editor below:
+The reading is maak's own =((maak tasks))= module, the one =maak --list --json= answers from (see [[file:cli.org][the command line]]), so a task is described once in this repository rather than once per consumer. What each reader is allowed to do is what differs: =maak --list --json= loads the file, so it knows every task a run would find, and the helper only reads it, so it answers while the file is halfway through an edit and on a machine with none of the project's libraries. On a file whose tasks are all written out the two agree byte for byte, which is what =contrib/test/maak-tasks.sh= checks.
+
+The helper needs maak's libraries, and finds them beside itself in a checkout or on the load path, where an installed maak puts them. The Maak file itself is still never evaluated.  Put the helper where your shell finds it, once, for every editor below:
 
 #+begin_src shell
 install -m 755 contrib/bin/maak-tasks ~/.local/bin/maak-tasks
@@ -83,7 +87,7 @@ install -m 755 contrib/bin/maak-tasks ~/.local/bin/maak-tasks
 
 They all list the tasks the file defines, show the docstring, prompt for the arguments, run the task where its output belongs, visit a definition, and dry-run one with =maak -n=.  Neovim, Vim and VS Code also repeat the last run, and Neovim and Vim complete task names for =:MaakRun=.
 
-The prompts are maak.el's, because they are what maak's grammar allows: a required argument is asked for, an optional one left blank is not passed at all (and neither is anything after it), a rest argument takes any number of words, and a keyword argument is never asked for because a string never becomes a keyword.
+The prompts are maak.el's, because they are what maak's grammar allows: a required argument is asked for, an optional one left blank is not passed at all (and neither is anything after it), a rest argument takes any number of words, and a keyword argument is never asked for because a string never becomes a keyword. When the docstring gives an argument prose under its ~Args:~ line, that is what the prompt shows; when it does not, the editor shows the name and the default it already has, which is why the prose is worth writing.
 
 * The REPL workflow
 

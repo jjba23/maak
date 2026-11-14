@@ -22,6 +22,8 @@ Tasks can:
 
 You extend maak the same way you extend any Scheme program: by writing more Scheme.
 
+A *value* is not a task, and neither is a parameter. ~(define deb-packages (make-parameter '()))~ returns something callable, but it is a value a task reads rather than a task, so it never appears in a listing and cannot be run by name.
+
 ** Exports decide what is runnable
 
 - *Open fallback (no exports).* If you do not write an ~#:export~ directive in your module, or leave it empty, maak is "open season": every procedure in the file is a task.
@@ -75,8 +77,31 @@ Task arguments always arrive as strings, because that is what a command line is.
               (string-lines (read-file "data/numbers.txt")))))
 #+end_src
 
-** Do not shadow the built-ins
+** Writing the prose for an argument
 
+The lambda list says what an argument is called and whether it has to be given; it cannot say what to type. That answer goes in the docstring, under a line reading ~Args:~, one line per argument:
+
+#+begin_src scheme
+(define* (deploy target #:optional (env "dev"))
+  "Ship the build to the server.
+
+Args:
+  target: the host to ship to, as HOST[:PORT].
+  env: which environment's .env file to read; the default is the one beside
+    the Maak file."
+  ...)
+#+end_src
+
+The rule is the one this repository's own docstrings already kept, which is why it is a convention over the docstring rather than a second format beside it:
+
+- a line reading ~Args:~ starts the section;
+- every line under it names one argument, then a colon, then the prose;
+- a line that names no argument continues the one above it, so prose may wrap;
+- a blank line ends the section.
+
+~maak --list~ prints the docstring as it stands, so the section reads as documentation there. ~maak --list --json~ and ~contrib/bin/maak-tasks --preview~ give the same prose beside the argument it belongs to, which is what an editor prompts with.
+
+** Do not shadow the built-ins
 Avoid task names that collide with names maak or Guile already provide — ~format~, ~display~, ~run~, ~test~ is fine but ~list~ is asking for trouble. Pick something specific: ~fmt~, ~lint~, ~check~, ~ship~.
 
 ** Tasks calling tasks
@@ -92,6 +117,46 @@ A task is a procedure, so calling one is a function call. No subprocess, no shel
 #+end_src
 
 When you *do* want a separate process — a clean environment, a different working directory, an exit status of its own — use ~run~ or ~$~.
+
+** What a task declares about itself
+
+A docstring says what a task does. Three things about a task are not prose, and they arrive as a call of its own, after the definition:
+
+#+begin_src scheme
+(define (package-docker)
+  "Build a Docker image for Maak."
+  (guix-pack '() #:format "docker" #:image-tag "maak"))
+
+(define (push-docker-latest)
+  "Push the latest locally generated Docker image to Dockerhub."
+  (container (list "push" "localhost/maak:latest" "docker.io/jjba23/maak:latest")))
+
+(task-metadata! package-docker #:example "maak package-docker")
+(task-metadata! push-docker-latest #:depends '(package-docker))
+#+end_src
+
+The vocabulary is exactly three fields, and it is closed:
+
+- ~#:depends~ is a quoted list of task names that must have finished before this one starts. A dependency says *when* a task may run, never whether it does: maak has no notion of up to date, and a task named on the command line runs whether or not what it needs has changed. That is what keeps ordering from becoming a cache by the back door.
+- ~#:hidden?~ keeps a task out of the listings — the one a person reads and the one an editor reads — while still letting it be run by name and needed by another task. It is for the work a project does *for* its tasks rather than for a person: the tidy-up after a deploy, the helper that publishes one artefact.
+- ~#:example~ is one invocation to show a reader, as prose. It is what a picker prints under the documentation, so a task whose arguments matter says how it is normally called.
+
+Put the call after the definition, where the name is bound. The task it describes is the procedure, so a declaration for something that is not a task is an error where it is written, and so is a dependency that is not a name. Metadata lives on the procedure, which means it dies with the task it describes: a run that loads another Maak file cannot inherit it.
+
+Nothing else is a field, and that is the decision rather than an omission. Inputs, outputs, a timeout, a retry count — each of those is a claim about what a task *is*, and adding one is a change to maak's vocabulary and a decision to argue in the release notes, not a key a project adds on its own. The three that exist are the ones that a runner, a listing and an editor all need and that a task cannot express any other way.
+
+What they do:
+
+#+begin_src shell
+# A dependency orders a run: package-docker finishes before push-docker-latest
+# starts, whether the run is sequential or -j runs several tasks at once.
+maak push-docker-latest
+
+# A hidden task is not offered, but it can still be named
+maak tidy
+#+end_src
+
+A dependency that names no task of the file, and a cycle, are errors before anything runs — ~dependency cycle: a -> b -> a~ says which tasks the cycle runs through. A task named twice is run once, and a dependency two tasks share runs once before the first of them.
 
 * How ~--list~ lays out docstrings
 
@@ -120,3 +185,10 @@ The docstring of a task is its documentation. ~maak --list~ prints it in a way t
   #+end_src
 
 Common source indentation is removed first, so a docstring written inside an indented procedure still reads flush left.
+
+A task that needs others to have finished first says so under its documentation, and a task that asked to be left out with ~#:hidden?~ is left out of the listing altogether:
+
+#+begin_src
+push-docker-latest: Push the latest locally generated Docker image to Dockerhub.
+                    needs: package-docker
+#+end_src

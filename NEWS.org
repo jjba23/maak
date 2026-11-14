@@ -14,6 +14,63 @@ Nothing yet.
 
 *[Released]*
 
+** v0.19.0 (2026-11-14)
+
+The three items the vision document listed as "in scope and not built yet" are
+built, and they rest on one decision: what a task is, is data — and every
+consumer reads the same description of it.
+
+*** Added
+
+- `maak --list --json` prints the task listing as one versioned JSON object:
+  the file, the root it sits in, and every task with its docstring, the line its
+  definition starts on, what it needs first, an example invocation and the
+  arguments maak binds, each with its kind, its default and the prose that
+  describes it.  Nothing else is printed, so the output is the JSON and only the
+  JSON.  `--json` on its own is an error, since it describes a listing rather
+  than asking for one.
+- `task-metadata!` declares what a task is beyond its docstring, and the
+  vocabulary is exactly three fields: `#:depends`, a quoted list of tasks that
+  must have finished before this one starts; `#:hidden?`, which keeps a task out
+  of the listings while leaving it runnable; and `#:example`, one invocation to
+  show a reader.  A fourth field is a decision about what a task is rather than a
+  key a project adds, which is why the list is closed.
+- A dependency orders a run and nothing else: the sequential runner and `-j`
+  both put a task after the ones it needs, a task named twice runs once, and a
+  cycle or a dependency that names no task is an error before anything starts.
+  Nothing is remembered between runs, so ordering has not become a cache by the
+  back door.
+- The prose for an argument lives in the docstring under a line reading `Args:`,
+  one line per argument, which is the convention this repository's own
+  docstrings already kept.  `maak --list --json` and
+  `contrib/bin/maak-tasks --preview` give it beside the argument it belongs to,
+  which is what an editor prompts with.
+- `maak --list` says what a task needs first, under its documentation, and
+  leaves out a task that asked to be hidden.
+- `test/veritas/unit/listing.scm`, `test/veritas/unit/metadata.scm` and
+  `test/veritas/unit/json.scm`, plus cases in `integration.scm` that compare the
+  two readers byte for byte and run a dependency-ordered `-j`.
+
+*** Changed
+
+- `contrib/bin/maak-tasks` is a front end for maak's own reader, `(maak tasks)`,
+  instead of a second parser of the same file.  Its modes, its exit statuses and
+  its JSON all stay, and a task is now described once in this repository rather
+  than once per integration.  It needs maak's libraries, which it finds in a
+  checkout or wherever an installed maak put them.
+- The fixture the helper and the guide are tested against has one task of every
+  shape, a hidden task, a dependency and a written-out argument section.
+- A parameter is no longer a task.  `(define build-args (make-parameter '()))`
+  returns something callable, and `maak-proc?` counted it as one, so a value a
+  task reads appeared in the listing as a task with no documentation.
+
+*** Fixed
+
+- `packaging/debian/changelog` carries the released version again; it had been
+  five releases behind, which the suite had been failing on.
+
+*[Released]*
+
 ** v0.18.2 (2026-11-10)
 
 *** Added
