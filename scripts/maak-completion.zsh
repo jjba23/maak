@@ -15,6 +15,7 @@ _maak() {
         '(-i --ignore-errors)'{-i,--ignore-errors}'[Keep going after a failure, and still succeed]'
         '(-k --keep-going)'{-k,--keep-going}'[Keep going after a failure]'
         '(-l --list)'{-l,--list}'[List available tasks in the Maak file]'
+        '--json[Print the task listing as JSON, with --list]'
         '(-L --load-path)'{-L,--load-path}'[Add a directory to the Guile load path]:directory:_directories'
         '(-n --dry-run)'{-n,--dry-run}'[Dry-run mode (print shell commands without executing)]'
         '(-q --quiet)'{-q,--quiet}'[Quiet mode (suppress logging output)]'

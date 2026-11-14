@@ -70,6 +70,7 @@
 (define keep-going-fixture "test/maak/fixtures/keep-going.scm")
 (define several-fixture "test/maak/fixtures/several.scm")
 (define parallel-fixture "test/maak/fixtures/parallel.scm")
+(define order-fixture "test/maak/fixtures/order.scm")
 (define subdir "test/maak/fixtures/subdir")
 
 (define (unique-path name)
@@ -124,9 +125,23 @@ own, because a pipe can only be read once and both streams are wanted."
     (delete-file err-file)
     (list status stdout stderr)))
 
+(define (helper-run . arguments)
+  "Run the editor helper with ARGUMENTS and return its standard output.
+
+The helper is the other reader of a Maak file: it reads the file without
+evaluating it, which is what lets an editor ask about a file halfway through an
+edit.  Its standard error is dropped -- it carries Guile's notes about compiling
+the library it borrows, not anything about the tasks."
+  (let ((port (with-error-to-file "/dev/null"
+                (lambda ()
+                  (apply open-pipe* OPEN_READ "contrib/bin/maak-tasks"
+                         arguments)))))
+    (let ((stdout (get-string-all port)))
+      (close-pipe port)
+      stdout)))
+
 (define (status-of result)
   (list-ref result 0))
-
 (define (stdout-of result)
   (list-ref result 1))
 
@@ -308,6 +323,51 @@ that a case can ask about it alongside the status of the run."
                                #:got (list (status-of result)
                                            (said? result "stderr"
                                                   "invalid job count")))))
+
+         ;; A dependency orders a run of workers as well, and the only honest
+         ;; way to ask is in a process: the task that needs another looks for
+         ;; the file the other one wrote, so the answer says whether it started
+         ;; before or after the task it needs had finished.
+         (test "-j starts a task only after the ones it needs have finished"
+               (let* ((marker (unique-path "order-marker"))
+                      (result (begin
+                                (setenv "MAAK_ORDER_MARKER" marker)
+                                (launcher-run "-f" order-fixture
+                                              "--no-banner"
+                                              "-j" "2" "--" "finish"))))
+                 (unsetenv "MAAK_ORDER_MARKER")
+                 (when (file-exists? marker) (delete-file marker))
+                 (assert-equal #:expect (list 0 #t)
+                               #:got (list (status-of result)
+                                           (said? result "stdout"
+                                                  "finish-saw-prepare")))))
+
+         ;; ---- One description, two readers -------------------------------
+         ;;
+         ;; `--list --json' asks the loaded module what its tasks are and
+         ;; completes that with the file's lambda lists; the helper the editors
+         ;; run asks only the file.  The two answers are compared byte for byte
+         ;; below, on a file with one task of every shape and on this checkout's
+         ;; own Maak file, so a shape one reader understands and the other does
+         ;; not fails here rather than in an editor.
+
+         (test "maak and the editor helper describe the same file the same way"
+               (let ((file (canonicalize-path "contrib/test/fixture/maak.scm")))
+                 (assert-equal #:expect (stdout-of (launcher-run "-f" file
+                                                                 "--list" "--json"))
+                               #:got (helper-run "--file" file))))
+
+         (test "maak and the editor helper agree on this checkout's Maak file"
+               (let ((file (canonicalize-path "maak.scm")))
+                 (assert-equal #:expect (stdout-of (launcher-run "-f" file
+                                                                 "--list" "--json"))
+                               #:got (helper-run "--file" file))))
+
+         (test "the helper leaves a hidden task out of a listing it prints"
+               (assert-false (said? (list 0 (helper-run "--file"
+                                                        (canonicalize-path
+                                                         order-fixture)))
+                                    "stdout" "\"name\":\"tidy\"")))
 
          ;; ---- The task and argument grammar ------------------------------
          ;;

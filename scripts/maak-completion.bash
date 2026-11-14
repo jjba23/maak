@@ -13,7 +13,7 @@ _maak() {
   }
 
   local opts="-C --directory -e --env-file -f --file -h --help -i --ignore-errors
-    -k --keep-going -l --list -L --load-path -n --dry-run -q --quiet
+    -k --keep-going -l --list --json -L --load-path -n --dry-run -q --quiet
     -t --tasks -v --version --banner --no-banner --no-env-file
     --no-print-directory --debug"
 

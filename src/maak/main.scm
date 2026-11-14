@@ -32,6 +32,7 @@
   #:use-module (ice-9 getopt-long)
   #:use-module (maak maak)
   #:use-module (maak dsl)
+  #:use-module (maak tasks)
   #:use-module (maak version)
   ;; The error reporting helpers are readable from here so the test suite can
   ;; exercise the messages a user actually sees without starting a process.
@@ -42,6 +43,7 @@
   #:export (main maak-option-spec maak-default-file resolve-maak-file
                  resolve-banner? resolve-env-files truthy-string?
                  resolve-print-directory?
+                 describe-tasks
                  report-maak-error report-generic-error))
 
 (define maak-default-file
@@ -59,6 +61,12 @@
                (required? #f))
     (list (single-char #\l)
           (value #f)
+          (required? #f))
+    ;; `--json' is the listing for a machine rather than for a person: the same
+    ;; tasks, printed as the description an editor can act on.  It has no
+    ;; meaning without `--list', which is why it is a flag beside it rather than
+    ;; a mode of its own.
+    (json (value #f)
           (required? #f))
     (dry-run (single-char #\n)
              (value #f)
@@ -364,6 +372,62 @@ one line naming the tasks that did not."
                     names)
             #:hint "Each failure is reported above with the message the task gave it."))))))
 
+;; ====== The listing, for a machine ======
+;;
+;; `--list' prints the listing a person reads; `--list --json' prints the same
+;; listing for the editors and anything else that has to act on a project without
+;; guessing.  Two readers answer it, and each is asked for what only it can know.
+;;
+;; The loaded module decides which tasks there are, what their docstrings say and
+;; what they declare about themselves, because that is what a run obeys: a task a
+;; macro defines, or one a used module brings in, is a task maak will run.  The
+;; file supplies what a loaded module cannot: the lambda list, which Guile keeps
+;; out of a compiled procedure, and the line the definition starts on.  A task
+;; the file does not spell out therefore arrives with no arguments rather than
+;; with imagined ones.
+
+(define (describe-tasks file)
+  "Return the tasks FILE defines, as the description an editor reads.
+
+FILE is read as well as loaded: see the note above for which reader answers
+what.  The tasks come in the file's own order, which is the order the helper
+that editors already run prints, and a task the file does not spell out follows
+those it does, by name."
+  (let* ((written (static-tasks file))
+         (loaded (map (lambda (task)
+                        (let* ((name (symbol->string (car task)))
+                               (proc (variable-ref (cdr task)))
+                               (described (find (lambda (description)
+                                                  (string=? name
+                                                            (task-description-name
+                                                             description)))
+                                                written)))
+                          (make-task-description
+                           name
+                           (or (procedure-documentation proc) "")
+                           (if described
+                               (task-description-arguments described)
+                               '())
+                           (if described (task-description-line described) 0)
+                           (map symbol->string (task-depends proc))
+                           (task-hidden? proc)
+                           (task-example proc))))
+                      (resolve-maak-tasks)))
+         (by-name (lambda (name tasks)
+                    (find (lambda (task)
+                            (string=? name (task-description-name task)))
+                          tasks))))
+    (append
+     (filter-map (lambda (description)
+                   (by-name (task-description-name description) loaded))
+                 written)
+     (sort (remove (lambda (description)
+                     (by-name (task-description-name description) written))
+                   loaded)
+           (lambda (a b)
+             (string<? (task-description-name a)
+                       (task-description-name b)))))))
+
 ;; ====== Running ======
 
 (define (run-maak options)
@@ -372,6 +436,8 @@ one line naming the tasks that did not."
                                'resources #f))
         (should-list (option-ref options
                                  'list #f))
+        (should-json (option-ref options
+                                 'json #f))
         (should-version (option-ref options
                                     'version #f))
         (should-help (option-ref options
@@ -387,6 +453,10 @@ one line naming the tasks that did not."
       (should-version
        (print-version)
        0)
+      ((and should-json (not should-list))
+       (raise-maak-error
+        "--json prints the task listing, so it needs --list"
+        #:hint "Run `maak --list --json' to read the tasks as JSON."))
       (else
        ;; `-C' comes first, before the Maak file is found and before an
        ;; environment file beside it is looked for, so a relative `-f' means
@@ -421,8 +491,12 @@ one line naming the tasks that did not."
                                                            'load-path #f))
                             file)
          (parameterize ((dry-run? should-dry-run)
-                        (quiet? should-quiet)
-                        (banner? (resolve-banner? options)))
+                        ;; A listing a machine reads carries no greeting and no
+                        ;; log lines: it is read as JSON, whole, by something
+                        ;; that would choke on the banner in front of it.
+                        (quiet? (or should-quiet should-json))
+                        (banner? (and (not should-json)
+                                      (resolve-banner? options))))
            ;; The environment is read before the maak file is loaded, so a task
            ;; file can already consult the variables it names.
            (for-each (lambda (env-file)
@@ -437,7 +511,11 @@ one line naming the tasks that did not."
              (log-info "Loading tasks from Maak file: ~a\n" file))
            (load file)
            (if should-list
-               (list-tasks #:as-is? #f)
+               (if should-json
+                   (begin
+                     (display (tasks-json (describe-tasks file) file))
+                     (newline))
+                   (list-tasks #:as-is? #f))
                (begin
                  (unless (quiet?)
                    (log-info "Executing Maak tasks: ~a\n"

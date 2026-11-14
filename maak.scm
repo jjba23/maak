@@ -371,6 +371,14 @@ A bare push does not send tags that are not annotated; `maak git-push --
                       (~ "docker.io/jjba23/~a:latest" project-name))
                 #:verbose? #t))
 
+;; A push needs an image to push, and the task that builds one is a step of its
+;; own rather than something a push runs inline: `--dry-run' then shows the two
+;; commands in the order they would run, and `maak package-docker' stays a thing
+;; to run on its own.
+(task-metadata! push-docker-latest
+                #:depends '(package-docker)
+                #:example "maak push-docker-latest")
+
 (define (push-docker-tag)
   "Push the locally generated Docker image to Dockerhub."
   (git:git-fetch "--all")
@@ -379,6 +387,8 @@ A bare push does not send tags that are not annotated; `maak git-push --
                         (~ "localhost/~a:latest" project-name)
                         (~ "docker.io/jjba23/~a:~a" project-name latest-tag))
                   #:verbose? #t)))
+
+(task-metadata! push-docker-tag #:depends '(package-docker))
 
 (define deb-packages
   (make-parameter (map symbol->string

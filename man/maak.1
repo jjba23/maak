@@ -204,7 +204,21 @@ fails with the list of tasks that did not succeed.  Without this flag the first
 failure ends the run, which is what a pipeline of tasks usually wants.
 .TP
 .BR \-l ", " \-\-list
-List every task in the loaded Maak file, with its documentation.
+List every task in the loaded Maak file, with its documentation.  A task that
+declared what it needs first under its documentation, and a task that asked to
+be left out of the listings is left out altogether.
+.TP
+.B \-\-json
+With
+.BR \-\-list ,
+print the listing as JSON instead of as text: one object naming the file, the
+root it sits in, and every task with its name, docstring, the line its
+definition starts on, the tasks it needs first, an example invocation and the
+arguments maak binds, each with its kind, default and the prose the docstring
+gives it.  Nothing else is printed, so the output is the JSON and only the
+JSON.  Without
+.BR \-\-list
+it is an error, because it describes a listing rather than asking for one.
 .TP
 .BR \-L ", " \-\-load\-path " " DIR
 Add
@@ -484,6 +498,35 @@ The same mechanism for a message that is already formatted.
 .TP
 .B (maak\-error? exception)
 Recognise either of the above once it has been caught.
+.SS Declaring what a task is
+.TP
+.B (task\-metadata! task #:depends DEPENDS #:hidden? HIDDEN #:example EXAMPLE)
+Record what a task declares about itself, after its definition:
+.PP
+.RS 4
+.EX
+(define (push-docker-latest)
+  "Push the latest image to Dockerhub."
+  (container (list "push" "localhost/maak:latest")))
+
+(task-metadata! push-docker-latest
+                #:depends \(aq(package-docker)
+                #:example "maak push-docker-latest")
+.EE
+.RE
+.PP
+.B #:depends
+is a quoted list of task names that must have finished before this one starts.
+A dependency says when a task may run, never whether it does: nothing is
+remembered between runs, so a task named on the command line runs whether or
+not what it needs has changed.  A sequential run and a
+.B \-j
+run both honour it, and a dependency that names no task, or a cycle, is an
+error before anything runs.
+.B #:hidden?
+keeps the task out of the listings, without making it unrunnable.
+.B #:example
+is one invocation to show a reader.
 .SS Files
 .BR cp ", " mv ", " mkdir\-p ", " remkdir\-p ", " delete\-file\-recursively ", " cat ", "
 .BR touch ", " ln\-s ", " chmod\-file ", " read\-file ", " write\-file

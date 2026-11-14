@@ -92,6 +92,14 @@ Options:
     -l, --list
         List all available tasks in the currently loaded Maak file.
 
+    --json
+        With --list, print the listing as JSON instead: one object naming the
+        file, the root it sits in, and every task with its docstring, the line
+        it starts on, what it needs first, an example invocation and the
+        arguments maak binds.  Nothing else is printed, so the output is the
+        JSON and only the JSON.  `--json' on its own is an error, because it
+        describes a listing rather than asking for one.
+
     -t, --tasks LIST
         Run the tasks named in LIST, a comma separated list.  This is the
         option the tasks named on the command line are turned into; naming

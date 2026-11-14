@@ -15,6 +15,7 @@
   #:use-module (ice-9 string-fun)
   #:use-module (ice-9 textual-ports)
   #:use-module (srfi srfi-1)
+  #:use-module (srfi srfi-9)
   #:use-module (srfi srfi-13)
   #:use-module (ice-9 getopt-long)
   #:use-module (maak dsl)
@@ -360,7 +361,9 @@
   #:export (resolve-maak-tasks list-tasks run-tasks run-tasks-parallel
                               run-task
                               format-task-doc available-task-names
-                              unknown-task-error))
+                              unknown-task-error
+                              task-metadata! task-meta task-depends
+                              task-hidden? task-example task-order))
 
 (define* (resolve-maak-tasks #:key (module-name '(maak)))
   "Return the runnable tasks of MODULE-NAME as `(NAME . VARIABLE)' pairs.
@@ -396,7 +399,158 @@ Tasks page of the documentation, docs/tasks.org."
          (symbol->string (car task)))
        (sort (resolve-maak-tasks) task-name<?)))
 
-(define (format-task-doc name doc)
+;; ====== What a task declares about itself ======
+;;
+;; A docstring says what a task does.  Three things about a task are not prose,
+;; and they arrive as an ordinary call after the definition:
+;;
+;;   (define (deploy) "Ship it." (run (list "rsync" ...)))
+;;   (task-metadata! deploy
+;;                   #:depends '(build test)
+;;                   #:example "maak deploy prod.example.com")
+;;
+;; The vocabulary is three fields -- what the task needs first, whether a
+;; listing should offer it, and how one is invoked -- and it is deliberately
+;; closed.  A vocabulary is a decision about what a task is; one that grows a
+;; field for every need stops being one.  A fourth field is a change to this
+;; file and an argument in the guide's Tasks page, not a key a project adds.
+;;
+;; The metadata lives on the procedure, which is what makes it a property of the
+;; task rather than of its name: it dies with the task it describes, so a run
+;; that loads a different Maak file cannot inherit it.
+
+(define-record-type <task-meta>
+  (make-task-meta depends hidden? example)
+  task-meta?
+  (depends task-meta-depends)
+  (hidden? task-meta-hidden?)
+  (example task-meta-example))
+
+(define (task-depends-names depends)
+  "Return DEPENDS as the task names it declares, as symbols."
+  (unless (list? depends)
+    (raise-maak-error
+     (format #f "task-metadata!: #:depends takes a list of task names, got ~s"
+             depends)
+     #:hint "Write #:depends '(build fmt), naming the tasks this one needs first."))
+  (map (lambda (name)
+         (cond
+           ((symbol? name) name)
+           ((string? name) (string->symbol name))
+           (else
+            (raise-maak-error
+             (format #f "task-metadata!: ~s does not name a task" name)
+             #:hint "A dependency is a task name, written as a symbol or a string."))))
+       depends))
+
+(define* (task-metadata! task #:key (depends '()) (hidden? #f) (example #f))
+  "Record what TASK declares about itself.
+
+TASK is the procedure the task is defined as, so this call goes after the
+definition, where the name is bound:
+
+@example
+(define (deploy) \"Ship it.\" (run (list \"rsync\" ...)))
+(task-metadata! deploy
+                #:depends '(build test)
+                #:example \"maak deploy prod.example.com\")
+@end example
+
+DEPENDS names the tasks that must have finished before this one starts, as a
+list of symbols or strings; a dependency says *when* a task may run, never
+whether it does, because maak has no notion of up to date.  HIDDEN? keeps the
+task out of the listings -- the human one and the machine-readable one an editor
+reads -- while still letting it be run by name and needed by another task.
+EXAMPLE is an invocation to show a reader, prose rather than a value.
+
+The call returns TASK, so a file may write it inline.  A declaration that cannot
+be honoured -- a dependency that is not a name, an example that is not a string,
+metadata for something that is not a task -- is a maak error where it is
+written, rather than a task that runs in the wrong order later."
+  (unless (procedure? task)
+    (raise-maak-error
+     (format #f "task-metadata! expects the procedure a task is defined as, got ~s"
+             task)
+     #:hint "Write (task-metadata! deploy #:depends '(build)) after the definition of `deploy'."))
+  (when (and example (not (string? example)))
+    (raise-maak-error
+     (format #f "task-metadata!: #:example takes the invocation as a string, got ~s"
+             example)
+     #:hint "Write #:example \"maak deploy prod.example.com\"."))
+  (set-procedure-property!
+   task 'maak-task-meta
+   (make-task-meta (task-depends-names depends) (and hidden? #t) (and example example)))
+  task)
+
+(define (task-meta task)
+  "Return what TASK declares about itself, or #f when it declares nothing."
+  (and (procedure? task)
+       (procedure-property task 'maak-task-meta)))
+
+(define (task-depends task)
+  "Return the names of the tasks TASK needs to have finished first, in order."
+  (let ((meta (task-meta task)))
+    (if meta (task-meta-depends meta) '())))
+
+(define (task-hidden? task)
+  "Return #t when TASK asks the listings to leave it out."
+  (let ((meta (task-meta task)))
+    (and meta (task-meta-hidden? meta) #t)))
+
+(define (task-example task)
+  "Return the invocation TASK holds up as an example, or the empty string."
+  (let ((meta (task-meta task)))
+    (if (and meta (task-meta-example meta)) (task-meta-example meta) "")))
+
+;; ====== The order a run puts the tasks in ======
+;;
+;; A dependency orders a run and nothing else.  Nothing here asks whether a task
+;; is up to date, and nothing is remembered between runs, which is what keeps
+;; the ordering from becoming a cache by the back door: every task named, and
+;; every task a named one needs, runs.
+
+(define* (task-order tasks #:key (known (resolve-maak-tasks)))
+  "Return TASKS as the list to run, with each task's dependencies before it.
+
+A task named twice appears once, and a dependency that two tasks share runs once
+before the first of them.  The order the tasks were given is kept otherwise, so
+a run of several tasks still reads in the order it was written.
+
+KNOWN is the `(NAME . VARIABLE)' alist the order is resolved against,
+`resolve-maak-tasks' by default.  A dependency that names no task of the file,
+and a dependency cycle, are maak errors: both leave a run that cannot honour
+what the file says, and a silently shortened run is the kind of thing that only
+shows up as a deploy that shipped half."
+  (define (dependencies-of task)
+    (let ((entry (assoc task known)))
+      (unless entry
+        (unknown-task-error task))
+      (task-depends (variable-ref (cdr entry)))))
+  (define (visit task seen path)
+    ;; Return (ORDER . SEEN) for TASK and everything it needs, dependencies
+    ;; first and each of them once.  PATH is the chain being visited, which is
+    ;; how a cycle is told from a diamond.
+    (cond
+      ((memq task seen) (cons '() seen))
+      ((memq task path)
+       (raise-maak-error
+        (format #f "dependency cycle: ~a"
+                (string-join (map symbol->string (reverse (cons task path)))
+                             " -> "))
+        #:hint "Remove one of the dependencies; a task may not need itself, directly or through other tasks."))
+      (else
+       (let walk ((remaining (dependencies-of task)) (order '()) (seen seen))
+         (if (null? remaining)
+             (cons (append order (list task)) (cons task seen))
+             (let ((sub (visit (car remaining) seen (cons task path))))
+               (walk (cdr remaining) (append order (car sub)) (cdr sub))))))))
+  (let walk ((remaining tasks) (order '()) (seen '()))
+    (if (null? remaining)
+        order
+        (let ((sub (visit (car remaining) seen '())))
+          (walk (cdr remaining) (append order (car sub)) (cdr sub))))))
+
+(define* (format-task-doc name doc #:key (needs '()))
   "Return the lines that describe task NAME, given its docstring DOC.
 
 A docstring that is one paragraph starts inline after the name, and every
@@ -414,7 +568,11 @@ own line and every line indented to the same column, with the blank lines left
 blank.
 
 Common leading indentation is removed first with `dedent-string', so a
-docstring written inside an indented function still reads flush left."
+docstring written inside an indented function still reads flush left.
+
+NEEDS names the tasks this one requires to have finished first, and is printed
+under the documentation as a line of its own, aligned to the same margin; a task
+that needs nothing prints nothing extra."
   (let* ((label (string-append (bold-output name) ":"))
          (prefix (string-append name ": "))
          ;; The column the documentation aligns to: the visible length of the
@@ -430,32 +588,44 @@ docstring written inside an indented function still reads flush left."
                      ;; A blank line inside the documentation stays blank
                      ;; rather than being padded out to the margin.
                      (if (string=? line "") ""
-                         (string-append margin line)))))
-    (cond
-      ((null? lines)
-       (list label))
-      ((any blank-line? lines)
-       (cons label (map indented lines)))
-      (else
-       (cons (string-append prefix (car lines))
-             (map indented (cdr lines)))))))
+                         (string-append margin line))))
+         (needed (if (null? needs)
+                     '()
+                     (list (string-append margin "needs: "
+                                          (string-join needs ", "))))))
+    (append
+     (cond
+       ((null? lines)
+        (list label))
+       ((any blank-line? lines)
+        (cons label (map indented lines)))
+       (else
+        (cons (string-append prefix (car lines))
+              (map indented (cdr lines)))))
+     needed)))
 
 (define* (list-tasks #:key (as-is? #f))
   "List documentation for every maak task in the loaded file.
 
 Tasks are sorted by name unless AS-IS? is #t.  Each docstring is laid out so
 its lines align under the task name rather than wrapping back to the left
-margin; see `format-task-doc'."
+margin; see `format-task-doc'.  A task that needs others to have finished first
+says so under its documentation, and a task that asked to be left out of the
+listings with `task-metadata!' is left out."
   (let* ((raw-tasks (resolve-maak-tasks))
          (tasks (if as-is? raw-tasks (sort raw-tasks task-name<?))))
     (log-separator)
     (for-each (lambda (task)
-                (let* ((proc (variable-ref (cdr task)))
-                       (doc (procedure-documentation proc))
-                       (lines (format-task-doc (symbol->string (car task))
-                                               doc)))
-                  (newline)
-                  (log-message (string-join lines "\n"))))
+                (let ((proc (variable-ref (cdr task))))
+                  (unless (task-hidden? proc)
+                    (newline)
+                    (log-message
+                     (string-join
+                      (format-task-doc (symbol->string (car task))
+                                       (procedure-documentation proc)
+                                       #:needs (map symbol->string
+                                                    (task-depends proc)))
+                      "\n")))))
               tasks)
     (newline)
     (newline)))
@@ -540,17 +710,19 @@ is passed on exactly as it arrived."
                     (on-failure #f))
   "Run TASKS sequentially, in the order given.
 
-Every task must name a procedure the loaded Maak file makes visible; otherwise
-a maak error lists the tasks that do exist.  TASK-ARGS are passed to each task.
-Returns the names of the tasks that failed, in the order they were given -- the
-empty list when everything succeeded.
+The tasks run in the order `task-order' settles: a task that declares
+dependencies with `task-metadata!' runs after them, and a task named twice runs
+once.  Every task must name a procedure the loaded Maak file makes visible;
+otherwise a maak error lists the tasks that do exist.  TASK-ARGS are passed to
+each task.  Returns the names of the tasks that failed, in the order they were
+run -- the empty list when everything succeeded.
 
 With KEEP-GOING? a task that fails stops nothing: the tasks after it still run.
 ON-FAILURE is then called with the task name and the exception it raised, as
 `(ON-FAILURE TASK KEY VALUE ...)', so the caller can report the failure where
 it happened and decide what a run full of them means.  Without KEEP-GOING? the
 first failure is raised as it always was, backtrace and all."
-  (let loop ((remaining tasks)
+  (let loop ((remaining (task-order tasks))
              (failed '()))
     (cond
       ((null? remaining) (reverse failed))
@@ -694,23 +866,31 @@ default) starts them all.
 Each task runs in a forked worker, so a task sees the Maak file as it was
 loaded and cannot change the environment of the tasks beside it.  A worker's
 standard output and standard error, including the output of every command it
-runs, go to a log of its own; the logs are printed as blocks, in the order the
-tasks were named, as soon as the next task in that order has finished.  That is
-what keeps a parallel run readable: no two tasks interleave their lines.
+runs, go to a log of its own; the logs are printed as blocks, in the order
+`task-order' settled, as soon as the next task in that order has finished.  That
+is what keeps a parallel run readable: no two tasks interleave their lines.
 
-Returns the names of the tasks that failed, in the order they were given.  A
-task that cannot be found is an error before any worker starts, so a mistyped
-name cannot leave half a run behind."
+A worker whose task declared dependencies starts only once they have finished,
+so a run of `-j' still puts a task after the ones it needs; the tasks beside it
+are unaffected, and a failure does not stop the run -- every task that can start
+does.  A task named twice is started once, because `task-order' names it once.
+
+Returns the names of the tasks that failed, in the order they were run.  A task
+that cannot be found, or a dependency that names none, is an error before any
+worker starts, so a mistyped name cannot leave half a run behind."
   (let* ((valid (resolve-maak-tasks))
-         (pending (let loop ((remaining tasks) (index 0) (acc '()))
-                    (cond
-                      ((null? remaining) (reverse acc))
-                      (else
-                       (unless (assoc (car remaining) valid)
-                         (unknown-task-error (car remaining)))
-                       (loop (cdr remaining)
-                             (+ index 1)
-                             (cons (cons index (car remaining)) acc))))))
+         (order (task-order tasks #:known valid))
+         (pending (let loop ((remaining order) (index 0) (acc '()))
+                    (if (null? remaining)
+                        (reverse acc)
+                        (loop (cdr remaining)
+                              (+ index 1)
+                              (cons (list index
+                                          (car remaining)
+                                          (task-depends
+                                           (variable-ref
+                                            (cdr (assoc (car remaining) valid)))))
+                                    acc)))))
          (count (length pending))
          (limit (if (and (exact-integer? jobs) (>= jobs 1))
                     jobs
@@ -718,25 +898,31 @@ name cannot leave half a run behind."
          (paths (make-vector count #f))
          (statuses (make-vector count #f))
          (running '())
+         (done '())
          (next 0)
          (failed '())
+         (startable? (lambda (entry)
+                       ;; An entry is (INDEX TASK DEPENDENCIES); it may start
+                       ;; once every task it needs has finished, whatever that
+                       ;; task's exit status was.
+                       (every (lambda (needed) (memq needed done))
+                              (third entry))))
          (start! (lambda ()
                    (let start ()
-                     (when (and (pair? pending)
-                                (< (length running) limit))
-                       (let* ((entry (car pending))
-                              (index (car entry))
-                              (task (cdr entry))
-                              (path (parallel-task-log-path index)))
-                         (vector-set! paths index path)
-                         (set! pending (cdr pending))
-                         (set! running
-                               (cons (cons (fork-task-worker task
-                                                             task-args
-                                                             path)
-                                           index)
-                                     running))
-                         (start)))))))
+                     (when (< (length running) limit)
+                       (let ((ready (find startable? pending)))
+                         (when ready
+                           (let* ((index (first ready))
+                                  (path (parallel-task-log-path index)))
+                             (vector-set! paths index path)
+                             (set! pending (delq ready pending))
+                             (set! running
+                                   (cons (cons (fork-task-worker (second ready)
+                                                                 task-args
+                                                                 path)
+                                               index)
+                                         running))
+                             (start)))))))))
     (start!)
     (let wait ()
       (when (or (pair? pending) (pair? running))
@@ -746,13 +932,16 @@ name cannot leave half a run behind."
                (entry (assoc pid running)))
           (when entry
             (set! running (delete entry running))
-            (vector-set! statuses (cdr entry) status)))
+            (let ((index (cdr entry)))
+              (vector-set! statuses index status)
+              ;; A finished task is what lets the ones needing it start.
+              (set! done (cons (list-ref order index) done)))))
         ;; Print every block that is next in line and has finished.
         (let flush ()
           (when (and (< next count) (vector-ref statuses next))
             (let ((code (status:exit-val (vector-ref statuses next))))
               (unless (and code (zero? code))
-                (set! failed (cons (list-ref tasks next) failed))))
+                (set! failed (cons (list-ref order next) failed))))
             (display-task-log (vector-ref paths next))
             (set! next (+ next 1))
             (flush)))
