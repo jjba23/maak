@@ -428,6 +428,27 @@ those it does, by name."
              (string<? (task-description-name a)
                        (task-description-name b)))))))
 
+;; ====== Loading the Maak file ======
+
+(define (reset-maak-module!)
+  "Empty the module a Maak file defines, before one is loaded into it.
+
+A Maak file defines the module `(maak)', and `load' adds to a module that
+already exists rather than replacing it.  A process that loads a second Maak
+file -- which the test suite does, and which an editor holding maak open would
+-- would otherwise answer with the union of every file it had ever loaded: the
+tasks of the file in front of it, plus the tasks of the ones before.
+
+Both the module and its public interface are emptied, because a task is looked
+up in the interface: clearing the module alone leaves the last file's exports
+behind, which is the half of the union that a listing shows."
+  (let ((module (resolve-module '(maak) #:ensure #f)))
+    (when module
+      (module-clear! module)
+      (let ((interface (module-public-interface module)))
+        (when interface
+          (module-clear! interface))))))
+
 ;; ====== Running ======
 
 (define (run-maak options)
@@ -509,6 +530,7 @@ those it does, by name."
              (log-info "Maak ~a: the infinitely extensible command runner\n"
                        maak-version)
              (log-info "Loading tasks from Maak file: ~a\n" file))
+           (reset-maak-module!)
            (load file)
            (if should-list
                (if should-json

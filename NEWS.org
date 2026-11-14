@@ -68,6 +68,10 @@ consumer reads the same description of it.
 
 - `packaging/debian/changelog` carries the released version again; it had been
   five releases behind, which the suite had been failing on.
+- A run describes the file it loaded.  `load` adds to the module `(maak)` rather
+  than replacing it, and a task is looked up in the module's public interface,
+  so a process that loaded a second Maak file answered with the union of both --
+  which nothing did before the suite started loading several files in one run.
 
 *[Released]*
 

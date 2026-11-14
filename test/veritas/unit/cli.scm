@@ -252,7 +252,18 @@ unaffected."
                (assert-contains #:expect (stdout-of (listing-run))
                                 #:got "ok: Print a line and succeed.")
                (assert-contains #:expect (stdout-of (listing-run))
-                                #:got "boom: Fail the way a task is supposed to fail."))))
+                                #:got "boom: Fail the way a task is supposed to fail."))
+         ;; A Maak file defines the module `(maak)', and `load' adds to a module
+         ;; that already exists: a run that loaded another file first would
+         ;; otherwise describe both.  The two runs are sequenced inside one
+         ;; assertion, so the answer does not depend on what else has loaded.
+         (test "a listing describes the file it loaded, not the one before it"
+               (assert-false
+                (string-contains
+                 (begin
+                   (run-cli-fixture keep-going-fixture "--list")
+                   (stdout-of (listing-run)))
+                 "first-pass")))))
 
 (define failure-suite
   (suite "A task that fails"
