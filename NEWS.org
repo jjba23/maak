@@ -14,6 +14,66 @@ Nothing yet.
 
 *[Released]*
 
+** v0.21.0 (2026-11-15)
+
+A run is inspectable before and after it happens: a typed plan, a watch with no
+watcher to install, an explanation of the composition and the environment, and
+a bundle that carries its Guile.
+
+*** Added
+
+- `maak --plan TASK` runs the task with dry-run semantics and prints the typed
+  plan it describes instead of a transcript: each command, its argv or shell
+  line, the directory it would run in, the environment it was given, whether it
+  would be elevated and whether it would be started in the background.  The
+  recorder sits in the helpers that build every command -- `run`, `$`,
+  `syscall`, `capture`, `run-pipeline` and `guix repl` -- so a task's own
+  Scheme decides what the plan says.  Nothing is executed.
+- `maak --plan --json TASK` prints the same plan as one versioned object.  A
+  task's own printing goes to standard error, so a task that logs does not
+  corrupt the object a CI job archives.  `--plan` records one task at a time and
+  refuses `-j` rather than silently ignoring it.
+- `maak --watch TASK` runs the task now and again whenever the tree changes.
+  The tree is `git ls-files --cached --others --exclude-standard` in a checkout
+  and a walk that skips repository and cache directories otherwise.  Each run
+  reloads the Maak file, re-reads the environment files from the environment the
+  watch started with, and starts in the directory the watch started in, so an
+  edit to a task or a `.env` takes effect and a task's changes do not leak into
+  the run after it.  A failing run is reported and the watch continues.
+  `MAAK_WATCH_INTERVAL` sets the interval and accepts fractional seconds.
+- `maak explain TASK`, also spelled `--explain`, prints what the task calls and
+  what calls it, what it declared with `task-metadata!`, the load path, the
+  elevation command and a per-variable report of the environment files: the
+  process environment wins, and otherwise the first file that sets a name wins,
+  because later files do not override.  The call graph is read from the Maak
+  file's text, so a call built with `apply`, passed as a procedure or produced
+  by a macro is not in it, and the guide says so.
+- `(maak bundle)` builds a self-contained artefact of a project's automation on
+  top of `guix pack`: a generated package installs the Maak file and a launcher,
+  propagates maak, Guile and the packages the caller names, and produces a
+  relocatable tarball, a squashfs image or a docker image tarball.  `#:load?`
+  loads a docker pack with the container helper, and `#:maak-package` points at
+  a project's own build of maak.  This repository's `maak package-bundle` task
+  uses it.
+
+*** Changed
+
+- The repository's own `hot-reload` and `dev` tasks use `watch-tree` instead of
+  a hand-rolled `watchexec` invocation, so `watchexec` is no longer part of the
+  development manifest.
+- The Bash, Zsh and Fish completions know `--plan`, `--watch` and `--explain`,
+  and the help screen, manual page and guide document the new modes and the
+  bundle helper.
+
+*** Verification
+
+- The Veritas suite is green, with new specs for the plan, the watch, the
+  explanation and the bundle: the plan is parsed as JSON, the environment
+  precedence is asserted rather than assumed, and the call graph is checked on
+  the project's own Maak file.
+- `contrib/test/maak-tasks.sh` still passes all 43 checks, including the two
+  that compare `maak --list --json` with the editor helper byte for byte.
+
 ** v0.20.0 (2026-11-15)
 
 Seven editor integrations that prompt with the task author's own words, a task

@@ -1,3 +1,23 @@
+maak (0.21.0-1) unstable; urgency=medium
+
+  * `maak --plan TASK` prints the typed plan a run would execute, without
+    executing it: each command, its argv or shell line, its directory, its
+    environment and its elevation.  `--plan --json` prints the same plan as a
+    versioned object.
+  * `maak --watch TASK` re-runs a task when the tree changes, reloading the
+    Maak file, the environment files and the starting directory for every run.
+    MAAK_WATCH_INTERVAL sets the interval, including fractional seconds.
+  * `maak explain TASK` prints the static call graph, the load path, the
+    elevation command and which environment file wins for each variable.
+  * `(maak bundle)` builds a self-contained Guix pack of a project's
+    automation, with a relocatable tarball, squashfs or docker image, so it
+    runs where Guile and maak are not installed.  `maak package-bundle` builds
+    this repository's.
+  * The repository's `hot-reload` and `dev` tasks use maak's own watcher, and
+    watchexec is no longer a development dependency.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Sun, 15 Nov 2026 12:00:00 +0100
+
 maak (0.20.0-1) unstable; urgency=medium
 
   * Every editor integration prompts with the prose the docstring gives an
