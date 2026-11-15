@@ -8,11 +8,11 @@
 ;; The single place the program's version is written by hand, together with the
 ;; handful of facts the CLI reports about itself.  `--version' prints it, the
 ;; Nix derivation reads this file while it evaluates, and the copies that cannot
-;; read Scheme -- the RPM spec, the manual page and the installation page --
-;; are rewritten from it by the `sync-version' task, which reads this file
-;; rather than the library it happens to be running under.  A release is therefore one edit,
-;; not a search of the tree, and the suite fails while any copy disagrees with
-;; this one.
+;; read Scheme -- the RPM spec, the Arch recipe, the Homebrew formula, the manual
+;; page and the installation page -- are rewritten from it by the `sync-version'
+;; task, which reads this file rather than the library it happens to be running
+;; under.  A release is therefore one edit, not a search of the tree, and the
+;; suite fails while any copy disagrees with this one.
 
 ;;; Code:
 
@@ -29,7 +29,7 @@
                          print-version))
 
 (define maak-version
-  "0.19.0")
+  "0.20.0")
 
 (define maak-homepage
   "https://codeberg.org/jjba23/maak")
