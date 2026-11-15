@@ -96,6 +96,31 @@ def label(task):
     return "  ".join(parts)
 
 
+def prose(argument):
+    """The docstring's prose for an argument, ready to follow its name."""
+    doc = argument.get("doc") or ""
+    return u" \u2014 " + doc if doc else ""
+
+
+def detail(task):
+    """What the task says beyond its name, for the second line of a panel."""
+    parts = []
+    summary = " ".join((task["doc"] or "").strip().split())
+    if summary:
+        parts.append(summary)
+    if task.get("depends"):
+        parts.append("needs: " + ", ".join(task["depends"]))
+    if task.get("example"):
+        parts.append("example: " + task["example"])
+    return "  ".join(parts)
+
+
+def row(task):
+    """A quick panel entry: the label, then its detail when it has one."""
+    extra = detail(task)
+    return [label(task), extra] if extra else [label(task)]
+
+
 def error(message):
     sublime.error_message("Maak: {0}".format(message))
 
@@ -117,7 +142,7 @@ class MaakRunCommand(sublime_plugin.WindowCommand):
             return error("no tasks in {0}/maak.scm".format(root))
         listing.sort(key=lambda task: task["name"])
         self.window.show_quick_panel(
-            [label(task) for task in listing],
+            [row(task) for task in listing],
             lambda index: self.chosen(root, listing, index),
         )
 
@@ -147,15 +172,17 @@ class MaakRunCommand(sublime_plugin.WindowCommand):
         argument = arguments[index]
         kind = argument["kind"]
         if kind == "optional":
-            prompt = "Argument <{0}> ({1}, blank to omit)".format(
-                argument["name"], argument["default"] or "optional"
+            prompt = "Argument <{0}>{1} ({2}, blank to omit)".format(
+                argument["name"],
+                prose(argument),
+                argument["default"] or "optional",
             )
         elif kind == "rest":
-            prompt = "Arguments <{0}> (space separated, blank for none)".format(
-                argument["name"]
+            prompt = "Arguments <{0}>{1} (space separated, blank for none)".format(
+                argument["name"], prose(argument)
             )
         else:
-            prompt = "Argument <{0}>".format(argument["name"])
+            prompt = "Argument <{0}>{1}".format(argument["name"], prose(argument))
 
         def on_done(value):
             kept = list(words)
@@ -216,13 +243,15 @@ class MaakListCommand(sublime_plugin.WindowCommand):
             return error(str(failure))
         panel = self.window.create_output_panel("maak")
         self.window.run_command("show_panel", {"panel": "output.maak"})
+        lines = []
+        for task in listing:
+            lines.append(label(task))
+            extra = detail(task)
+            if extra:
+                lines.append("    " + extra)
         panel.run_command(
             "append",
-            {
-                "characters": "{0}\n".format(
-                    "\n".join(label(task) for task in listing)
-                )
-            },
+            {"characters": "{0}\n".format("\n".join(lines))},
         )
         panel.run_command(
             "append",
@@ -243,7 +272,7 @@ class MaakGotoCommand(sublime_plugin.WindowCommand):
             return error(str(failure))
         listing.sort(key=lambda task: task["name"])
         self.window.show_quick_panel(
-            [label(task) for task in listing],
+            [row(task) for task in listing],
             lambda index: self.open(root, listing, index),
         )
 

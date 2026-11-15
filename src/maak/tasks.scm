@@ -567,17 +567,18 @@ preview that showed the section as well would say everything twice."
 (define (task-words-text task)
   "Return TASK's arguments, one tab separated line each, as a picker reads them.
 
-The line is the kind, the name, the default and whether there is one.  The
-prose is not part of it: a picker that prompts for an argument shows the name
-and the default, and one that wants to say more reads the JSON."
+The line is the kind, the name, the default, whether there is one and the prose
+the docstring gives the argument, so a picker can prompt with the same words an
+editor's own prompt uses without parsing JSON."
   (call-with-output-string
     (lambda (port)
       (for-each (lambda (found-argument)
-                  (format port "~a\t~a\t~a\t~a~%"
+                  (format port "~a\t~a\t~a\t~a\t~a~%"
                           (argument-kind found-argument)
                           (argument-name found-argument)
                           (argument-default found-argument)
-                          (if (argument-has-default? found-argument) 1 0)))
+                          (if (argument-has-default? found-argument) 1 0)
+                          (argument-doc found-argument)))
                 (task-description-arguments task)))))
 
 (define (argument-json found-argument)
@@ -618,12 +619,12 @@ is open."
          ;; own instead of the one the last task left behind.
          (cons "use_new_terminal" "true"))))
 
-(define (zed-tasks-json tasks)
+(define* (zed-tasks-json tasks #:optional (executable "maak"))
   "Return TASKS as the .zed/tasks.json Zed reads.
 
 Zed has no discovery hook: it reads a static tasks file, so this is written by
 `maak-tasks --zed', and kept current by `maak-zed watch', which is the last
-entry in the list."
+entry in the list.  EXECUTABLE is the command a generated task runs."
   (json-array
    (append
     (map (lambda (task)
@@ -635,7 +636,7 @@ entry in the list."
                                (format #f "maak: ~a" (task-description-name task))
                                (format #f "maak: ~a — ~a"
                                        (task-description-name task) summary))))
-                    (cons "command" (json-string "maak"))
+                    (cons "command" (json-string executable))
                     (cons "args"
                           (json-array (list (json-string (task-description-name task)))))
                     (cons "cwd" (json-string "$ZED_WORKTREE_ROOT"))

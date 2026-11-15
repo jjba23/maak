@@ -79,7 +79,8 @@ it once from *tasks: spawn*, leave it in its terminal, and the rest of the list
 stays current for the session.  Stop it with Ctrl-C in its terminal.
 
 Both commands take =--file= to name a Maak file, =--helper= to name the
-=maak-tasks= script, and =MAAK_TASKS= to do the latter from the environment.
+=maak-tasks= script, and =--executable= to name the maak a generated task runs;
+=MAAK_TASKS= and =MAAK_EXECUTABLE= do the same from the environment.
 
 A project can also make syncing a task of its own:
 

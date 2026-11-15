@@ -59,5 +59,8 @@ The prompts follow the lambda list of the task, the way maak.el does:
 - a keyword argument is never asked for, because maak's command line cannot pass
   one.  A keyword argument with no default is an error, said before the run.
 
+Each prompt shows the prose the docstring gives the argument under its ~Args:~
+line, and a task that declares what it needs first says so in the picker.
+
 An argument that begins with a dash is set apart with =--=, as in
 =maak quick-math -- -23 42=.

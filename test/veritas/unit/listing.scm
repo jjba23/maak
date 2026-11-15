@@ -186,14 +186,19 @@
          (test "the words are one tab separated line per argument"
                (assert-equal
                 #:expect
-                (string-append "required\ttarget\t\t0\n"
-                               "optional\tenv\t\"dev\"\t1\n"
-                               "key\tjobs\t1\t1\n"
-                               "rest\textra\t\t0\n")
+                (string-append "required\ttarget\t\t0\tthe host to ship to, as HOST[:PORT].\n"
+                               "optional\tenv\t\"dev\"\t1\twhich environment's .env file to read, when there is one.\n"
+                               "key\tjobs\t1\t1\thow many uploads at once; maak cannot pass a keyword.\n"
+                               "rest\textra\t\t0\t\n")
                 #:got (task-words-text (named "deploy"))))
          (test "a Zed task list leaves a hidden task out"
                (assert-false (string-contains (zed-tasks-json listed)
-                                              "maak: tidy")))))
+                                              "maak: tidy")))
+         (test "a Zed task list runs the maak it is given"
+               (assert-true
+                (and (string-contains (zed-tasks-json listed "/opt/maak")
+                                      "\"command\":\"/opt/maak\"")
+                     #t)))))
 
 (define (spec)
   (veritas-run #:concurrent? #f

@@ -13,7 +13,8 @@
 #
 # `:sh' gives the command no terminal, so set MAAK_TERMINAL to the terminal you
 # want the task to run in -- `foot -e', `alacritty -e', `kitty', `xterm -e' -- and
-# a task gets a real one.
+# a task gets a real one.  MAAK_TASKS names the helper, and MAAK_EXECUTABLE the
+# maak to run (default `maak`).
 
 set -euo pipefail
 
@@ -70,7 +71,7 @@ task=${selection%%$'\t'*}
 # applies.
 arguments=()
 stopped=0
-while IFS=$'\t' read -r kind name default has_default; do
+while IFS=$'\t' read -r kind name default has_default doc; do
   case $kind in
     key)
       if [[ $has_default != 1 ]]; then
@@ -79,7 +80,7 @@ while IFS=$'\t' read -r kind name default has_default; do
       fi
       ;;
     required)
-      read -r -p "Argument <$name>: " answer
+      read -r -p "Argument <$name>${doc:+ ($doc)}: " answer
       if [[ -z ${answer//[[:space:]]/} ]]; then
         echo "maak-picker: $task needs a value for <$name>" >&2
         exit 1
@@ -90,7 +91,11 @@ while IFS=$'\t' read -r kind name default has_default; do
       if ((stopped)); then
         continue
       fi
-      read -r -p "Argument <$name> (RET to omit${has_default:+: $default}): " answer
+      hint="RET to omit"
+      if ((has_default)); then
+        hint+=": $default"
+      fi
+      read -r -p "Argument <$name> ($hint)${doc:+ — $doc}: " answer
       if [[ -z ${answer//[[:space:]]/} ]]; then
         stopped=1
       else
@@ -101,14 +106,14 @@ while IFS=$'\t' read -r kind name default has_default; do
       if ((stopped)); then
         continue
       fi
-      read -r -p "Arguments <$name> (space separated, RET for none): " answer
+      read -r -p "Arguments <$name> (space separated, RET for none)${doc:+ — $doc}: " answer
       read -r -a words <<<"$answer"
       arguments+=("${words[@]}")
       ;;
   esac
 done < <("$helper" --directory "$root" --words "$task")
 
-command=(maak)
+command=("${MAAK_EXECUTABLE:-maak}")
 if ((dry_run)); then
   command+=(-n)
 fi

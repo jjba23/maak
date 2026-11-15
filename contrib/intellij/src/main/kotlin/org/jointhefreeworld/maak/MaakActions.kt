@@ -97,7 +97,7 @@ object MaakRunner {
                 }
 
                 "required" -> {
-                    val answer = ask(project, task, "Argument <${argument.name}>:") ?: return null
+                    val answer = ask(project, task, "Argument <${argument.name}>${argument.prose}:") ?: return null
                     if (answer.isBlank()) {
                         Messages.showErrorDialog(project, "${task.name} needs a value for <${argument.name}>.", "Maak")
                         return null
@@ -106,7 +106,11 @@ object MaakRunner {
                 }
 
                 "optional" -> if (!stopped) {
-                    val answer = ask(project, task, "Argument <${argument.name}> (blank to omit):") ?: return null
+                    val answer = ask(
+                        project,
+                        task,
+                        "Argument <${argument.name}>${argument.prose} (blank to omit):",
+                    ) ?: return null
                     if (answer.isBlank()) stopped = true else words += answer
                 }
 
@@ -114,7 +118,7 @@ object MaakRunner {
                     val answer = ask(
                         project,
                         task,
-                        "Arguments <${argument.name}> (space separated, blank for none):",
+                        "Arguments <${argument.name}>${argument.prose} (space separated, blank for none):",
                     ) ?: return null
                     words += answer.split(Regex("\\s+")).filter { it.isNotEmpty() }
                 }

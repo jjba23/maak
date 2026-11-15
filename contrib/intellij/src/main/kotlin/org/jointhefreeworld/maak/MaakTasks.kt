@@ -28,6 +28,7 @@ data class MaakArgument(
     val default: String,
     val hasDefault: Boolean,
     val keyword: String,
+    val doc: String,
 ) {
     /** The command-line spelling of the argument. */
     val display: String
@@ -38,6 +39,9 @@ data class MaakArgument(
             "rest" -> "...$name"
             else -> name
         }
+
+    /** The prose the docstring gives the argument, ready to follow its name. */
+    val prose: String get() = if (doc.isEmpty()) "" else " — $doc"
 }
 
 /** One task of a Maak file. */
@@ -45,6 +49,8 @@ data class MaakTask(
     val name: String,
     val doc: String,
     val line: Int,
+    val depends: List<String>,
+    val example: String,
     val arguments: List<MaakArgument>,
 ) {
     val signature: String get() = arguments.joinToString(" ") { it.display }
@@ -56,6 +62,7 @@ data class MaakTask(
             append(name)
             if (signature.isNotEmpty()) append("  ").append(signature)
             if (summary.isNotEmpty()) append("  — ").append(summary)
+            if (depends.isNotEmpty()) append("  (needs: ").append(depends.joinToString(", ")).append(")")
         }
 }
 
@@ -93,6 +100,8 @@ object Maak {
                 name = task.get("name").asString,
                 doc = task.get("doc").asString,
                 line = task.get("line").asInt,
+                depends = task.getAsJsonArray("depends")?.map { it.asString } ?: emptyList(),
+                example = task.get("example")?.asString ?: "",
                 arguments = task.getAsJsonArray("arguments").map { argumentElement ->
                     val argument = argumentElement.asJsonObject
                     MaakArgument(
@@ -101,6 +110,7 @@ object Maak {
                         default = argument.get("default").asString,
                         hasDefault = argument.get("hasDefault").asBoolean,
                         keyword = argument.get("keyword").asString,
+                        doc = argument.get("doc")?.asString ?: "",
                     )
                 },
             )

@@ -40,7 +40,8 @@
 ;;
 ;; The other modes exist so that a shell integration never has to parse JSON:
 ;; `--names' prints one task per line, `--preview NAME' the description fzf
-;; shows, and `--words NAME' one tab separated line per argument.
+;; shows, and `--words NAME' one tab separated line per argument, ending with
+;; the prose that argument's docstring gives it.
 ;;
 ;;; Code:
 
@@ -70,9 +71,11 @@ Print the tasks of a Maak file, as JSON.
       --fzf              print name, signature and first docstring line, tab
                          separated, for a picker
       --zed              print a Zed tasks.json for the file's tasks
+      --executable NAME  the command a generated Zed task runs; default maak
       --preview NAME     print the description of task NAME
       --words NAME       print NAME's arguments, one tab separated line each:
-                         kind, name, default, and 1 when it has a default
+                         kind, name, default, 1 when it has a default, and the
+                         prose the docstring gives it
   -h, --help             print this help and exit
 
 The Maak file is found in DIR (or the current directory) and its parents.  The
@@ -135,7 +138,8 @@ leave it out with `task-metadata!' is left out here too.")
              (file #f)
              (directory #f)
              (mode 'json)
-             (task-name #f))
+             (task-name #f)
+             (executable "maak"))
     (cond
      ((null? arguments)
       (let* ((path (cond (file file)
@@ -153,7 +157,7 @@ leave it out with `task-metadata!' is left out here too.")
           ((json) (display (tasks-json tasks path)) (newline))
           ((names) (display (task-names-text tasks)))
           ((fzf) (display (tasks-fzf-text tasks)))
-          ((zed) (display (zed-tasks-json tasks)) (newline))
+          ((zed) (display (zed-tasks-json tasks executable)) (newline))
           ((preview words)
            (let ((task (find (lambda (described)
                                (string=? (task-description-name described)
@@ -166,23 +170,27 @@ leave it out with `task-metadata!' is left out here too.")
      ((member (car arguments) '("-h" "--help"))
       (display usage) (newline) (exit 0))
      ((member (car arguments) '("-f" "--file"))
-      (loop (cddr arguments) (option-value arguments) directory mode task-name))
+      (loop (cddr arguments) (option-value arguments) directory mode task-name executable))
      ((member (car arguments) '("-C" "--directory"))
-      (loop (cddr arguments) file (option-value arguments) mode task-name))
+      (loop (cddr arguments) file (option-value arguments) mode task-name executable))
      ((string=? (car arguments) "--names")
-      (loop (cdr arguments) file directory 'names task-name))
+      (loop (cdr arguments) file directory 'names task-name executable))
      ((string=? (car arguments) "--fzf")
-      (loop (cdr arguments) file directory 'fzf task-name))
+      (loop (cdr arguments) file directory 'fzf task-name executable))
      ((string=? (car arguments) "--zed")
-      (loop (cdr arguments) file directory 'zed task-name))
+      (loop (cdr arguments) file directory 'zed task-name executable))
+     ((string=? (car arguments) "--executable")
+      (loop (cddr arguments) file directory mode task-name (option-value arguments)))
      ((string=? (car arguments) "--preview")
-      (loop (cddr arguments) file directory 'preview (option-value arguments)))
+      (loop (cddr arguments) file directory 'preview (option-value arguments) executable))
      ((string=? (car arguments) "--words")
-      (loop (cddr arguments) file directory 'words (option-value arguments)))
+      (loop (cddr arguments) file directory 'words (option-value arguments) executable))
      ((string-prefix? "--file=" (car arguments))
-      (loop (cdr arguments) (substring (car arguments) 7) directory mode task-name))
+      (loop (cdr arguments) (substring (car arguments) 7) directory mode task-name executable))
      ((string-prefix? "--directory=" (car arguments))
-      (loop (cdr arguments) file (substring (car arguments) 12) mode task-name))
+      (loop (cdr arguments) file (substring (car arguments) 12) mode task-name executable))
+     ((string-prefix? "--executable=" (car arguments))
+      (loop (cdr arguments) file directory mode task-name (substring (car arguments) 13)))
      (else (die "unknown option ~a (see --help)" (car arguments))))))
 
 (main (cdr (command-line)))

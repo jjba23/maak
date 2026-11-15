@@ -29,7 +29,10 @@ lives in a repository of its own; the rest live here.
   procedure when it exports nothing.
 - *Show the documentation.*  The docstring is the task's documentation, so it is
   what the picker shows.
-- *Prompt for the arguments the task takes*, in the order maak binds them.
+- *Prompt for the arguments the task takes*, in the order maak binds them, with
+  the prose the docstring gives an argument when it gives one.
+- *Show what a task declares about itself*: the tasks it needs first, and an
+  example invocation where the editor has a line to put it on.
 - *Run the task where its output belongs*: a terminal, a build panel, the Run
   tool window.
 - *Go to the definition*, because the helper reports the line the procedure is
@@ -37,6 +40,9 @@ lives in a repository of its own; the rest live here.
 - *Dry-run it*: every integration can pass =maak -n= and show the commands
   instead of running them.
 - *Repeat the last run*, where the editor has somewhere to keep it.
+- *Notice a changed Maak file*: Neovim and VS Code forget their cached task list
+  as soon as =maak.scm= is written, and Zed's generated list is kept current by
+  =maak-zed=.
 
 * One reader of the Maak file
 
@@ -121,7 +127,9 @@ The helper is the contract, not these seven plugins.  An editor with a different
 kind of extension surface — or no plugin API at all, as Helix, or a static task
 file, as Zed — can call =maak-tasks --names=, =--fzf=, =--preview NAME=,
 =--words NAME= or =--zed= instead of reading JSON, and get the same answers in a
-shell.
+shell.  =--words= prints one tab separated line per argument, ending with the
+prose the docstring gives it, so a shell integration can prompt with the same
+words an editor's own prompt uses.
 
 Zed is the one editor whose list has to be written down, so =contrib/zed/maak-zed=
 keeps the writing down up to date: =sync= after an edit, =watch= for as long as

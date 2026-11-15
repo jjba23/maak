@@ -51,6 +51,11 @@ and =:MaakGoto= use =vim.ui.select=, so a picker plugin that replaces it —
 [[https://github.com/stevearc/dressing.nvim][dressing]] — is what you pick
 with, without this plugin knowing about it.
 
+The list is cached until the Maak file changes: a write through this editor or
+anywhere else forgets the cached copy at once, so the next =:Maak= reads the new
+tasks.  A plugin can listen for the =User MaakTasksChanged= event, or call
+=require("maak").refresh()= itself.
+
 * Arguments
 
 The prompts follow the lambda list of the task, the way maak.el does:
@@ -61,6 +66,9 @@ The prompts follow the lambda list of the task, the way maak.el does:
 - a rest argument takes any number of space separated words;
 - a keyword argument is never asked for, because maak's command line cannot pass
   one.  A keyword argument with no default is an error, said before the run.
+
+Each prompt shows the prose the docstring gives the argument under its ~Args:~
+line, when it gives one, so the answer is what the task's author meant.
 
 An argument that begins with a dash is set apart with =--=, as in
 =maak quick-math -- -23 42=.

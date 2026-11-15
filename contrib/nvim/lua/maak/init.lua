@@ -53,13 +53,58 @@ function M.root()
 end
 
 -- Reading the file costs one guile start, so the answer is kept until the file
--- changes.
+-- changes.  The stamp catches a change between two calls, and the watcher below
+-- forgets the answer as soon as the file is written, so the next pick re-reads
+-- it even when the write lands in the same second as the read.
 local cache = {}
+local watchers = {}
+
+--- Forget the cached tasks of ROOT, or of every root when ROOT is nil.
+function M.refresh(root)
+  if root then
+    cache[root .. "/maak.scm"] = nil
+  else
+    cache = {}
+  end
+end
+
+--- Watch ROOT for changes to maak.scm, once, and forget the cache on one.
+local function watch(root)
+  local file = root .. "/maak.scm"
+  if watchers[file] then
+    return
+  end
+  local uv = vim.uv or vim.loop
+  if not uv or not uv.new_fs_event then
+    return
+  end
+  local watcher = uv.new_fs_event()
+  if not watcher then
+    return
+  end
+  local started = pcall(watcher.start, watcher, root, {}, function(err, name)
+    -- Some platforms report no name for a change in the directory; the
+    -- watcher is on one directory, so an unnamed change is this file's.
+    if err or (name ~= nil and name ~= "maak.scm") then
+      return
+    end
+    vim.schedule(function()
+      M.refresh(root)
+      vim.api.nvim_exec_autocmds("User", { pattern = "MaakTasksChanged" })
+    end)
+  end)
+  if started then
+    watchers[file] = watcher
+  else
+    watcher:close()
+  end
+end
 
 --- The tasks of the Maak file in ROOT.
 function M.tasks(root)
   local file = root .. "/maak.scm"
-  local stamp = vim.fn.getftime(file)
+  watch(root)
+  local stamp = vim.fn.getftime(file) .. ":" .. vim.fn.getfsize(file)
   if cache[file] and cache[file].stamp == stamp then
     return cache[file].tasks
   end
@@ -116,7 +161,17 @@ function M.signature(task)
   return table.concat(words, " ")
 end
 
---- One line naming TASK, its arguments and the first line of its docstring.
+--- The prose the docstring gives ARGUMENT, ready to follow its name in a
+--- prompt, or the empty string when it gives none.
+local function prose(argument)
+  if argument.doc and argument.doc ~= "" then
+    return " — " .. argument.doc
+  end
+  return ""
+end
+
+--- One line naming TASK, its arguments, the first line of its docstring and
+--- the tasks it needs first.
 function M.label(task)
   local line = task.name
   local signature = M.signature(task)
@@ -126,6 +181,10 @@ function M.label(task)
   local summary = (task.doc or ""):match("^[^\n]*")
   if summary and summary ~= "" then
     line = line .. "  — " .. summary
+  end
+  local needs = task.depends or {}
+  if #needs > 0 then
+    line = line .. "  (needs: " .. table.concat(needs, ", ") .. ")"
   end
   return line
 end
@@ -151,7 +210,7 @@ function M.read_arguments(task)
         return nil
       end
     elseif argument.kind == "required" then
-      local answer = vim.fn.input(("Argument <%s>: "):format(argument.name))
+      local answer = vim.fn.input(("Argument <%s>%s: "):format(argument.name, prose(argument)))
       if answer:find("%S") == nil then
         vim.notify(
           ("maak: %s needs a value for <%s>"):format(task.name, argument.name),
@@ -162,9 +221,10 @@ function M.read_arguments(task)
       table.insert(arguments, answer)
     elseif argument.kind == "optional" then
       local answer = vim.fn.input(
-        ("Argument <%s> (%s, RET to omit): "):format(
+        ("Argument <%s> (%s, RET to omit)%s: "):format(
           argument.name,
-          argument.hasDefault and argument.default or "optional"
+          argument.hasDefault and argument.default or "optional",
+          prose(argument)
         )
       )
       if answer:find("%S") == nil then
@@ -172,8 +232,12 @@ function M.read_arguments(task)
       end
       table.insert(arguments, answer)
     elseif argument.kind == "rest" then
-      local answer =
-        vim.fn.input(("Arguments <%s> (space separated, RET for none): "):format(argument.name))
+      local answer = vim.fn.input(
+        ("Arguments <%s> (space separated, RET for none)%s: "):format(
+          argument.name,
+          prose(argument)
+        )
+      )
       for word in answer:gmatch("%S+") do
         table.insert(arguments, word)
       end

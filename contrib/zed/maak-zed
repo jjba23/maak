@@ -19,14 +19,16 @@ set -eu
 
 program=$(basename -- "$0")
 helper=${MAAK_TASKS:-maak-tasks}
+executable=${MAAK_EXECUTABLE:-maak}
 file=
 interval=1
 target=
 
 usage() {
   cat <<'EOF'
-usage: maak-zed sync  [--file FILE] [--helper PATH]
+usage: maak-zed sync  [--file FILE] [--helper PATH] [--executable NAME]
        maak-zed watch [--interval SECONDS] [--file FILE] [--helper PATH]
+                      [--executable NAME]
 
 sync  writes the .zed/tasks.json that Zed reads, next to the Maak file, and
       says whether it had to write it.
@@ -37,6 +39,8 @@ watch does that once, then again whenever the Maak file changes.  Zed reloads
   --file FILE         the Maak file to read; by default the nearest maak.scm in
                       this directory or above
   --helper PATH       the maak-tasks script; by default maak-tasks on PATH
+  --executable NAME   the command a generated task runs; by default maak, or
+                      MAAK_EXECUTABLE
   --interval SECONDS  how often watch looks; 1 second by default
   -h, --help          this text
 EOF
@@ -64,7 +68,7 @@ sync_tasks() {
 
   mkdir -p -- "$directory/.zed"
 
-  if ! "$helper" --file "$file" --zed >"$scratch"; then
+  if ! "$helper" --file "$file" --executable "$executable" --zed >"$scratch"; then
     rm -f -- "$scratch"
     printf '%s: %s could not be read, so %s was left alone\n' \
       "$program" "$file" "$target" >&2
@@ -129,6 +133,11 @@ while [ $# -gt 0 ]; do
     --helper)
       [ $# -ge 2 ] || die "--helper needs a path"
       helper=$2
+      shift 2
+      ;;
+    --executable)
+      [ $# -ge 2 ] || die "--executable needs a command"
+      executable=$2
       shift 2
       ;;
     --interval)

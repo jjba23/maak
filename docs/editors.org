@@ -85,7 +85,13 @@ install -m 755 contrib/bin/maak-tasks ~/.local/bin/maak-tasks
 | Sublime Text | Quick panels, and the run in a Sublime build panel.                    | [[file:../contrib/sublime/README.org][contrib/sublime]]     |
 | Helix        | =maak-picker= for =:sh=: fzf, the argument prompts, and a terminal.      | [[file:../contrib/helix/README.org][contrib/helix]]       |
 
-They all list the tasks the file defines, show the docstring, prompt for the arguments, run the task where its output belongs, visit a definition, and dry-run one with =maak -n=.  Neovim, Vim and VS Code also repeat the last run, and Neovim and Vim complete task names for =:MaakRun=.
+They all list the tasks the file defines, show the docstring, prompt for the
+arguments — with the prose from the docstring's ~Args:~ section when it is there
+— and show the tasks a task needs first.  They run the task where its output
+belongs, visit a definition, and dry-run one with =maak -n=.  Neovim, Vim and VS
+Code also repeat the last run, and Neovim and Vim complete task names for
+=:MaakRun=.  Neovim and VS Code forget their cached task list as soon as
+=maak.scm= changes, so a saved edit is what the next pick shows.
 
 The prompts are maak.el's, because they are what maak's grammar allows: a required argument is asked for, an optional one left blank is not passed at all (and neither is anything after it), a rest argument takes any number of words, and a keyword argument is never asked for because a string never becomes a keyword. When the docstring gives an argument prose under its ~Args:~ line, that is what the prompt shows; when it does not, the editor shows the name and the default it already has, which is why the prose is worth writing.
 

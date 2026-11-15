@@ -58,3 +58,6 @@ argument must be answered, a blank optional one stops the prompts so the task's
 own default applies, a rest argument takes space separated words, and a keyword
 argument is never asked for — maak's command line cannot pass one, and one
 without a default is an error said before the run.
+
+Each prompt shows the prose the docstring gives the argument under its ~Args:~
+line, and the picker says which tasks the task needs first.

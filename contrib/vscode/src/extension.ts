@@ -17,12 +17,15 @@ interface MaakArgument {
   default: string;
   hasDefault: boolean;
   keyword: string;
+  doc: string;
 }
 
 interface MaakTask {
   name: string;
   doc: string;
   line: number;
+  depends: string[];
+  example: string;
   arguments: MaakArgument[];
 }
 
@@ -96,8 +99,26 @@ function roots(): string[] {
 }
 
 /** Read the tasks of the Maak file in ROOT with the shared helper. */
+const listings = new Map<string, { stamp: string; listing: MaakListing }>();
+
+/** A change to the file changes this, so a cache miss costs one start. */
+function fileStamp(file: string): string {
+  try {
+    const stat = fs.statSync(file);
+    return `${stat.mtimeMs}:${stat.size}`;
+  } catch {
+    return "missing";
+  }
+}
+
 function load(root: string): Promise<MaakListing> {
   const helper = setting("helper", "maak-tasks");
+  const file = path.normalize(path.join(root, "maak.scm"));
+  const stamp = fileStamp(file);
+  const cached = listings.get(file);
+  if (cached && cached.stamp === stamp) {
+    return Promise.resolve(cached.listing);
+  }
   return new Promise((resolve, reject) => {
     cp.execFile(helper, ["--directory", root], { cwd: root }, (error, stdout, stderr) => {
       if (error) {
@@ -105,7 +126,9 @@ function load(root: string): Promise<MaakListing> {
         return;
       }
       try {
-        resolve(JSON.parse(stdout) as MaakListing);
+        const listing = JSON.parse(stdout) as MaakListing;
+        listings.set(file, { stamp, listing });
+        resolve(listing);
       } catch (parseError) {
         reject(parseError as Error);
       }
@@ -141,6 +164,27 @@ function firstLine(doc: string): string {
   return (doc ?? "").split("\n")[0];
 }
 
+/** What the task says beyond its name, for a picker's detail line. */
+function detail(task: MaakTask): string {
+  const parts: string[] = [];
+  const summary = firstLine(task.doc);
+  if (summary !== "") {
+    parts.push(summary);
+  }
+  if (task.depends?.length) {
+    parts.push(`needs: ${task.depends.join(", ")}`);
+  }
+  if (task.example) {
+    parts.push(`example: ${task.example}`);
+  }
+  return parts.join("  ");
+}
+
+/** The prose the docstring gives ARGUMENT, ready to follow its name. */
+function prose(argument: MaakArgument): string {
+  return argument.doc ? ` — ${argument.doc}` : "";
+}
+
 /**
  * Ask for the values of the task's arguments, in order.
  *
@@ -162,7 +206,7 @@ async function readArguments(task: MaakTask): Promise<string[] | undefined> {
     } else if (argument.kind === "required") {
       const answer = await vscode.window.showInputBox({
         title: `maak ${task.name}`,
-        prompt: `Argument <${argument.name}>`,
+        prompt: `Argument <${argument.name}>${prose(argument)}`,
         ignoreFocusOut: true,
       });
       if (answer === undefined) {
@@ -178,8 +222,8 @@ async function readArguments(task: MaakTask): Promise<string[] | undefined> {
     } else if (argument.kind === "optional") {
       const answer = await vscode.window.showInputBox({
         title: `maak ${task.name}`,
-        prompt: `Argument <${argument.name}>${
-          argument.hasDefault ? `, default ${argument.default}` : ""
+        prompt: `Argument <${argument.name}>${prose(argument)}${
+          argument.hasDefault ? ` (default ${argument.default})` : ""
         } — leave blank to omit`,
         ignoreFocusOut: true,
       });
@@ -193,7 +237,7 @@ async function readArguments(task: MaakTask): Promise<string[] | undefined> {
     } else if (argument.kind === "rest") {
       const answer = await vscode.window.showInputBox({
         title: `maak ${task.name}`,
-        prompt: `Arguments <${argument.name}> — space separated, blank for none`,
+        prompt: `Arguments <${argument.name}>${prose(argument)} — space separated, blank for none`,
         ignoreFocusOut: true,
       });
       if (answer === undefined) {
@@ -238,7 +282,7 @@ function pick(prompt: string, tasks: MaakTask[]): Thenable<MaakTask | undefined>
     .map((task) => ({
       label: task.name,
       description: signature(task),
-      detail: firstLine(task.doc),
+      detail: detail(task),
       task,
     }));
   return vscode.window
@@ -334,10 +378,9 @@ async function listTasks(): Promise<void> {
   output.clear();
   for (const task of project.tasks) {
     const words = signature(task);
+    const rest = detail(task);
     output.appendLine(
-      `${task.name}${words === "" ? "" : `  ${words}`}${
-        firstLine(task.doc) === "" ? "" : `  — ${firstLine(task.doc)}`
-      }`
+      `${task.name}${words === "" ? "" : `  ${words}`}${rest === "" ? "" : `  — ${rest}`}`
     );
   }
   output.appendLine("");
@@ -346,7 +389,19 @@ async function listTasks(): Promise<void> {
 }
 
 /** The tasks of every Maak file, for `Tasks: Run Task`. */
-class MaakTaskProvider implements vscode.TaskProvider {
+class MaakTaskProvider implements vscode.TaskProvider, vscode.Disposable {
+  private readonly changed = new vscode.EventEmitter<void>();
+  readonly onDidChangeTasks = this.changed.event;
+
+  /** Tell VS Code to ask for the tasks again, after the Maak file changed. */
+  refresh(): void {
+    this.changed.fire();
+  }
+
+  dispose(): void {
+    this.changed.dispose();
+  }
+
   async provideTasks(): Promise<vscode.Task[]> {
     const provided: vscode.Task[] = [];
     for (const root of roots()) {
@@ -369,7 +424,7 @@ class MaakTaskProvider implements vscode.TaskProvider {
           "maak",
           execution
         );
-        vscodeTask.detail = signature(task);
+        vscodeTask.detail = detail(task);
         provided.push(vscodeTask);
       }
     }
@@ -403,14 +458,36 @@ class MaakTaskProvider implements vscode.TaskProvider {
 
 export function activate(context: vscode.ExtensionContext): void {
   output = vscode.window.createOutputChannel("Maak");
+  const provider = new MaakTaskProvider();
+
+  // A saved maak.scm is a new task list.  Forgetting the cached read and firing
+  // onDidChangeTasks is what makes `Tasks: Run Task` and the pickers see it
+  // without reloading the window.
+  const watcher = vscode.workspace.createFileSystemWatcher("**/maak.scm");
+  const forget = (uri: vscode.Uri) => {
+    listings.delete(path.normalize(uri.fsPath));
+    provider.refresh();
+  };
+
   context.subscriptions.push(
     output,
+    provider,
+    watcher,
+    watcher.onDidChange(forget),
+    watcher.onDidCreate(forget),
+    watcher.onDidDelete(forget),
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration("maak")) {
+        listings.clear();
+        provider.refresh();
+      }
+    }),
     vscode.commands.registerCommand("maak.runTask", () => runTask(context, false)),
     vscode.commands.registerCommand("maak.dryRunTask", () => runTask(context, true)),
     vscode.commands.registerCommand("maak.runLastTask", () => runLastTask(context)),
     vscode.commands.registerCommand("maak.goToTask", goToTask),
     vscode.commands.registerCommand("maak.listTasks", listTasks),
-    vscode.tasks.registerTaskProvider("maak", new MaakTaskProvider())
+    vscode.tasks.registerTaskProvider("maak", provider)
   );
 }
 

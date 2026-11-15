@@ -99,15 +99,17 @@ check "preview says what a task needs first" "$preview" 'needs: build'
 check "preview says how to invoke it" "$preview" 'example: maak deploy prod.example.com'
 check "preview leaves the argument section out of the documentation" \
   "$(printf '%s\n' "$preview" | grep -c '^  Args:$')" '^0$'
-check "words prints the promptable arguments, in order" "$words" '^required	target		0$'
-check "words prints an optional argument's default" "$words" '^optional	env	"dev"	1$'
-check "words marks the keyword a picker must not ask for" "$words" '^key	jobs	1	1$'
+check "words prints the promptable arguments, in order" "$words" '^required	target		0	the host to ship to, as HOST\[:PORT\]\.$'
+check "words prints an optional argument's default and prose" "$words" '^optional	env	"dev"	1	which environment'
+check "words marks the keyword a picker must not ask for" "$words" '^key	jobs	1	1	how many uploads at once'
 check "fzf prints name, signature and summary" \
   "$("$helper" --file "$fixture" --fzf | grep '^report')" '^report	day	Print the report for DAY\.$'
 check "zed labels a task with its docstring" \
   "$("$helper" --file "$fixture" --zed)" '"label":"maak: report — Print the report for DAY\."'
 check "zed runs the task in the worktree root" \
   "$("$helper" --file "$fixture" --zed)" "\"cwd\":\"\\\$ZED_WORKTREE_ROOT\""
+check "zed runs the maak it is given" \
+  "$("$helper" --file "$fixture" --zed --executable /opt/maak)" '"command":"/opt/maak"'
 check_not "zed leaves a hidden task out" "$("$helper" --file "$fixture" --zed)" 'maak: tidy'
 
 # The file is found upward from a directory, which is how an editor asks.

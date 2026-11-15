@@ -72,13 +72,23 @@ function! maak#signature(task) abort
   return join(l:words, ' ')
 endfunction
 
-" One line naming the task, its arguments and the first line of its docstring.
+" The prose the docstring gives an argument, ready to follow its name in a
+" prompt, or the empty string when it gives none.
+function! s:prose(argument) abort
+  let l:prose = get(a:argument, 'doc', '')
+  return l:prose ==# '' ? '' : ' — ' . l:prose
+endfunction
+
+" One line naming the task, its arguments, the first line of its docstring and
+" the tasks it needs first.
 function! maak#label(task) abort
   let l:signature = maak#signature(a:task)
   let l:summary = get(split(a:task.doc, "\n"), 0, '')
+  let l:needs = get(a:task, 'depends', [])
   return a:task.name
         \ . (l:signature ==# '' ? '' : '  ' . l:signature)
         \ . (l:summary ==# '' ? '' : '  — ' . l:summary)
+        \ . (empty(l:needs) ? '' : '  (needs: ' . join(l:needs, ', ') . ')')
 endfunction
 
 function! s:error(message) abort
@@ -103,23 +113,24 @@ function! maak#read_arguments(task) abort
         return v:null
       endif
     elseif l:argument.kind ==# 'required'
-      let l:answer = input('Argument <' . l:argument.name . '>: ')
+      let l:answer = input('Argument <' . l:argument.name . '>' . s:prose(l:argument) . ': ')
       if l:answer =~# '^\s*$'
         call s:error(printf('%s needs a value for <%s>', a:task.name, l:argument.name))
         return v:null
       endif
       call add(l:arguments, l:answer)
     elseif l:argument.kind ==# 'optional'
-      let l:answer = input(printf('Argument <%s> (%s, RET to omit): ',
+      let l:answer = input(printf('Argument <%s> (%s, RET to omit)%s: ',
             \ l:argument.name,
-            \ l:argument.hasDefault ? l:argument.default : 'optional'))
+            \ l:argument.hasDefault ? l:argument.default : 'optional',
+            \ s:prose(l:argument)))
       if l:answer =~# '^\s*$'
         break
       endif
       call add(l:arguments, l:answer)
     elseif l:argument.kind ==# 'rest'
-      let l:answer = input(printf('Arguments <%s> (space separated, RET for none): ',
-            \ l:argument.name))
+      let l:answer = input(printf('Arguments <%s> (space separated, RET for none)%s: ',
+            \ l:argument.name, s:prose(l:argument)))
       call extend(l:arguments, split(l:answer))
     endif
   endfor

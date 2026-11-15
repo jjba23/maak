@@ -59,6 +59,10 @@ them and =tasks.json= can name one:
 | =maak.executable= | =maak=         | The maak a task runs with.                          |
 | =maak.helper=     | =maak-tasks=   | The helper that reads the Maak file.                |
 
+The task list is cached until the Maak file changes.  A saved =maak.scm=, a new
+one or a deleted one clears the cache and tells VS Code to ask again, so =Tasks:
+Run Task= and the pickers show the new list without reloading the window.
+
 * Arguments
 
 The prompts follow the lambda list of the task, the way maak.el does:
@@ -69,6 +73,10 @@ The prompts follow the lambda list of the task, the way maak.el does:
 - a rest argument takes any number of space separated words;
 - a keyword argument is never asked for, because maak's command line cannot pass
   one.  A keyword argument with no default is an error, said before the run.
+
+Each prompt shows the prose the docstring gives the argument under its ~Args:~
+line, and the picker's detail line shows what the task needs first and an
+example invocation when it declares one.
 
 An argument that begins with a dash is set apart with =--=, as in
 =maak quick-math -- -23 42=.

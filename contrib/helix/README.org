@@ -42,14 +42,19 @@ poor for anything that expects a tty.
 - =space m n= — the same pick with =maak -n=: the commands, not the run.
 - =maak-picker --dry-run= on its own, if you prefer to type it.
 - The =fzf= preview pane holds the task's whole docstring and one line per
-  argument, including the keyword arguments maak cannot pass.
+  argument, including the keyword arguments maak cannot pass and the prose the
+  docstring gives each one.
 
 * Arguments
 
 The prompts follow the lambda list of the task, the way maak.el does: a required
 argument must be answered, a blank optional one stops the prompts so the task's
 own default applies, a rest argument takes space separated words, and a keyword
-argument is shown but never asked for.
+argument is shown but never asked for.  Each prompt also shows the prose the
+docstring gives the argument under its ~Args:~ line.
+
+=MAAK_TASKS= names the helper and =MAAK_EXECUTABLE= the maak to run (default
+=maak=); =MAAK_TERMINAL= names the terminal a task runs in.
 
 * Why not a Helix plugin
 
