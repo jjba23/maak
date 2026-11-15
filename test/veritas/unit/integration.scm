@@ -276,6 +276,14 @@ that a case can ask about it alongside the status of the run."
                                #:got (list (status-of result)
                                            (said? result "stdout" "maak explain: alpha")))))
 
+         (test "this checkout's bundle task asks for a pack"
+               (let ((result (launcher-run "-f" "maak.scm"
+                                           "--no-banner" "-n"
+                                           "--tasks" "package-bundle")))
+                 (assert-equal #:expect (list 0 #t)
+                               #:got (list (status-of result)
+                                           (said? result "stdout" "guix pack --file=")))))
+
          (test "a failure stops the tasks after it"
                (let ((result (launcher-run "-f" keep-going-fixture
                                            "--no-banner" "--"

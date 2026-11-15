@@ -372,7 +372,7 @@ A bare push does not send tags that are not annotated; `maak git-push --
 
 Args:
   pack-format: a guix pack format: tarball, squashfs or docker."
-  (bundle "maak"
+  (bundle #:name "maak"
           #:format pack-format
           #:maak-file "maak.scm"
           #:maak-package (format #f "(load ~s)" (canonicalize-path "guix.scm"))
