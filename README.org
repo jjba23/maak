@@ -62,8 +62,8 @@ gettext — is in [[file:docs/features.org][Features]].
 
 * Installation
 
-Guix, Nix, the container image, the RPM and the Debian package are all in
-[[file:docs/installation.org][Installing maak]]. From a checkout, the launcher
+Guix, Nix, Homebrew, the container image, the RPM and the Debian package are all
+in [[file:docs/installation.org][Installing maak]]. From a checkout, the launcher
 runs this tree's own sources:
 
 #+begin_src shell

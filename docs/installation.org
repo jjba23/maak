@@ -71,6 +71,27 @@ nix build
 ./result/bin/maak --list
 #+end_src
 
+* With Homebrew
+
+Homebrew installs maak from its source archive through the formula in
+~packaging/homebrew/Formula/maak.rb~. A formula, rather than a cask or a gem:
+maak is a command-line program, so it is built from source with Guile rather
+than installed from a macOS app bundle or from RubyGems.
+
+#+begin_src shell
+brew install --formula packaging/homebrew/Formula/maak.rb
+#+end_src
+
+The formula installs ~maak~, the ~maak-tasks~ helper every editor integration
+uses and ~maak-zed~, with the manual page and the shell completions. It also
+builds against GNU ~getopt~ and coreutils, which the launcher needs on macOS,
+and byte-compiles the modules into the Cellar.
+
+The formula's checksum is the checksum of the release's archive, so it is
+refreshed after each release just as the Arch recipe's is. Install from a tagged
+checkout, or after that refresh, and not from a tree whose tag has not been
+published yet.
+
 * In a container (Podman / Docker)
 
 Prebuilt images live on Docker Hub:

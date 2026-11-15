@@ -8,8 +8,8 @@
 ;; The version is written once, in src/maak/version.scm, where the library and
 ;; `maak --version' read it and where default.nix reads it while it evaluates.
 ;; Every file that cannot read a Scheme module carries a copy instead: the RPM
-;; spec, the manual page, the installation page, the Arch recipe and the
-;; Debian changelog.
+;; spec, the manual page, the installation page, the Arch recipe, the Homebrew
+;; formula and the Debian changelog.
 ;;
 ;; `maak sync-version' rewrites all but the changelog from that file, and this
 ;; spec is what notices a copy that nobody rewrote.  It found two: the Arch
@@ -75,6 +75,12 @@ field rather than a number that happens to look like one."
                              #:got (version-in
                                     "packaging/arch/PKGBUILD"
                                     "pkgver=([0-9]+\\.[0-9]+\\.[0-9]+)")))
+
+         (test "the Homebrew formula carries the released version"
+               (assert-equal #:expect maak-version
+                             #:got (version-in
+                                    "packaging/homebrew/Formula/maak.rb"
+                                    "refs/tags/v([0-9]+\\.[0-9]+\\.[0-9]+)\\.tar\\.gz")))
 
          (test "the Debian changelog's newest entry carries the released version"
                (assert-equal #:expect maak-version
