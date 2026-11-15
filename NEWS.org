@@ -14,6 +14,53 @@ Nothing yet.
 
 *[Released]*
 
+** v0.22.0 (2026-11-15)
+
+C and C++ projects can move a Makefile into tasks without losing the pieces
+they rely on: a compiler and linker invocation, pkg-config's flags, a static
+library, parallel object compilation and an explicit up-to-date check.
+
+*** Added
+
+- `(maak cc)`, a module of C and C++ build helpers, re-exported by
+  `(maak maak)`.  The compiler and archiver are parameters read from
+  `MAAK_CC`/`CC`, `MAAK_CXX`/`CXX` and `MAAK_AR`/`AR`, and a value may carry a
+  wrapper such as `"ccache gcc"`.
+- `compile` and `compile-argv` compile one source with includes, defines,
+  flags, a language, a standard, `-fPIC` and `-MMD -MP`.  `compile-objects`
+  compiles a list, with `#:jobs` for concurrent compilers and
+  `#:incremental?` for skipping objects newer than their sources.
+- `link` and `link-argv` link objects into a program or a shared library, with
+  libraries, library paths, `#:flags` before the objects (LDFLAGS) and
+  `#:link-flags` after them (LDLIBS and pkg-config's libs), plus `#:shared?`,
+  `#:static?` and `#:soname`.  `static-library` writes an `ar rcs` archive.
+- `object-file`, `up-to-date?` and `environment-flags`: the object path for a
+  source, the explicit target/input check a task uses to skip a compile, and
+  the words of `CFLAGS`, `CPPFLAGS`, `LDFLAGS` or `LDLIBS` when a task asks
+  for one.  Nothing is rebuilt on a timestamp unless the task says so.
+- `pkg-config-cflags`, `pkg-config-libs`, `pkg-config-exists?` and
+  `pkg-config-version`, with the program taken from `MAAK_PKG_CONFIG` or the
+  `pkg-config-command` parameter.  They run even in a dry run, because
+  pkg-config reads the system, so `--plan` shows the flags a compile would
+  really use.
+- `install-file` and `install-directory` in `(maak shell)`, the `install` a
+  Makefile's install target reaches for, with parent directories and modes.
+- `docs/c-and-cpp.org`: a C project, a C++ project, pkg-config, explicit
+  incremental builds, a Make/Automake mapping table, and what maak does not do.
+
+*** Changed
+
+- The `link` helper in a Maak file is the C linker rather than Guile's POSIX
+  `link`; `(maak cc)` declares the replacement so importing it does not warn.
+  A task that needs the POSIX call should import it under another name.
+
+*** Verification
+
+- The Veritas suite is green, with a new `cc` spec that asserts the argv
+  builders, the shell-word parsing of a pkg-config stand-in, the explicit
+  up-to-date check, the environment flag reader and both install helpers.
+- `contrib/test/maak-tasks.sh` still passes all 43 checks.
+
 ** v0.21.1 (2026-11-15)
 
 *** Fixed

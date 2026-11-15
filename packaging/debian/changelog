@@ -1,3 +1,19 @@
+maak (0.22.0-1) unstable; urgency=medium
+
+  * (maak cc): C and C++ build helpers.  compile/compile-argv,
+    compile-objects with #:jobs and #:incremental?, link/link-argv with
+    LDFLAGS and link-flags kept apart, static-library, object-file,
+    up-to-date?, environment-flags, and pkg-config queries that run even in a
+    dry run so --plan shows the real flags.  The compiler, archiver and
+    pkg-config program come from MAAK_CC/CC, MAAK_CXX/CXX, MAAK_AR/AR and
+    MAAK_PKG_CONFIG.
+  * install-file and install-directory in (maak shell), for the install target
+    of a Makefile with DESTDIR and modes.
+  * docs/c-and-cpp.org: a C and a C++ project, pkg-config, explicit
+    incremental builds, a Make/Automake mapping table and the limits.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Sun, 15 Nov 2026 14:00:00 +0100
+
 maak (0.21.1-1) unstable; urgency=medium
 
   * `maak package-bundle` passes the bundle name as `#:name`, the keyword
