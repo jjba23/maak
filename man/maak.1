@@ -333,6 +333,34 @@ How often
 .B \-\-watch
 looks at the tree, in seconds.  One second by default; a value that is not a
 positive number is an error.
+.TP
+.B MAAK_CC
+The C compiler
+.B (maak cc)
+uses, falling back to
+.B CC
+and then
+.BR cc .
+The value may carry flags, as in
+.BR "ccache gcc" .
+.TP
+.B MAAK_CXX
+The C++ compiler, falling back to
+.B CXX
+and then
+.BR c++ .
+.TP
+.B MAAK_AR
+The archiver, falling back to
+.B AR
+and then
+.BR ar .
+.TP
+.B MAAK_PKG_CONFIG
+The pkg\-config program the
+.B (maak cc)
+queries run; by default
+.BR pkg-config .
 .SH TASK AUTHORING
 A task is an ordinary procedure.  Its docstring is shown by
 .B \-\-list
@@ -510,6 +538,146 @@ but raise a maak error when the command is missing.
 Quote
 .I string
 so a shell reads it as one literal word.
+.SS C and C++
+The helpers in
+.B (maak cc)
+build compiler, linker and archiver commands, and are re\-exported by
+.BR "(maak maak)" .
+None of them decides that a task does not need to run.
+.TP
+.B (compile source #:output FILE #:includes DIRS #:defines DEFS #:flags FLAGS #:language LANG #:compiler PROGRAM #:standard STD #:pic? BOOL #:depfile? BOOL)
+Compile one
+.I source
+to an object.  The object defaults to the source with its extension replaced
+by
+.BR .o .
+.B #:includes
+and
+.B #:defines
+become
+.B \-I
+and
+.B \-D
+arguments;
+.B #:flags
+is inserted verbatim;
+.B #:standard
+becomes
+.BR \-std=STD ;
+.B #:pic?
+adds
+.BR \-fPIC ;
+and
+.B #:depfile?
+adds
+.BR "\-MMD \-MP" .
+.B #:language
+is
+.B c
+or
+.BR c++ ,
+and
+.B #:compiler
+overrides the compiler for this command.
+.TP
+.B (compile-objects sources #:directory DIR #:jobs N #:incremental? BOOL ...)
+Compile every source to its object under
+.IR DIR ,
+with the same keyword arguments as
+.BR compile .
+With
+.BR #:jobs " N"
+above one, N compilers run at once.  With
+.BR #:incremental? " #t"
+an object newer than its source is left alone; without it every object is
+compiled.
+.TP
+.B (link objects #:output FILE #:libraries NAMES #:library-paths DIRS #:flags FLAGS #:link-flags FLAGS #:language LANG #:compiler PROGRAM #:shared? BOOL #:static? BOOL #:soname NAME)
+Link
+.I objects
+into
+.IR FILE .
+.B #:libraries
+and
+.B #:library-paths
+build
+.B \-l
+and
+.B \-L
+arguments.
+.B #:flags
+is inserted before the objects, where
+.B LDFLAGS
+goes;
+.B #:link-flags
+after them, where
+.B LDLIBS
+and pkg\-config's libs go.
+.B #:shared?
+adds
+.BR \-shared ,
+.B #:static?
+adds
+.BR \-static ,
+and
+.B #:soname
+adds
+.BR \-Wl,\-soname,NAME .
+.TP
+.B (static-library output objects #:archiver PROGRAM)
+Write
+.I objects
+into a static library with
+.BR "ar rcs" .
+.TP
+.B (object-file source #:optional DIRECTORY)
+Return the object path for
+.IR source ,
+in its own directory or in
+.IR DIRECTORY .
+.TP
+.B (up-to-date? output inputs)
+Return
+.B #t
+when
+.I output
+exists and is not older than every one of
+.IR inputs .
+A missing output or input is not up to date.  This is the explicit check a task
+uses to skip a compile; maak never applies it on its own.
+.TP
+.B (environment-flags "CFLAGS")
+Return the whitespace separated words of the named environment variable.  The
+task says which of
+.BR CFLAGS ,
+.BR CXXFLAGS ,
+.BR CPPFLAGS ,
+.B LDFLAGS
+and
+.B LDLIBS
+reaches which command; none is read automatically.
+.TP
+.B (pkg-config-cflags packages)
+.B (pkg-config-libs packages #:static? BOOL)
+.B (pkg-config-exists? packages)
+.B (pkg-config-version package)
+The four pkg\-config queries, with cflags and libs returned as lists.  They
+run even in a dry run, because pkg\-config reads the system rather than
+changing it, and a plan that left out the flags a compile would use would be
+wrong.  The program is the
+.B pkg-config-command
+parameter or
+.BR MAAK_PKG_CONFIG .
+.TP
+.B (install-file source destination #:mode "644")
+Install one file, creating its parent directories, with the mode a Makefile's
+.B install
+target would set.  A
+.B DESTDIR
+staging prefix is composed by the task.
+.TP
+.B (install-directory directory #:mode "755")
+Create a directory and its parents with the mode.
 .SS Reporting a failure
 .TP
 .B (task\-error message)

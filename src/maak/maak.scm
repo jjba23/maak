@@ -24,6 +24,7 @@
   #:use-module (maak guix)
   #:use-module (maak bundle)
   #:use-module (maak watch)
+  #:use-module (maak cc)
   #:use-module (maak i18n)
   #:use-module (maak version)
   #:use-module (maak git)
@@ -108,6 +109,28 @@
                            watch-changed?
                            watch-tree
                            watch-interval
+                           ;; ====== C and C++ ======
+                           c-compiler
+                           cxx-compiler
+                           ar-command
+                           pkg-config-command
+                           compiler-for
+                           object-file
+                           compile-argv
+                           compile
+                           compile-objects
+                           link-argv
+                           link
+                           static-library-argv
+                           static-library
+                           up-to-date?
+                           environment-flags
+                           pkg-config-argv
+                           pkg-config
+                           pkg-config-cflags
+                           pkg-config-libs
+                           pkg-config-exists?
+                           pkg-config-version
                            ;; ====== Guix values ======
                            guix-available?
                            guix-channels
@@ -144,6 +167,8 @@
                            tmp-dir
                            read-file
                            write-file
+                           install-file
+                           install-directory
                            ;; ====== Nix helpers ======
                            nix-shell
                            nix-develop

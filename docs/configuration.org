@@ -17,6 +17,10 @@ maak is configured three ways, in increasing order of precision: command-line fl
 | ~MAAK_NO_BANNER~  | Set to ~1~ to skip the greeting banner.                             |
 | ~MAAK_DEBUG~      | Set to ~1~ to print the Guile backtrace on error.                   |
 | ~MAAK_WATCH_INTERVAL~ | How often ~--watch~ looks at the tree, in seconds (1 by default). |
+| ~MAAK_CC~         | The C compiler for ~(maak cc)~; falls back to ~CC~, then ~cc~.        |
+| ~MAAK_CXX~        | The C++ compiler for ~(maak cc)~; falls back to ~CXX~, then ~c++~.    |
+| ~MAAK_AR~         | The archiver for ~(maak cc)~; falls back to ~AR~, then ~ar~.          |
+| ~MAAK_PKG_CONFIG~ | The pkg-config program; ~pkg-config~ by default.                    |
 | ~MAAK_ELEVATE~    | The program that answers ~#:sudo?~: ~doas~, ~sudo~, or one with options. |
 | ~MAAK_CONTAINER_ENGINE~ | The container engine: ~podman~ or ~docker~.                  |
 | ~MAAK_COMPOSE~    | The Compose program, for example ~podman-compose~ or ~docker compose~. |
@@ -25,6 +29,14 @@ maak is configured three ways, in increasing order of precision: command-line fl
 #+begin_src shell
 MAAK_ENV_FILE=".env:.env.local" MAAK_NO_BANNER=1 maak -- build
 #+end_src
+
+~CC~, ~CXX~ and ~AR~ are honoured by the C/C++ helpers unless ~MAAK_CC~,
+~MAAK_CXX~ or ~MAAK_AR~ names a compiler, and a value may carry a wrapper such
+as ~"ccache gcc"~.  ~CFLAGS~, ~CXXFLAGS~, ~CPPFLAGS~, ~LDFLAGS~ and ~LDLIBS~
+are *not* read automatically: a task says which one reaches which command with
+~(environment-flags "CFLAGS")~, because a flag that belongs to a compile and one
+that belongs to a link are not the same decision.  See
+[[file:c-and-cpp.org][C, C++ and Make/Automake]].
 
 * Parameters: dry-run, quiet, banner, escalation
 

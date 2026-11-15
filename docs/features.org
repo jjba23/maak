@@ -13,6 +13,7 @@
 - *Background jobs with a pid* — ~#:async?~ forks a process and hands back a job record you can poll, wait on, and read the exit code of.
 - *Parallel tasks with readable output* — ~maak -j 4 -- fmt,lint,test~ runs tasks in forked workers and prints each one's output as a single block, in the order you named them.
 - *Dry-run and quiet as lexical parameters* — ~(parameterize ((dry-run? #t)) …)~ makes destructive code safe to exercise inside a test, without a command-line flag.
+- *C and C++ without a Makefile* — ~(maak cc)~ builds compiler, linker and ~ar~ commands, reads ~CFLAGS~/~CPPFLAGS~/~LDFLAGS~/~LDLIBS~ when a task asks, queries ~pkg-config~, compiles several objects in parallel, and checks ~up-to-date?~ only when the task says so.
 - *A plan before the run* — ~maak --plan TASK~ records the typed plan a task describes: each command, its argv or shell line, its directory, its environment, its elevation and whether it would run in the background.  ~--plan --json~ makes it a versioned value for CI and editors.
 - *A watch without a watcher* — ~maak --watch TASK~ re-runs a task when the tree changes, reloading the Maak file each time, with no watchexec or inotify binding to install.
 - *The composition, explained* — ~maak explain TASK~ renders the static call graph, the load path, the escalation and a per-variable report of which environment file wins.

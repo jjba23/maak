@@ -31,7 +31,9 @@ elevation, background — as text or as versioned JSON; `--watch` re-runs a task
 when the tree changes, reloading the file each time; `explain` renders the static
 call graph and says which environment file wins. `(maak bundle)` packs a project's
 automation as a self-contained `guix pack` that runs where Guile and maak are not
-installed. Parallel runs fork one
+installed. `(maak cc)` builds compiler, linker and archiver commands, pkg-config's
+flags and an explicit `up-to-date?` check, so a C or C++ project can move its
+Makefile into tasks without acquiring a timestamp graph. Parallel runs fork one
 worker per task and print each task's output as a block, in the order named. Tasks
 can declare what they need first, whether a listing should offer them and an
 example invocation, and both the sequential and the parallel runner order a run

@@ -45,7 +45,9 @@
             home-dir
             tmp-dir
             read-file
-            write-file))
+            write-file
+            install-file
+            install-directory))
 
 ;; ====== Program lookup ======
 
@@ -177,6 +179,38 @@ it."
     (display content port)
     (close-port port))
   file)
+
+(define* (install-file source destination
+                       #:key (mode "644") (verbose? #f) (expand? #f))
+  "Install SOURCE at DESTINATION with MODE, creating parent directories.
+
+This is the `install` a Makefile's `install` target reaches for, with the
+destination named in full.  MODE is an octal string such as \"755\" for a
+program or \"644\" for data.  The parent directories are made with `mkdir-p'
+first, because `install -D' is a GNU extension and this works wherever `install'
+does.  A `DESTDIR' staging prefix is the caller's to compose; a task migrates a
+Makefile's `$(DESTDIR)$(bindir)' by concatenating it into DESTINATION.
+
+@example
+(install-file \"build/app\" \"/usr/local/bin/app\" #:mode \"755\")
+@end example"
+  (let ((parent (dirname destination)))
+    (unless (or (string=? parent ".")
+                (string=? parent "")
+                (file-exists? parent))
+      (mkdir-p parent #:verbose? verbose?)))
+  (run (list "install" "-m" mode source destination)
+       #:verbose? verbose? #:expand? expand?))
+
+(define* (install-directory directory
+                            #:key (mode "755") (verbose? #f) (expand? #f))
+  "Create DIRECTORY and its parents with MODE.
+
+The directory counterpart of `install-file': one `install -d' that sets the
+mode of the directory it creates, which is what a Makefile's
+`$(MKDIR_P) $(DESTDIR)$(datadir)/app' does."
+  (run (list "install" "-d" "-m" mode directory)
+       #:verbose? verbose? #:expand? expand?))
 
 (define (with-directory dir thunk)
   "Call THUNK with the process working directory changed to DIR.

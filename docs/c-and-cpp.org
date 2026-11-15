@@ -1,0 +1,215 @@
+#+title: C, C++, and migrating from Make or Automake
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+A Makefile is a description of commands and the times they were last run.  A
+Maak file is a description of tasks and the commands they build, and ~(maak cc)~
+adds the things a C or C++ project reaches for: a compiler invocation, a
+linker invocation, a static library, ~pkg-config~ flags and an explicit
+"is this up to date?" check.  None of it is a second build engine, and none of
+it tries to be Make.
+
+* The helpers
+
+| Helper                              | What it does                                                     |
+|-------------------------------------+------------------------------------------------------------------|
+| ~c-compiler~, ~cxx-compiler~, ~ar-command~ | Parameters for the programs, honoured from ~MAAK_CC~, ~CC~, ~MAAK_CXX~, ~CXX~, ~MAAK_AR~, ~AR~. |
+| ~compiler-for~                      | The compiler for ~'c~ or ~'c++~, with a value such as ~"ccache gcc"~ split into words. |
+| ~object-file~                       | ~"src/a.c"~ to ~"src/a.o"~, or ~"build/a.o"~ with a directory.          |
+| ~compile~, ~compile-argv~           | One source to one object, with includes, defines, flags, standard, ~-fPIC~ and dependency files. |
+| ~compile-objects~                   | Every source to its object, optionally in parallel (~#:jobs~) and optionally skipping up-to-date objects (~#:incremental?~). |
+| ~link~, ~link-argv~                 | Objects to a program or a shared library, with libraries, library paths, flags, ~-static~ and a soname. |
+| ~static-library~, ~static-library-argv~ | Objects to an archive with ~ar rcs~.                              |
+| ~up-to-date?~                       | Whether an output exists and is not older than its inputs.       |
+| ~environment-flags~                 | The words of ~CFLAGS~, ~CPPFLAGS~, ~LDFLAGS~ or ~LDLIBS~, when a task asks for one. |
+| ~pkg-config-cflags~, ~pkg-config-libs~, ~pkg-config-exists?~, ~pkg-config-version~ | pkg-config's answers as lists, a boolean and a string. |
+| ~install-file~, ~install-directory~ | The ~install~ a Makefile's ~install~ target reaches for.            |
+
+All of them are re-exported by ~(maak maak)~, so a normal Maak file needs only
+its usual import.
+
+* A C project
+
+The Makefile this replaces has ~CC~, ~CFLAGS~, a pattern rule for objects, a
+link rule and the phony targets.  The Maak file says the same thing as
+procedures:
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak maak))
+
+(define program "hello")
+(define sources '("src/main.c" "src/util.c"))
+(define includes '("include" "src"))
+(define objects (map (lambda (source) (object-file source "build")) sources))
+
+(define prefix (or (getenv "PREFIX") "/usr/local"))
+(define destdir (or (getenv "DESTDIR") ""))
+
+(define (cflags)
+  (append (environment-flags "CPPFLAGS")
+          (environment-flags "CFLAGS")))
+
+(define (build)
+  "Compile and link the program."
+  (mkdir-p "build")
+  (compile-objects sources
+                   #:directory "build"
+                   #:incremental? #t
+                   #:jobs 4
+                   #:includes includes
+                   #:flags (cflags)
+                   #:depfile? #t)
+  (link objects
+        #:output (string-append "build/" program)
+        #:libraries '("m")))
+
+(define (test)
+  "Run the test binary."
+  (build)
+  (run (list (string-append "build/" program) "--test")))
+
+(define (install)
+  "Install the program under PREFIX, honouring DESTDIR."
+  (build)
+  (install-file (string-append "build/" program)
+                (string-append destdir prefix "/bin/" program)
+                #:mode "755"))
+
+(define (clean)
+  "Remove the build directory."
+  (delete-file-recursively "build"))
+#+end_src
+
+Run ~maak build~, ~maak test~, ~maak install~, ~maak clean~.  The tasks are
+phony by nature, so there is no ~.PHONY~ line.  ~maak -j 4 build,test~ runs the
+tasks in parallel; ~#:jobs 4~ inside ~build~ parallelises the compiles of that
+one task.
+
+~#:incremental? #t~ makes ~compile-objects~ skip an object newer than its
+source; without it every object is compiled, which is what a clean build
+should do.  The check is ~up-to-date?~, and it is always explicit: maak never
+decides that a task does not need to run.
+
+* A C++ project
+
+C++ differs in the driver and the standard, so it is one keyword:
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak maak))
+
+(define (build)
+  "Compile the C++ program and link it against zlib."
+  (mkdir-p "build")
+  (compile-objects '("src/main.cc")
+                   #:directory "build"
+                   #:language 'c++
+                   #:standard "c++17"
+                   #:includes '("include")
+                   #:flags (append (environment-flags "CXXFLAGS")
+                                  (pkg-config-cflags '("zlib")))
+                   #:depfile? #t)
+  (link '("build/main.o")
+        #:output "build/app"
+        #:language 'c++
+        #:link-flags (pkg-config-libs '("zlib"))))
+#+end_src
+
+The split between the keyword lists matters: ~#:includes~, ~#:library-paths~
+and ~#:libraries~ take *names* and build ~-I~, ~-L~ and ~-l~ from them, while
+~#:flags~ takes flags that are already formed and places them before the
+objects.  pkg-config's cflags go to ~#:flags~; its libs go to ~#:link-flags~,
+which is after the objects, because a linker reads libraries left to right and
+one placed before the objects is a library nothing needed yet.
+
+* pkg-config
+
+The four queries answer the four questions a ~PKG_CHECK_MODULES~ line used to:
+
+#+begin_src scheme
+(pkg-config-exists? '("gtk+-3.0"))          ;; #t or #f
+(pkg-config-version "glib-2.0")             ;; "2.78.0"
+(pkg-config-cflags '("gtk+-3.0"))           ;; ("-I/..." "-pthread" ...)
+(pkg-config-libs '("gtk+-3.0"))             ;; ("-L/..." "-lgtk-3" ...)
+(pkg-config-libs '("gtk+-3.0") #:static? #t) ;; the static answer
+#+end_src
+
+~pkg-config~ is read even in a dry run: it reads the system rather than
+changing it, and a plan that left out the flags a compile would use would be a
+lie.  ~maak --plan build~ therefore shows the real compiler command, with the
+real pkg-config flags.  The program is the ~pkg-config-command~ parameter or
+~MAAK_PKG_CONFIG~, which is also how a cross build points at the target's
+pkg-config.
+
+* Incremental builds are explicit
+
+Make decides whether a recipe runs by comparing timestamps.  maak leaves that
+decision to the task, because the condition may be a hash, a row or a network
+check rather than an mtime.  For a C build, the condition usually is an mtime:
+
+#+begin_src scheme
+(unless (up-to-date? object (list source "include/config.h"))
+  (compile source #:output object #:depfile? #t))
+#+end_src
+
+~#:depfile?~ adds ~-MMD -MP~, so the compiler writes the dependency file beside
+the object; maak does not read it.  Pass the headers you care about to
+~up-to-date?~, or write a small task that reads the ~.d~ file and hands the
+paths back.
+
+* Make and Automake, side by side
+
+| Make or Automake                         | maak                                                                 |
+|------------------------------------------+----------------------------------------------------------------------|
+| ~CC = clang~, ~CXX = clang++~             | ~MAAK_CC~ / ~MAAK_CXX~, or ~(parameterize ((c-compiler "clang")) ...)~. |
+| ~CFLAGS = -O2~, ~CPPFLAGS = -DNDEBUG~     | ~(environment-flags "CFLAGS")~, ~#:flags~, ~#:defines '("NDEBUG")~.     |
+| ~all: app~                               | A task, usually ~build~.                                             |
+| ~app: a.o b.o~                           | ~(link objects #:output "app")~.                                     |
+| ~%.o: %.c~                               | ~(compile-objects sources)~ or ~(compile source #:output object)~.    |
+| ~$@~, ~$<~, ~$^~                          | ~#:output~, the source argument, the object list.                    |
+| ~.PHONY: clean install~                  | Tasks are phony; there is nothing to declare.                        |
+| ~$(wildcard src/*.c)~                    | ~(map ...)~ over a list, or ~scandir~.                                 |
+| ~$(shell pkg-config ...)~                | ~pkg-config-cflags~, ~pkg-config-libs~.                              |
+| ~ifeq~, ~ifdef~, ~ifndef~                  | ~if~, ~cond~, ~when~, ~unless~.                                       |
+| ~include other.mk~                       | ~load~ or ~use-modules~.                                             |
+| ~VPATH~, out-of-tree builds              | ~-C~, ~#:directory~, absolute paths.                                  |
+| ~make -j4~                               | ~maak -j 4~ for tasks, ~compile-objects #:jobs 4~ for objects.        |
+| ~make -C dir~                            | ~maak -C dir~.                                                       |
+| ~make VAR=value~                         | A task argument, ~(getenv "VAR")~, or ~parameterize~.                 |
+| ~make install DESTDIR=...~               | ~(install-file ...)~ with the prefix composed in the task.            |
+| ~make dist~                              | ~git-archive-tar~ or ~tar-create~ in ~(maak git)~ and ~(maak archive)~. |
+| ~make distcheck~                         | A task that builds, tests, installs into a temporary ~DESTDIR~ and cleans. |
+
+Automake's ~configure.ac~ and ~Makefile.am~ are replaced by the Maak file:
+~AC_INIT~'s version becomes a ~define~, ~AC_PROG_CC~ becomes the compiler
+parameter, ~PKG_CHECK_MODULES~ becomes the pkg-config queries above, and
+~LT_INIT~ becomes ~link #:shared? #t #:soname "libfoo.so.1"~.
+
+A project can keep Autotools during the migration: ~autoreconf~, ~./configure~
+and ~make~ are ordinary commands a task can ~run~.  The direction is to move
+each generated rule into a task, not to make maak run ~make~.
+
+* What is not here
+
+- *No automatic timestamp graph.*  ~up-to-date?~ and ~#:incremental?~ are the
+  explicit checks; a dependency says *when* a task may run, never *whether* it
+  does.
+- *No pattern rules or ~VPATH~.*  A list, ~object-file~ and ~compile-objects~
+  take their place.
+- *No libtool.*  ~link #:shared? #t #:soname ...~ covers the ordinary shared
+  library; a ~.la~ file is not read.
+- *No 1:1 parity.*  A Makefile construct that has no Scheme equivalent is
+  written as Scheme, which is the point of the migration.
+
+* Watching and inspecting a C build
+
+The modes documented on [[file:inspect.org][Plans, watches and explanations]] apply
+unchanged: ~maak --plan build~ records every compiler and linker command,
+~maak --watch test~ re-runs only what changed because the tasks use
+~up-to-date?~, and ~maak explain build~ prints the task graph and the
+environment the compiler will read.
