@@ -17,6 +17,8 @@ continues.
 | [[file:quick-start.org][Quick start]] | Your first Maak file: eight steps from a module to a dry run. |
 | [[file:tasks.org][Tasks]] | How a function becomes a task, what exports hide, how arguments arrive, and how =--list= lays them out. |
 | [[file:cli.org][The command line]] | Every option, the task-and-argument grammar, running several tasks, environment files and load paths. |
+| [[file:inspect.org][Plans, watches and explanations]] | The typed plan behind =--plan=, re-running a task with =--watch=, and what =explain= says about a task's composition and environment. |
+| [[file:bundle.org][Shipping your automation as a bundle]] | A self-contained artefact that runs a Maak file where Guile and maak are not installed. |
 | [[file:configuration.org][Configuration]] | The environment variables, and the Scheme parameters behind dry-run, quiet, the banner and escalation. |
 | [[file:builtins.org][The built-in toolkit]] | =run=, pipelines, jobs, file helpers, =task-error=, string helpers and the gettext workflow. |
 | [[file:guix-and-nix.org][Guix, Nix and reproducibility]] | The Guix and Nix helpers, and why a pin is a value a task can ask for. |

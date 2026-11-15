@@ -69,6 +69,8 @@
 (define cli-fixture "test/maak/fixtures/cli.scm")
 (define keep-going-fixture "test/maak/fixtures/keep-going.scm")
 (define several-fixture "test/maak/fixtures/several.scm")
+(define plan-fixture "test/maak/fixtures/plan.scm")
+(define explain-fixture "test/maak/fixtures/explain.scm")
 (define parallel-fixture "test/maak/fixtures/parallel.scm")
 (define order-fixture "test/maak/fixtures/order.scm")
 (define subdir "test/maak/fixtures/subdir")
@@ -258,6 +260,21 @@ that a case can ask about it alongside the status of the run."
                  (assert-equal #:expect (list 0 #t)
                                #:got (list (status-of result)
                                            (said? result "stdout" "subdir-marker-ran")))))
+
+         (test "--plan reaches the launcher with the task and its arguments"
+               (let ((result (launcher-run "-f" plan-fixture
+                                           "--no-banner" "--plan" "greet" "world")))
+                 (assert-equal #:expect (list 0 #t #t)
+                               #:got (list (status-of result)
+                                           (said? result "stdout" "echo world")
+                                           (said? result "stdout" "elevate: ")))))
+
+         (test "the explain subcommand is a word, not a task"
+               (let ((result (launcher-run "-f" explain-fixture
+                                           "--no-banner" "explain" "alpha")))
+                 (assert-equal #:expect (list 0 #t)
+                               #:got (list (status-of result)
+                                           (said? result "stdout" "maak explain: alpha")))))
 
          (test "a failure stops the tasks after it"
                (let ((result (launcher-run "-f" keep-going-fixture

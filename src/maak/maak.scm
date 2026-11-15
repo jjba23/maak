@@ -22,6 +22,8 @@
   #:use-module (maak shell)
   #:use-module (maak nix)
   #:use-module (maak guix)
+  #:use-module (maak bundle)
+  #:use-module (maak watch)
   #:use-module (maak i18n)
   #:use-module (maak version)
   #:use-module (maak git)
@@ -77,6 +79,7 @@
                            maak-error-hint
                            raise-maak-error
                            task-error
+                           exception->message
                            ;; ====== Load paths ======
                            maak-load-path
                            add-load-path!
@@ -95,6 +98,16 @@
                            guix-shell
                            guix-container
                            guix-pack
+                           ;; ====== Bundles ======
+                           bundle
+                           bundle-script
+                           bundle-file-name
+                           ;; ====== Watching ======
+                           watch-files
+                           watch-snapshot
+                           watch-changed?
+                           watch-tree
+                           watch-interval
                            ;; ====== Guix values ======
                            guix-available?
                            guix-channels
@@ -778,7 +791,8 @@ docs/tasks.org)."
                   (not (string=? proc-doc "")))
          (log-info "  ~a" proc-doc))
        (newline)
-       (run-task-procedure task proc task-args valid-tasks))
+       (parameterize ((current-task task))
+         (run-task-procedure task proc task-args valid-tasks)))
       (else (unknown-task-error task)))))
 
 ;; ====== Several tasks at once ======

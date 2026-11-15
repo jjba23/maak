@@ -37,6 +37,7 @@
   #:export (maak-file-in
             read-forms
             static-tasks
+            static-call-graph
             make-task-description
             task-description?
             task-description-name
@@ -56,6 +57,9 @@
             argument-doc
             argument-docs
             argument-signature
+            json-string
+            json-object
+            json-array
             tasks-json
             task-names-text
             tasks-fzf-text
@@ -456,6 +460,104 @@ where its last definition stands, which is the one maak binds."
     (map (lambda (task)
            (description-of task (assoc-ref metadata (string->symbol (car task)))))
          tasks)))
+
+;;; The call graph the file writes
+
+;; A task that calls another task is an ordinary procedure call, so the
+;; composition is in the file's text rather than in the loaded procedure.  The
+;; reading is deliberately the same reading `static-tasks' does: the same
+;; `define' shapes, the same export rule, the same last-definition-wins.  What
+;; it cannot see -- a call built by `apply', a procedure passed as a value, a
+;; macro that expands to a call -- is documented on the page that renders it.
+
+(define (task-body-of form)
+  "Return `(NAME . BODY)' when FORM defines a procedure, else #f.
+
+BODY is the sequence of forms under the definition, docstring included; the
+call walker ignores non-pairs, so leaving the docstring in costs nothing and
+keeps this reader next to `task-of', whose two definition shapes it mirrors."
+  (and (pair? form)
+       (memq (car form) '(define define*))
+       (let ((parts (cdr form)))
+         (cond
+          ((and (pair? parts) (pair? (car parts)) (symbol? (car (car parts))))
+           (cons (car (car parts)) (cddr parts)))
+          ((and (pair? parts)
+                (symbol? (car parts))
+                (pair? (cdr parts))
+                (pair? (cadr parts))
+                (memq (car (cadr parts)) '(lambda lambda*))
+                (pair? (cdr (cadr parts)))
+                (list? (cadr (cadr parts))))
+           (cons (car parts) (cddr (cadr parts))))
+          (else #f)))))
+
+(define (called-tasks-list forms known found)
+  "Return the task names FORMS call, given the task names KNOWN.
+
+FOUND is the list found so far, in the order the calls are written.  A quoted
+form is not a call, a lambda's parameter list is not one either, and a nested
+definition is walked through its body so a closure inside a task still counts."
+  (fold (lambda (form found)
+          (called-tasks form known found))
+        found
+        forms))
+
+(define (called-tasks form known found)
+  "Return the task names FORM calls, reading it as Scheme source."
+  (cond
+   ((not (pair? form)) found)
+   ((memq (car form) '(quote quasiquote)) found)
+   ((and (memq (car form) '(lambda lambda*)) (pair? (cdr form)))
+    (called-tasks-list (cddr form) known found))
+   ((and (memq (car form) '(define define*)) (pair? (cdr form)))
+    (let ((definition (task-body-of form)))
+      (if definition
+          (called-tasks-list (cdr definition) known found)
+          ;; A value definition: walk the value, not the name, so a value that
+          ;; happens to share a task's name is not read as a call to it.
+          (called-tasks-list (cddr form) known found))))
+   ((and (symbol? (car form)) (memq (car form) known))
+    (called-tasks-list (cdr form) known
+                       (if (memq (car form) found)
+                           found
+                           (append found (list (car form))))))
+   (else (called-tasks-list form known found))))
+
+(define (static-call-graph path)
+  "Return the calls between the tasks PATH defines, as an alist.
+
+Each entry is `(TASK . (CALLEE ...))', in the file's task order, and a callee
+is another task the file defines.  Only calls written in the file are seen:
+a call built by `apply', passed as a procedure or produced by a macro is not.
+A task that calls itself is kept, because recursion is a real edge; the page
+that renders the graph says the reading is static."
+  (let* ((forms (read-forms path))
+         (exports (module-exports forms))
+         (definitions
+          (reverse
+           (let loop ((remaining forms) (found '()))
+             (if (null? remaining)
+                 found
+                 (let ((definition (task-body-of (car remaining))))
+                   (loop (cdr remaining)
+                         (if definition
+                             (cons definition
+                                   (remove (lambda (other)
+                                             (eq? (car other) (car definition)))
+                                           found))
+                             found)))))))
+         (visible (if (and exports (pair? exports))
+                      (filter (lambda (definition)
+                                (member (symbol->string (car definition)) exports))
+                              definitions)
+                      definitions))
+         (known (map car visible)))
+    (map (lambda (definition)
+           (cons (car definition)
+                 (called-tasks-list (cdr definition) known '())))
+         visible)))
+
 
 ;;; Printing
 

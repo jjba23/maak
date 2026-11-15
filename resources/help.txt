@@ -43,6 +43,11 @@ Tasks, and the arguments they are given:
     stands: maak reads no options there, and a word that names one of its own
     tasks is an argument like any other.
 
+    The one word that is a question rather than a task is 'explain':
+
+        maak explain deploy        what deploy calls, how its environment is
+                                   assembled, and which .env file won
+
 Options:
     -f, --file FILE
         Specify the path to the Maak file (defaults to ./maak.scm).
@@ -96,9 +101,24 @@ Options:
         With --list, print the listing as JSON instead: one object naming the
         file, the root it sits in, and every task with its docstring, the line
         it starts on, what it needs first, an example invocation and the
-        arguments maak binds.  Nothing else is printed, so the output is the
-        JSON and only the JSON.  `--json' on its own is an error, because it
-        describes a listing rather than asking for one.
+        arguments maak binds.  With --plan, print the plan as JSON instead.
+        Nothing else is printed, so the output is the JSON and only the JSON.
+        `--json' on its own is an error, because it describes a listing or a
+        plan rather than asking for one.
+
+    --plan
+        Run the named tasks with dry-run semantics and print the plan instead
+        of a transcript: each command, its arguments, the directory it would
+        run in, the environment it was given, and whether it would be elevated
+        or started in the background.  Nothing is executed.  `--plan --json'
+        prints the same plan as one versioned JSON object.
+
+    --watch
+        Run the named tasks now, then again whenever a file in the tree
+        changes.  The Maak file is reloaded for each run, so an edit to the
+        tasks is what the next run uses; a failing run is reported and the
+        watch continues.  MAAK_WATCH_INTERVAL sets how often the tree is
+        looked at (one second by default).  Ctrl-C stops the watch.
 
     -t, --tasks LIST
         Run the tasks named in LIST, a comma separated list.  This is the
@@ -158,6 +178,15 @@ Examples:
 
     # Read credentials from a file, without exporting anything
     maak -e .env.production -- deploy
+
+    # See what 'deploy' would run, without running it
+    maak --plan deploy
+
+    # Run 'test' again whenever the tree changes
+    maak --watch test
+
+    # See what 'deploy' calls, and which .env file wins
+    maak explain deploy
 
     # A quiet run with no greeting banner
     maak --no-banner -- test

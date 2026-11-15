@@ -13,6 +13,10 @@
 - *Background jobs with a pid* — ~#:async?~ forks a process and hands back a job record you can poll, wait on, and read the exit code of.
 - *Parallel tasks with readable output* — ~maak -j 4 -- fmt,lint,test~ runs tasks in forked workers and prints each one's output as a single block, in the order you named them.
 - *Dry-run and quiet as lexical parameters* — ~(parameterize ((dry-run? #t)) …)~ makes destructive code safe to exercise inside a test, without a command-line flag.
+- *A plan before the run* — ~maak --plan TASK~ records the typed plan a task describes: each command, its argv or shell line, its directory, its environment, its elevation and whether it would run in the background.  ~--plan --json~ makes it a versioned value for CI and editors.
+- *A watch without a watcher* — ~maak --watch TASK~ re-runs a task when the tree changes, reloading the Maak file each time, with no watchexec or inotify binding to install.
+- *The composition, explained* — ~maak explain TASK~ renders the static call graph, the load path, the escalation and a per-variable report of which environment file wins.
+- *Bundles that carry their Guile* — ~(maak bundle)~ builds a self-contained ~guix pack~ of a project's automation, so it runs where neither Guile nor maak is installed.
 - *Environment files and load paths* — ~.env~ files, ~-e~, ~MAAK_ENV_FILE~, ~-L~, ~MAAK_LOAD_PATH~, and ~with-load-path~ for Maak files that are a thin front end over your own modules.
 - *Guix and Nix, first class* — ~manifest-shell~, ~program-shell~, time-machine variants, ~guix-container~, ~guix-pack~, mirror-image Nix helpers, and ~guix-build~ / ~guix-program~, which read a pinned Guix as *values* instead of running another Guix.
 - *Git, tar and zip without a shell string* — ~(maak git)~ and ~(maak archive)~ wrap the commands a release needs, with ~#:directory~, archive prefixes and compression as arguments rather than words that a shell might split.

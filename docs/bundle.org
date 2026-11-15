@@ -1,0 +1,95 @@
+#+title: Shipping your automation as a bundle
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+A bundle is one artefact that runs a project's Maak file on a machine with
+neither Guile nor maak installed.  It is built with ~guix pack~, so the closure
+of the programs the automation needs travels with it, and it carries the Maak
+file and a launcher of its own.
+
+* Building a bundle
+
+The library call is ~bundle~, from ~(maak bundle)~, re-exported by
+~(maak maak)~:
+
+#+begin_src scheme
+(define (ship)
+  "Build a bundle of this project's automation."
+  (bundle #:name "site"
+          #:maak-file "maak.scm"
+          #:packages '("bash" "coreutils" "git" "curl")
+          #:format "tarball"))
+#+end_src
+
+Run ~maak ship~ and it writes ~site-bundle.tar.gz~ in the working directory,
+and returns the path.  The archive is relocatable for a tarball, so it can be
+extracted anywhere; ~squashfs~ and ~docker~ are the other formats:
+
+#+begin_src scheme
+;; A docker image tarball, loaded into the engine afterwards
+(bundle #:name "site" #:maak-file "maak.scm" #:format "docker" #:load? #t)
+
+;; Name the file rather than let maak choose one
+(bundle #:name "site" #:maak-file "maak.scm" #:output "dist/site.tar.gz")
+#+end_src
+
+A docker bundle is an image tarball, not a running container; ~#:load?~ asks
+the ~(maak container)~ helper to load it, so the image is ready to run as well
+as written.
+
+* What is in it
+
+~bundle~ writes a Guix package file and hands it to ~guix pack~.  The package
+installs the Maak file under ~share/NAME/~ and a launcher in ~bin/NAME~, and it
+propagates maak, Guile and the packages named with ~#:packages~.  ~guix pack~
+puts all of them in one profile, so the pack's ~/bin~ holds the launcher, maak,
+Guile and the tools.  The launcher puts its own directory first on ~PATH~, so
+~maak~ finds the Guile the bundle came with.
+
+Only the files named are shipped.  A project whose Maak file loads its own
+modules has to ship those modules the same way a task ships a file; the bundle
+does not guess at a directory to copy.
+
+* The maak the bundle carries
+
+By default the bundle uses the ~maak~ package from the Guix channels it is
+built with (~(specification->package "maak")~).  A project that wants its own
+build of maak — this repository, for example — passes a Scheme expression that
+evaluates to the package:
+
+#+begin_src scheme
+(bundle #:name "site"
+        #:maak-file "maak.scm"
+        #:maak-package (format #f "(load ~s)" (canonicalize-path "guix.scm")))
+#+end_src
+
+The expression is inserted into the generated file as written, so it is trusted
+input: it is the project saying which maak it means.  The rest of the package
+file is generated.
+
+* This repository's own bundle
+
+This checkout has a task for the same job:
+
+#+begin_src shell
+maak package-bundle            # a relocatable tarball
+maak package-bundle docker     # an image tarball
+#+end_src
+
+It uses this repository's ~guix.scm~ for the maak package and carries ~bash~,
+~coreutils~, ~util-linux~, ~findutils~, ~sed~, ~git~, ~tar~, ~zip~, ~unzip~ and
+~curl~.  The tasks that call Guix or Nix are not in the bundle: their programs
+are not part of it, and a task that needs one says so when it runs.
+
+* Requirements
+
+- *Building* a bundle needs Guix, because ~guix pack~ computes the closure.
+- *Running* one needs neither Guix nor Guile nor maak.  A relocatable tarball
+  can be extracted anywhere; a non-relocatable pack and a docker image expect
+  their ~/gnu/store~ paths, as ~guix pack~ documents.
+- A bundle is built from a Maak file and the packages named; it does not
+  inspect the tasks to guess which programs they call.

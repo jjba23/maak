@@ -34,6 +34,9 @@
   #:use-module (maak dsl)
   #:use-module (maak tasks)
   #:use-module (maak version)
+  #:use-module (maak plan)
+  #:use-module (maak watch)
+  #:use-module (maak explain)
   ;; The error reporting helpers are readable from here so the test suite can
   ;; exercise the messages a user actually sees without starting a process.
   ;; They are *re*-exported: they are defined in `(maak dsl)', and an `#:export'
@@ -68,6 +71,17 @@
     ;; a mode of its own.
     (json (value #f)
           (required? #f))
+    ;; `--plan' runs a task with dry-run semantics and records what each
+    ;; command would be, instead of printing a transcript.
+    (plan (value #f)
+          (required? #f))
+    ;; `--watch' runs the named tasks now and again whenever the tree changes.
+    (watch (value #f)
+           (required? #f))
+    ;; `explain' is also spelled as a subcommand (`maak explain TASK'); the
+    ;; wrapper turns that spelling into this flag.
+    (explain (value #f)
+             (required? #f))
     (dry-run (single-char #\n)
              (value #f)
              (required? #f))
@@ -451,14 +465,101 @@ behind, which is the half of the union that a listing shows."
 
 ;; ====== Running ======
 
+(define (elevation-description)
+  "Return the privilege escalation command, and where the choice came from."
+  (let ((given (getenv "MAAK_ELEVATE")))
+    (format #f "~a (~a)"
+            (elevation-command)
+            (if (and given (not (string=? given "")))
+                "from MAAK_ELEVATE"
+                "detected on PATH"))))
+
+(define (called-by-entries graph task)
+  "Return the tasks in GRAPH whose body calls TASK."
+  (filter-map (lambda (entry)
+                (and (memq task (cdr entry)) (car entry)))
+              graph))
+
+(define (explain-task file task base-env env-files load-paths)
+  "Print the explanation of TASK, read from FILE and the environment files.
+
+Nothing is run: the task must be one of the file's tasks, and its composition
+is the file's static call graph.  BASE-ENV is the process environment captured
+before ENV-FILES were loaded, so `environment-report' can say which file would
+win."
+  (let ((proc (get-module-var task)))
+    (unless (and proc (assoc task (resolve-maak-tasks)))
+      (unknown-task-error task))
+    (let* ((graph (static-call-graph file))
+           (calls (or (assoc-ref graph task) '()))
+           (called-by (called-by-entries graph task)))
+      (display
+       (explain-text #:task (symbol->string task)
+                     #:file file
+                     #:doc (procedure-documentation proc)
+                     #:needs (task-depends proc)
+                     #:example (task-example proc)
+                     #:calls calls
+                     #:called-by called-by
+                     #:env-files env-files
+                     #:env-report (environment-report env-files base-env)
+                     #:load-paths load-paths
+                     #:elevation (elevation-description))))))
+
+(define (report-run-failure key vals)
+  "Report a failure that a watch caught, without ending the watch."
+  (let ((error (find-maak-error key vals)))
+    (if error
+        (report-maak-error error)
+        (report-generic-error key vals))))
+
+(define (run-watch file tasks task-args keep-going? ignore-errors? jobs
+                   env-files base-environ directory)
+  "Run TASKS now and again whenever the tree around FILE changes.
+
+Each run starts in DIRECTORY, reloads FILE and re-reads ENV-FILES from
+BASE-ENVIRON, so an edit to the tasks or to a `.env' is what the next run uses,
+a directory a task changed does not outlive the run, and a variable a task set
+does not leak into the run after it.  A failure is reported and the watch
+continues: a watch has nowhere to return an exit status to, and a typo being
+fixed is exactly when it should keep going."
+  (watch-tree (dirname file)
+              (lambda ()
+                (chdir directory)
+                (environ base-environ)
+                (for-each load-env-file env-files)
+                (catch #t
+                  (lambda ()
+                    (reset-maak-module!)
+                    (load file)
+                    (report-failed-tasks
+                     (if (> jobs 1)
+                         (run-tasks-parallel tasks
+                                             #:task-args task-args
+                                             #:jobs jobs)
+                         (run-tasks tasks
+                                    #:task-args task-args
+                                    #:keep-going? keep-going?
+                                    #:on-failure report-task-failure))
+                     ignore-errors?))
+                  (lambda (key . vals)
+                    (report-run-failure key vals))))
+              #:interval (watch-interval)))
+
 (define (run-maak options)
-  "Carry out the action OPTIONS select: help, version, listing, or tasks."
+  "Carry out the action OPTIONS select: help, version, listing, plan, or tasks."
   (let ((resources (option-ref options
                                'resources #f))
         (should-list (option-ref options
                                  'list #f))
         (should-json (option-ref options
                                  'json #f))
+        (should-plan (option-ref options
+                                 'plan #f))
+        (should-watch (option-ref options
+                                  'watch #f))
+        (should-explain (option-ref options
+                                    'explain #f))
         (should-version (option-ref options
                                     'version #f))
         (should-help (option-ref options
@@ -474,10 +575,22 @@ behind, which is the half of the union that a listing shows."
       (should-version
        (print-version)
        0)
-      ((and should-json (not should-list))
+      ((and should-json (not (or should-list should-plan)))
        (raise-maak-error
-        "--json prints the task listing, so it needs --list"
-        #:hint "Run `maak --list --json' to read the tasks as JSON."))
+        "--json prints the task listing or the plan, so it needs --list or --plan"
+        #:hint "Run `maak --list --json' or `maak --plan --json TASK'."))
+      ((and should-list (or should-plan should-watch should-explain))
+       (raise-maak-error
+        "--list is a listing, so it cannot be combined with --plan, --watch or explain"
+        #:hint "Ask for one of them: `maak --list', `maak --plan TASK', `maak --watch TASK' or `maak explain TASK'."))
+      ((and should-plan should-watch)
+       (raise-maak-error
+        "--plan and --watch ask for different things"
+        #:hint "Plan a run once with `--plan', or keep watch running with `--watch'."))
+      ((and should-explain (or should-plan should-watch))
+       (raise-maak-error
+        "explain reads a task, so it cannot be combined with --plan or --watch"
+        #:hint "Run `maak explain TASK' on its own."))
       (else
        ;; `-C' comes first, before the Maak file is found and before an
        ;; environment file beside it is looked for, so a relative `-f' means
@@ -496,7 +609,18 @@ behind, which is the half of the union that a listing shows."
               (tasks (map string->symbol string-tasks))
               (task-args (option-ref options
                                      '() '()))
+              ;; The process environment as the run found it.  A watch resets
+              ;; to it before every run, and `explain' compares the files
+              ;; against it.
+              (base-environ (environ))
+              ;; The directory a run of the task starts in.  A watch restores
+              ;; it before every run, so a task that changed it cannot move the
+              ;; run after it.
+              (work-directory (getcwd))
               (env-files (resolve-env-files options file))
+              (base-env (if should-explain
+                            (environment-alist base-environ)
+                            '()))
               ;; `--ignore-errors' is `--keep-going' and then some: nothing
               ;; stops the run either way, and only the exit status differs.
               (keep-going? (or (option-ref options 'keep-going #f)
@@ -504,56 +628,109 @@ behind, which is the half of the union that a listing shows."
               (ignore-errors? (option-ref options 'ignore-errors #f))
               (jobs (let ((given (option-ref options 'jobs #f)))
                       (if given (string->number given) 1))))
+         (when (and should-explain (null? raw-tasks))
+           (raise-maak-error
+            "explain needs a task to explain"
+            #:hint "Run `maak explain TASK', naming a task of the Maak file."))
+         (when (and should-explain (> (length raw-tasks) 1))
+           (raise-maak-error
+            (format #f "explain takes one task, got ~a"
+                    (string-join raw-tasks ", "))
+            #:hint "Run `maak explain TASK' once per task."))
+         (when (and should-explain (pair? task-args))
+           (raise-maak-error
+            "explain reads a task, it does not pass its arguments"
+            #:hint "Drop the words after the task; the plan of a run is `maak --plan TASK ARGS'."))
          (unless (and (exact-integer? jobs) (>= jobs 1))
            (raise-maak-error
             (format #f "invalid job count: ~a" (option-ref options 'jobs ""))
             #:hint "`-j/--jobs N' takes a positive whole number."))
-         (apply-load-paths! (split-load-path (option-ref options
-                                                           'load-path #f))
-                            file)
-         (parameterize ((dry-run? should-dry-run)
-                        ;; A listing a machine reads carries no greeting and no
-                        ;; log lines: it is read as JSON, whole, by something
-                        ;; that would choke on the banner in front of it.
-                        (quiet? (or should-quiet should-json))
-                        (banner? (and (not should-json)
+         (when (and should-plan (> jobs 1))
+           (raise-maak-error
+            "--plan records one task at a time, so -j does not apply"
+            #:hint "Plan without -j, or run the tasks with -j and read their output."))
+         (let ((load-paths (apply-load-paths!
+                            (split-load-path (option-ref options
+                                                         'load-path #f))
+                            file)))
+         (parameterize ((dry-run? (or should-dry-run should-plan))
+                        ;; A listing or a plan a machine reads carries no
+                        ;; greeting and no log lines: it is the whole of what a
+                        ;; reader gets, and a banner in front of it would choke
+                        ;; the reader.  Explain is a report for a person, and
+                        ;; still reads better without a run's chatter.
+                        (quiet? (or should-quiet should-json should-plan
+                                    should-explain))
+                        (banner? (and (not should-json) (not should-plan)
+                                      (not should-explain)
                                       (resolve-banner? options))))
            ;; The environment is read before the maak file is loaded, so a task
-           ;; file can already consult the variables it names.
-           (for-each (lambda (env-file)
-                       (unless (quiet?)
-                         (log-info "  Reading environment from: ~a\n" env-file))
-                       (load-env-file env-file))
-                     env-files)
+           ;; file can already consult the variables it names.  A watch re-reads
+           ;; its files for every run, so it does not read them here as well.
+           (unless should-watch
+             (for-each (lambda (env-file)
+                         (unless (quiet?)
+                           (log-info "  Reading environment from: ~a\n" env-file))
+                         (load-env-file env-file))
+                       env-files))
            (when (banner?)
              (log-separator)
              (log-info "Maak ~a: the infinitely extensible command runner\n"
                        maak-version)
              (log-info "Loading tasks from Maak file: ~a\n" file))
-           (reset-maak-module!)
-           (load file)
-           (if should-list
-               (if should-json
-                   (begin
-                     (display (tasks-json (describe-tasks file) file))
-                     (newline))
-                   (list-tasks #:as-is? #f))
-               (begin
-                 (unless (quiet?)
-                   (log-info "Executing Maak tasks: ~a\n"
-                             (string-join (map symbol->string
-                                               tasks) " =>")))
-                 (report-failed-tasks
-                  (if (> jobs 1)
-                      (run-tasks-parallel tasks
-                                          #:task-args task-args
-                                          #:jobs jobs)
-                      (run-tasks tasks
-                                 #:task-args task-args
-                                 #:keep-going? keep-going?
-                                 #:on-failure report-task-failure))
-                  ignore-errors?)))
-           0))))))
+           ;; A watch loads the file on every run, inside the loop; loading it
+           ;; here as well would load it twice before the first run.
+           (unless should-watch
+             (reset-maak-module!)
+             (load file))
+           (cond
+             (should-explain
+              (explain-task file (car tasks) base-env env-files load-paths)
+              0)
+             (should-list
+              (if should-json
+                  (begin
+                    (display (tasks-json (describe-tasks file) file))
+                    (newline))
+                  (list-tasks #:as-is? #f))
+              0)
+             (should-plan
+              (let* ((out (current-output-port))
+                     (steps (parameterize ((plan-steps '())
+                                           (current-output-port
+                                            (current-error-port)))
+                              (run-tasks tasks
+                                         #:task-args task-args
+                                         #:keep-going? keep-going?
+                                         #:on-failure report-task-failure)
+                              (reverse (plan-steps)))))
+                (display (if should-json
+                             (plan-json steps (getcwd))
+                             (plan-text steps))
+                         out)
+                (newline out))
+              0)
+             (should-watch
+              (run-watch file tasks task-args keep-going? ignore-errors? jobs
+                         env-files base-environ work-directory)
+              0)
+             (else
+              (begin
+                (unless (quiet?)
+                  (log-info "Executing Maak tasks: ~a\n"
+                            (string-join (map symbol->string
+                                              tasks) " =>")))
+                (report-failed-tasks
+                 (if (> jobs 1)
+                     (run-tasks-parallel tasks
+                                         #:task-args task-args
+                                         #:jobs jobs)
+                     (run-tasks tasks
+                                #:task-args task-args
+                                #:keep-going? keep-going?
+                                #:on-failure report-task-failure))
+                 ignore-errors?))
+              0)))))))))
 
 (define* (main #:key (args (command-line)))
   "Entry point for the maak command line interface.

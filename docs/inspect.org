@@ -1,0 +1,147 @@
+#+title: Plans, watches and explanations
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+A run leaves three things implicit: which commands it would execute, when it
+should run again, and where its environment came from.  Three questions answer
+them — ~--plan~, ~--watch~ and ~explain~ — and none of them needs a second Maak
+file or a second language.
+
+* The plan before the run
+
+~maak --plan TASK~ runs the task with dry-run semantics and records each
+command it builds instead of running it.  The result is a typed plan, not a
+transcript of quoted shell lines:
+
+#+begin_src shell
+$ maak --plan fmt
+maak plan
+  [1] fmt  find . -maxdepth 8 -name '*.scm' -type f -exec guix style -f '{}' ';'
+              cwd: /home/joe/Hacking/maak
+#+end_src
+
+Each step names the task that built it, the command, the directory it would run
+in, the environment assignments it was given, the escalation command it would
+use, whether its output is discarded and whether it would be started in the
+background.  A direct ~run~ is shown as its argv, a ~$~ line as the shell reads
+it, and a pipeline stage by stage, joined with ~|~.
+
+The plan is a description of what the task *decided*, which is why the task's
+own Scheme still runs, exactly as it does under ~--dry-run~.  The commands do
+not run: ~run~, ~$~, ~syscall~, ~capture~, ~run-pipeline~ and the Guix helpers
+record instead of executing.  A task that writes a file with plain Scheme —
+rather than with ~cp~, ~mv~ or another helper built on ~run~ — still writes it;
+that is the same boundary a dry run has.
+
+~--plan~ records one task at a time, so ~-j~ is refused rather than silently
+ignored.  A task that builds no command says so.
+
+** The plan a machine reads
+
+~maak --plan --json TASK~ prints the same plan as one versioned object, with
+nothing else on standard output.  A task's own printing goes to standard error,
+so a task that logs does not corrupt the object a CI job archives:
+
+#+begin_src shell
+$ maak --plan --json fmt
+{"version":1,"root":"/p","plan":[{"task":"fmt","kind":"run","argv":["find",".","-maxdepth","8","-name","*.scm","-type","f","-exec","guix","style","-f","{}",";"],"cwd":"/p","env":[],"elevation":null,"devNull":false,"async":false}]}
+#+end_src
+
+~kind~ is ~run~, ~shell~ or ~pipeline~.  A ~run~ and a ~shell~ step carry
+~argv~ as a list of strings; a ~pipeline~ carries a list of argument lists,
+one per stage.  ~env~ is the list of ~NAME=VALUE~ assignments the command was
+given, ~elevation~ is the escalation command or ~null~, and ~cwd~ is where the
+command would run.  The shape is versioned by ~version~, which is ~1~.
+
+* Watching a tree
+
+~maak --watch TASK~ runs the task now, then again whenever a file in the tree
+changes.  The tree is the files git tracks plus the untracked files it does not
+ignore when the Maak file is in a checkout, and a walk that skips
+~.git~, ~node_modules~, cache directories and the like otherwise.
+
+The Maak file is reloaded for every run, so an edit to the tasks is what the
+next run uses.  The environment files are re-read from the environment the
+watch started with, and every run starts in the directory the watch was started
+in, so a `.env` change takes effect, a variable a task set does not leak into
+the run after it, and a task that changed directory cannot move the run after
+it.  A run that fails is reported and the watch continues, because a watch has
+nowhere to return an exit status to and a typo being fixed is exactly when it
+should keep going.
+
+The snapshot is taken *after* a run, not before the next poll, so a task that
+writes into the tree — a build directory, a log, a generated file — does not
+start itself again.  A change that lands while a run is in progress therefore
+belongs to that run's baseline; the alternative is a task that rebuilds
+forever.
+
+#+begin_src shell
+# Run the tests whenever anything in the tree changes
+maak --watch test
+
+# Look twice a second instead of once
+MAAK_WATCH_INTERVAL=0.5 maak --watch test
+#+end_src
+
+~MAAK_WATCH_INTERVAL~ is the number of seconds between looks, one by default;
+a value that is not a positive number is an error.  Ctrl-C stops the watch.
+
+* Explaining a task
+
+~maak explain TASK~ prints the task's composition, the environment a run would
+assemble, and the load path and escalation it would use.  Nothing is run.
+
+#+begin_src shell
+$ maak explain hot-reload
+maak explain: hot-reload
+file: /p/maak.scm
+
+hot-reload — Hot-reloading developer's setup.
+needs: —
+example: —
+calls (from the file): —
+called by (from the file): hr, dev
+
+load paths:
+  /p
+
+elevation: sudo (detected on PATH)
+
+environment files: none (no --env-file, MAAK_ENV_FILE or .env)
+environment: no variable this task reads is set by a file
+#+end_src
+
+** The composition is read from the file
+
+A task that calls another task is an ordinary procedure call, so the call graph
+is read from the Maak file's text rather than observed from a run.  A call
+written in a task's body to another task of the same file is an edge, in both
+directions.  The reading is static, and it says so: a call built with
+~apply~, a procedure passed as a value, or a call a macro expands to is not
+seen.  Declared ~#:depends~ are printed separately, because they order a run
+rather than describe a call.
+
+** Which environment file won
+
+The precedence is the one a run uses, and it is printed per variable: the
+process environment wins, and among files the first one that sets a name wins,
+because later files do not override.  The report says which file set the value
+and what the files after it tried to say:
+
+#+begin_src shell
+$ CI=1 maak -e .env:.env.local explain deploy
+environment files, in order (the process environment wins; otherwise the first file that sets a name wins):
+  /p/.env
+  /p/.env.local
+environment:
+  CI=1 (from the process environment; /p/.env said 0)
+  DATABASE_URL=postgres://localhost/dev (from /p/.env; /p/.env.local said postgres://localhost/staging)
+#+end_src
+
+Only variables an environment file mentions are listed, so the report never
+dumps an unrelated environment.  A file named by ~-e~ that is missing is shown
+as ~(missing)~; a run would read no variables from it.

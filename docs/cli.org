@@ -21,7 +21,9 @@
 | ~-j~  | ~--jobs~               | ~N~      | Run up to ~N~ tasks at the same time, keeping each task's output together.       |
 | ~-k~  | ~--keep-going~         | None     | A task that fails does not stop the tasks after it.                            |
 | ~-l~  | ~--list~               | None     | List every available task in the loaded Maak file.                             |
-|       | ~--json~               | None     | With ~--list~, print the listing as JSON, for an editor or another program.     |
+|       | ~--json~               | None     | With ~--list~ or ~--plan~, print that as JSON, for an editor or another program. |
+|       | ~--plan~               | None     | Print the typed plan a run would execute, without running it.                  |
+|       | ~--watch~              | None     | Re-run the named tasks whenever the tree changes.                              |
 | ~-t~  | ~--tasks~              | ~LIST~   | Run the tasks in ~LIST~ (comma separated), leaving every other word as an argument. |
 | ~-L~  | ~--load-path~          | ~DIR~    | Add ~DIR~ to Guile's load path (repeatable; ~:~-separated allowed).              |
 | ~-n~  | ~--dry-run~            | None     | Print shell commands instead of executing them.                                |
@@ -114,9 +116,26 @@ Each task carries:
 
 The task set, the docstrings and the metadata come from the loaded Maak file, because that is what a run obeys: a task a macro defines, or one a used module brings in, is a task maak will run and therefore a task the listing names. The lambda list and the line come from the file itself, which is the only place they exist — Guile keeps neither in a compiled procedure — so a task the file does not spell out arrives with no arguments rather than with guessed ones.
 
-~--json~ on its own is an error, since it describes a listing rather than asking for one; write ~maak --list --json~.
+~--json~ on its own is an error, since it describes a listing rather than asking for one; write ~maak --list --json~.  ~--plan --json TASK~ prints the plan in [[file:inspect.org][the same spirit]]: one versioned object, and nothing else on standard output.
 
 An editor that has to answer without loading the file — because it is halfway through an edit, or because the project's libraries are not installed — has ~contrib/bin/maak-tasks~, which prints the same object from the file alone (see [[file:editors.org][Editors]]).
+
+** Plans, watches and explanations
+
+Three more modes answer questions a run leaves implicit, and each is documented on [[file:inspect.org][its own page]]:
+
+#+begin_src shell
+# What would this run execute?  The plan is typed, and --json makes it a value
+maak --plan deploy
+
+# Run the tests again whenever the tree changes
+maak --watch test
+
+# Which tasks does this one call, and which .env file wins?
+maak explain deploy
+#+end_src
+
+~explain~ is also spelled as the flag ~--explain~; either way it reads the task and runs nothing.  A ~--~ before the word keeps ~explain~ as the name of a task, for the project that has one.
 
 * Environment files
 

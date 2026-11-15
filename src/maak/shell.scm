@@ -95,6 +95,8 @@ Use `$' when a failing command must stop the task without its output, and
 `run' when the command takes arguments that a shell must not split.
 
 @example\n(string-trim (capture describe-tags-command))\n@end example"
+  (record-plan! (make-plan-step (current-task) 'shell (list command)
+                                '() #f #f #f (getcwd)))
   (cond
     ((dry-run?)
      (unless (quiet?)

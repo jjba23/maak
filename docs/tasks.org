@@ -118,6 +118,10 @@ A task is a procedure, so calling one is a function call. No subprocess, no shel
 
 When you *do* want a separate process — a clean environment, a different working directory, an exit status of its own — use ~run~ or ~$~.
 
+~maak explain ci~ prints the calls the file writes, in both directions, next to
+the environment the task would read; see
+[[file:inspect.org][Plans, watches and explanations]].
+
 ** What a task declares about itself
 
 A docstring says what a task does. Three things about a task are not prose, and they arrive as a call of its own, after the definition:

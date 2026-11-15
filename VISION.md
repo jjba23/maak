@@ -9,11 +9,14 @@ that the project was written to avoid.
 
 ## Where maak is today
 
-The program lives in `src/maak/`, about eight thousand lines across thirteen
+The program lives in `src/maak/`, about ten thousand lines across eighteen
 modules: `maak.scm` for tasks and their listing, `main.scm` for the command line,
-`dsl.scm` for strings, load paths and the error type, and one module per external
-world — `shell.scm`, `git.scm`, `archive.scm`, `guix.scm`, `nix.scm`,
-`container.scm`, `net.scm`, `niri.scm`, `i18n.scm`, `version.scm`.
+`dsl.scm` for strings, load paths and the error type, `tasks.scm` for the task
+description, `plan.scm` for what a run would execute, `watch.scm` for re-running
+one, `explain.scm` for the composition, `bundle.scm` for an artefact that
+carries its Guile, and one module per external world — `shell.scm`, `git.scm`,
+`archive.scm`, `guix.scm`, `nix.scm`, `container.scm`, `net.scm`, `niri.scm`,
+`i18n.scm`, `version.scm`.
 
 What works, concretely: a Maak file is loaded, its `maak-task?` variables are
 collected from the module's public interface, and each one is runnable by name
@@ -21,7 +24,14 @@ with the words after it bound to its lambda list. `run` and `run-pipeline` take
 argv lists, never a shell string; a pipeline reports every failing stage, gives
 a stage its own environment or elevation, and can keep what each stage wrote. The
 command line carries Make's flags (`-f`, `-C`, `-n`, `-k`, `-i`, `-j`, `-L`, `-e`)
-plus `--list`, `--tasks`, `--debug` and the banner controls. Parallel runs fork one
+plus `--list`, `--plan`, `--watch`, `--tasks`, `--debug`, the banner controls and
+the `explain` subcommand. `--plan` executes a task with dry-run semantics and
+prints a typed plan — task, argv or shell line, environment, directory,
+elevation, background — as text or as versioned JSON; `--watch` re-runs a task
+when the tree changes, reloading the file each time; `explain` renders the static
+call graph and says which environment file wins. `(maak bundle)` packs a project's
+automation as a self-contained `guix pack` that runs where Guile and maak are not
+installed. Parallel runs fork one
 worker per task and print each task's output as a block, in the order named. Tasks
 can declare what they need first, whether a listing should offer them and an
 example invocation, and both the sequential and the parallel runner order a run

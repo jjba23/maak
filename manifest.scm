@@ -64,5 +64,4 @@ concurrently by default.")
                           tar
                           zip
                           unzip
-                          git
-                          watchexec))
+                          git))

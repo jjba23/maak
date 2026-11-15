@@ -119,7 +119,7 @@ done
 # Only the words before that first separator are options and task words; the
 # ones after it are the arguments, and are never shown to `getopt' -- a task
 # argument that looks like an option is an argument.
-parsed_options=$(getopt -n "maak" -o C:e:ij:klf:hL:nqvt: --longoptions list,json,file:,help,dry-run,quiet,load-path:,env-file:,no-env-file,banner,no-banner,version,debug,directory:,keep-going,ignore-errors,jobs:,no-print-directory,tasks: -- "${option_side[@]}")
+parsed_options=$(getopt -n "maak" -o C:e:ij:klf:hL:nqvt: --longoptions list,json,plan,watch,explain,file:,help,dry-run,quiet,load-path:,env-file:,no-env-file,banner,no-banner,version,debug,directory:,keep-going,ignore-errors,jobs:,no-print-directory,tasks: -- "${option_side[@]}")
 eval set -- "$parsed_options"
 
 # The Maak file is resolved once every -C has been honoured, so it is kept as
@@ -192,6 +192,18 @@ while [ "$#" -gt 0 ]; do
     ;;
   --json)
     guile_cmd_args+=("--json")
+    shift
+    ;;
+  --plan)
+    guile_cmd_args+=("--plan")
+    shift
+    ;;
+  --watch)
+    guile_cmd_args+=("--watch")
+    shift
+    ;;
+  --explain)
+    guile_cmd_args+=("--explain")
     shift
     ;;
   -t | --tasks)
@@ -268,6 +280,15 @@ while [ "$#" -gt 0 ]; do
     ;;
   esac
 done
+
+# `maak explain TASK' is the spelling the guide uses; `--explain' is the flag it
+# becomes.  A `--' before the word leaves `explain' as a task name, which is the
+# one spelling that still runs a task called explain.
+if [ "${separator_seen}" = no ] && [ "${#task_lists[@]}" -eq 0 ] &&
+  [ "$#" -gt 0 ] && [ "${1}" = explain ]; then
+  guile_cmd_args+=("--explain")
+  shift
+fi
 
 if [ "${#load_paths[@]}" -gt 0 ]; then
   joined_load_paths=$(IFS=:; echo "${load_paths[*]}")

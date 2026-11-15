@@ -15,6 +15,10 @@ maak \- run project tasks written in GNU Guile Scheme
 .RI [ OPTIONS ]
 .RI \-\- \ TASKS ...
 .RI [ \-\- \ TASK_ARGS ] ...
+.PP
+.BR maak
+.B explain
+.I TASK
 .SH DESCRIPTION
 .B maak
 is a command runner and control plane: instead of a bespoke build DSL it uses
@@ -33,6 +37,10 @@ file at all, so
 .B maak \-\-version
 answers in any directory, while a run that would execute a task says there is
 no Maak file to read.
+.B maak explain
+.I TASK
+reads the file without running anything, and describes what the task calls,
+how its environment would be assembled and which environment file would win.
 A Maak file declares the module
 .B (maak)
 and imports the library:
@@ -215,10 +223,37 @@ print the listing as JSON instead of as text: one object naming the file, the
 root it sits in, and every task with its name, docstring, the line its
 definition starts on, the tasks it needs first, an example invocation and the
 arguments maak binds, each with its kind, default and the prose the docstring
-gives it.  Nothing else is printed, so the output is the JSON and only the
-JSON.  Without
-.BR \-\-list
-it is an error, because it describes a listing rather than asking for one.
+gives it.  With
+.BR \-\-plan ,
+print the plan as one versioned JSON object instead.  Nothing else is printed,
+so the output is the JSON and only the JSON.  Without
+.B \-\-list
+or
+.B \-\-plan
+it is an error, because it describes a listing or a plan rather than asking for
+one.
+.TP
+.B \-\-plan
+Run the named tasks with dry\-run semantics and print the plan instead of a
+transcript: each command, its arguments, the working directory it would run
+in, the environment it was given, and whether it would be elevated or started
+in the background.  Nothing is executed.  The task's own Scheme still runs, as
+it does in a dry run, so the plan describes what the task decided.  With
+.BR \-\-json
+the same plan is printed as one versioned object.
+.TP
+.B \-\-watch
+Run the named tasks now, then again whenever a file in the tree changes.  The
+Maak file is reloaded for each run, so an edit to the tasks is what the next
+run uses; a run that fails is reported and the watch continues.  The environment
+files are re-read for every run from the environment the watch started with, and
+every run starts in the directory the watch was started in, so a `.env` change
+takes effect, a variable a task set does not leak into the run after it, and a
+task that changed directory cannot move the run after it.  The tree is
+the files git tracks and the untracked files it does not ignore when the
+directory is a checkout, and a walk that skips the repository and cache
+directories otherwise.  A task's own writes become the next baseline, so a
+build directory does not start the task again.  Ctrl\-C stops the watch.
 .TP
 .BR \-L ", " \-\-load\-path " " DIR
 Add
@@ -292,6 +327,12 @@ overrides it.
 .B MAAK_DEBUG
 When set to a non\-empty value, print the Guile backtrace on an error instead
 of the short maak message.
+.TP
+.B MAAK_WATCH_INTERVAL
+How often
+.B \-\-watch
+looks at the tree, in seconds.  One second by default; a value that is not a
+positive number is an error.
 .SH TASK AUTHORING
 A task is an ordinary procedure.  Its docstring is shown by
 .B \-\-list
@@ -563,6 +604,36 @@ so maak builds and runs on a machine with no Guix, and only a call to one of
 these helpers reports that it is missing, with a hint.  The file a query is
 written to is removed after it runs, unless Guix refuses to answer: it is then
 kept, and the error names it so it can be run by hand.
+.SS Bundles
+.TP
+.B (bundle #:name NAME #:maak-file FILE ...)
+Build a self\-contained artefact that runs
+.I FILE
+on a machine with neither Guile nor maak installed, and return its path.  The
+artefact is a
+.B guix pack
+of a package that installs the Maak file and a launcher and propagates maak,
+Guile and the packages named with
+.BR #:packages .
+.B #:format
+chooses
+.BR tarball ,
+.B squashfs
+or
+.BR docker ;
+a tarball is made relocatable, so it can be extracted anywhere.
+.BR #:output
+names the file.
+.B #:maak-package
+is a Scheme expression for the maak package, which is how a project points at
+its own build of maak.  With
+.BR #:load? " #t"
+a docker pack is loaded into the container engine afterwards.
+.PP
+The generated package is kept when the build fails, and the error names it so
+.B guix pack
+can be run by hand.  Only the files named are shipped: the Maak file, and the
+packages a task's commands need.
 .SS Nix
 .BR nix\-shell ", " nix\-develop ", " nix\-build ", " nix\-flake\-build ", " nix\-flake\-check ", "
 .BR nix\-run
@@ -668,6 +739,30 @@ Read credentials from a file and skip the greeting banner:
 .RS 4
 .EX
 maak \-\-no\-banner \-e .env.production \-\- deploy
+.EE
+.RE
+.PP
+See what a run would do, without running it:
+.PP
+.RS 4
+.EX
+maak \-\-plan deploy
+.EE
+.RE
+.PP
+Run a task again whenever the tree changes:
+.PP
+.RS 4
+.EX
+maak \-\-watch test
+.EE
+.RE
+.PP
+Read what a task calls and which environment file wins:
+.PP
+.RS 4
+.EX
+maak explain deploy
 .EE
 .RE
 .SH SEE ALSO

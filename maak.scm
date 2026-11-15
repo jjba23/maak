@@ -30,9 +30,6 @@
 (define project-name
   'maak)
 
-(define hot-reload-file-types
-  '(scm))
-
 ;; ====== Maak file tasks ======
 
 (define (help)
@@ -366,6 +363,23 @@ A bare push does not send tags that are not annotated; `maak git-push --
              #:extra-packages '("bash" "coreutils" "util-linux-with-udev" "guile")
              #:verbose? #t))
 
+;; A bundle is the other answer to "ship it": a pack of this project's own
+;; automation, launcher included, that runs where Guile and maak are not
+;; installed.  The maak package comes from this checkout's guix.scm, so the
+;; bundle carries the same maak the task ran under.
+(define* (package-bundle #:optional (pack-format "tarball"))
+  "Pack this project's automation as a self-contained artefact.
+
+Args:
+  pack-format: a guix pack format: tarball, squashfs or docker."
+  (bundle "maak"
+          #:format pack-format
+          #:maak-file "maak.scm"
+          #:maak-package (format #f "(load ~s)" (canonicalize-path "guix.scm"))
+          #:packages '("bash" "coreutils" "util-linux" "findutils" "sed"
+                       "git" "tar" "zip" "unzip" "curl")
+          #:verbose? #t))
+
 (define (push-docker-latest)
   "Push the latest locally generated Docker image to Dockerhub."
   (ct:container (list "push"
@@ -463,15 +477,22 @@ A bare push does not send tags that are not annotated; `maak git-push --
            #:verbose? #t))))
 
 (define (hot-reload)
-  "Hot-reloading developer's setup."
-  (manifest-shell (list "watchexec" "'maak --list'"
-                        "--clear"
-                        (~ "--exts ~a"
-                           (string-join (map symbol->string
-                                             hot-reload-file-types) ","))
-                        "--on-busy-update=restart"
-                        "--shell" "bash"
-                        "--watch" ".")))
+  "Hot-reloading developer's setup.
+
+The listing is printed now and again whenever the tree changes.  Each run is a
+fresh `./scripts/maak --list', so an edit to this file is what the next listing
+shows, and the watch is maak's own: no watchexec to install, and the checkout's
+maak is the one that runs."
+  (watch-tree "."
+              (lambda ()
+                (catch #t
+                  (lambda ()
+                    (run (list "./scripts/maak" "--list")))
+                  (lambda (key . vals)
+                    ;; A broken edit must not end the watch.
+                    (format (current-error-port)
+                            "\nmaak: the listing failed: ~a\n"
+                            (exception->message key vals)))))))
 
 (define (hr)
   "Alias to hot-reloading."

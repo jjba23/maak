@@ -16,6 +16,7 @@ The repository's automation is written in maak itself — read [[file:../maak.sc
 | ~version~                              | Print the version, license and homepage.                         |
 | ~sync-version~                         | Sync the version's copies, commit the release and tag it.        |
 | ~test~                                 | Run the unit test suite with Veritas.                            |
+| ~package-bundle~                       | Pack this project's automation as a self-contained artefact.     |
 | ~container~                            | Run the same suite inside a networkless Guix container.          |
 | ~repl~                                 | Development REPL (Ares nREPL server).                            |
 | ~dev~, ~hr~, ~hot-reload~              | Watch the tree and re-list tasks on every change.                |

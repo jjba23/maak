@@ -33,6 +33,21 @@
                         quiet?
                         dry-run?
                         banner?
+                        ;; ====== Plans ======
+                        make-plan-step
+                        plan-step?
+                        plan-step-task
+                        plan-step-kind
+                        plan-step-argv
+                        plan-step-env
+                        plan-step-sudo?
+                        plan-step-dev-null?
+                        plan-step-async?
+                        plan-step-directory
+                        current-task
+                        plan-steps
+                        planning?
+                        record-plan!
                         remkdir-p
                         maak-proc?
                         maak-task?                        $
@@ -47,6 +62,7 @@
                         time-machine-program-shell
                         syscall
                         cat
+                        argv->string
                         ;; ====== Programs and background jobs ======
                         run
                         run-pipeline
@@ -97,7 +113,10 @@
 
 (define (log-message msg)
   (unless (quiet?)
-    (display (format #f "\n~a" msg))))
+    (display (format #f "\n~a" msg))
+    ;; A watch prints one line and then waits for the next change, and a
+    ;; pipeline would hold that line in a buffer until the watch ends.
+    (force-output)))
 
 (define (log-separator)
   (log-message "
@@ -262,6 +281,56 @@ those are filled in here so the user never sees a bare `~S'."
 ;; run it starts itself, and on again afterwards.
 (define banner?
   (make-parameter #t))
+
+;; ====== Plans ======
+;;
+;; `maak --plan' runs a task with dry-run semantics and records what each
+;; command would be, instead of printing a transcript: the task, the argv (or
+;; the shell line, or the stages of a pipeline), the environment assignments it
+;; was given, the directory it ran in, and whether it would be elevated or
+;; backgrounded.  Every command in maak is built by `run', `$', `syscall',
+;; `capture', `run-pipeline' or `guix repl', so those are the only places that
+;; record.
+;;
+;; The recorder is a parameter rather than a global: when nothing is planning,
+;; `plan-steps' is #f and the library is the one it always was.  A task that
+;; calls another task directly is a procedure call rather than a new plan
+;; scope, so the commands stay attributed to the task that was named; the
+;; static call graph `maak explain' renders is the answer to which task called
+;; which.
+
+(define-record-type <plan-step>
+  (make-plan-step task kind argv env sudo? dev-null? async? directory)
+  plan-step?
+  (task plan-step-task)
+  ;; `run' names a program and its arguments, `shell' one line the shell reads,
+  ;; and `pipeline' a list of argument lists joined by pipes.
+  (kind plan-step-kind)
+  (argv plan-step-argv)
+  (env plan-step-env)
+  (sudo? plan-step-sudo?)
+  (dev-null? plan-step-dev-null?)
+  (async? plan-step-async?)
+  (directory plan-step-directory))
+
+;; The task a recorded command belongs to, bound by `run-task' around the
+;; procedure so `record-plan!' does not have to hunt for it.
+(define current-task
+  (make-parameter #f))
+
+;; #f when nothing is planning; a list in reverse order while a plan is being
+;; collected.
+(define plan-steps
+  (make-parameter #f))
+
+(define (planning?)
+  "Return #t when a plan is being recorded."
+  (and (plan-steps) #t))
+
+(define (record-plan! step)
+  "Record STEP in the plan being collected, if there is one."
+  (when (planning?)
+    (plan-steps (cons step (plan-steps)))))
 
 ;; ====== Command decorations ======
 ;;
@@ -543,6 +612,8 @@ given.
   Signals an error if the command returns a non-zero exit code or is
   terminated by a signal.  The message names the command, and the exit code
   when there is one."
+  (record-plan! (make-plan-step (current-task) 'shell (list cmd)
+                                '() #f #f async? (getcwd)))
   (cond
     ((dry-run?)
      (unless (quiet?)
@@ -642,6 +713,8 @@ given, and a job record when @code{#:async?} was given."
                                #:env env
                                #:sudo? sudo?
                                #:dev-null? dev-null?)))
+    (record-plan! (make-plan-step (current-task) 'shell (list cmd)
+                                  env sudo? dev-null? async? (getcwd)))
     (cond
       ((dry-run?)
        (unless (quiet?)
@@ -752,6 +825,8 @@ allowed."
                             (append (list "env") assignments))
                         argv))
          (command (argv->string argv)))
+    (record-plan! (make-plan-step (current-task) 'run argv
+                                  env sudo? dev-null? async? (getcwd)))
     (cond
       ((dry-run?)
        (unless (quiet?)
@@ -1271,6 +1346,9 @@ are asked for together."
      "Wait for the job and capture a foreground pipeline, or give the stage a file with (stage argv #:tee file)."))
   (let* ((steps (pipeline-steps stages env capture?))
          (rendered (pipeline-rendered steps)))
+    (record-plan! (make-plan-step (current-task) 'pipeline
+                                  (map pipeline-step-argv steps)
+                                  env #f #f async? (getcwd)))
     (cond
       ((dry-run?)
        (unless (quiet?)
@@ -2006,6 +2084,8 @@ are lists of `HOST=DEST' (or `HOST') strings passed through as `-S' and `-E'.
                     #:key (file "guix.scm")
                     (format "docker")
                     (image-tag #f)
+                    (output #f)
+                    (relocatable? #f)
                     (symlinks '())
                     (extra-packages '())
                     (join " ")
@@ -2018,8 +2098,11 @@ are lists of `HOST=DEST' (or `HOST') strings passed through as `-S' and `-E'.
   "Build a `guix pack' of the program in FILE.
 
 FORMAT is any `guix pack --format' value (\"docker\", \"squashfs\",
-\"tarball\").  IMAGE-TAG names a docker image, SYMLINKS are `TARGET=SOURCE'
-entries for `-S', and EXTRA-PACKAGES are appended to the pack.
+\"tarball\").  IMAGE-TAG names a docker image, OUTPUT names the file to write
+instead of letting `guix pack' choose one, SYMLINKS are `TARGET=SOURCE'
+entries for `-S', and EXTRA-PACKAGES are appended to the pack.  With
+RELOCATABLE? a tarball is made relocatable, so it can be extracted anywhere
+rather than at `/'.
 
 @example
 (guix-pack '() #:format \"docker\" #:image-tag \"maak\"
@@ -2028,6 +2111,8 @@ entries for `-S', and EXTRA-PACKAGES are appended to the pack.
   ($ (append (list (~ "guix pack --file=~a" file)
                    (~ "--format=~a" format))
              (if image-tag (list (~ "--image-tag=~a" image-tag)) '())
+             (if output (list (~ "--output=~a" output)) '())
+             (if relocatable? (list "--relocatable") '())
              (map (lambda (s)
                     (~ "-S ~a" s)) symlinks)
              extra-packages)

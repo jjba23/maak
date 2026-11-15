@@ -124,6 +124,8 @@ returned."
   (let* ((path (guix-script-path))
          (command (format #f "guix repl -- ~a" (shell-quote path)))
          (keep? #f))
+    (record-plan! (make-plan-step (current-task) 'shell (list command)
+                                  '() #f #f #f (getcwd)))
     (if (dry-run?)
         (begin
           (unless (quiet?)

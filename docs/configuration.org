@@ -16,6 +16,7 @@ maak is configured three ways, in increasing order of precision: command-line fl
 | ~MAAK_LOAD_PATH~  | Extra Guile load path entries, ~:~-separated.                        |
 | ~MAAK_NO_BANNER~  | Set to ~1~ to skip the greeting banner.                             |
 | ~MAAK_DEBUG~      | Set to ~1~ to print the Guile backtrace on error.                   |
+| ~MAAK_WATCH_INTERVAL~ | How often ~--watch~ looks at the tree, in seconds (1 by default). |
 | ~MAAK_ELEVATE~    | The program that answers ~#:sudo?~: ~doas~, ~sudo~, or one with options. |
 | ~MAAK_CONTAINER_ENGINE~ | The container engine: ~podman~ or ~docker~.                  |
 | ~MAAK_COMPOSE~    | The Compose program, for example ~podman-compose~ or ~docker compose~. |
