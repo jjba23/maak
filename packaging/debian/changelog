@@ -1,3 +1,20 @@
+maak (0.20.0-1) unstable; urgency=medium
+
+  * Every editor integration prompts with the prose the docstring gives an
+    argument under its `Args:` line, and shows the tasks a task needs first.
+    `maak-tasks --words` ends each line with that prose.
+  * Neovim and VS Code forget their cached task list as soon as maak.scm
+    changes, so a saved edit is what the next picker shows.  VS Code's task
+    provider also fires onDidChangeTasks, which reloads `Tasks: Run Task`.
+  * `maak-tasks --executable` and `maak-zed --executable` name the maak a
+    generated Zed task runs; MAAK_EXECUTABLE does the same for maak-zed and the
+    Helix picker.  The Helix picker no longer shows a default for an optional
+    argument that has none.
+  * A Homebrew formula builds maak from the release archive and installs the
+    maak-tasks and maak-zed helpers, the manual page and the completions.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Sun, 15 Nov 2026 10:00:00 +0100
+
 maak (0.19.0-1) unstable; urgency=medium
 
   * The task description is data, and every consumer reads the same one.

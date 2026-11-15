@@ -14,6 +14,52 @@ Nothing yet.
 
 *[Released]*
 
+** v0.20.0 (2026-11-15)
+
+Seven editor integrations that prompt with the task author's own words, a task
+list that does not go stale under the cursor, and a Homebrew formula.
+
+*** Added
+
+- Argument prose reaches every prompt.  A docstring's `Args:` section says what
+  to type for an argument, and Neovim, Vim, VS Code, Sublime Text, IntelliJ and
+  the Helix picker now show it beside the argument's name.  The helper's
+  `--words` mode ends each line with that prose, so a shell integration prompts
+  with the same words an editor does.
+- A picker shows what a task declares about itself: the tasks it needs first in
+  every integration, and the example invocation where the editor has a second
+  line for it (VS Code's quick pick detail, Sublime Text's quick panel).
+- Neovim forgets its cached task list as soon as `maak.scm` changes: an
+  `fs_event` watcher on the project directory and a `BufWritePost` autocommand
+  both invalidate it, and `require("maak").refresh()` and the
+  `User MaakTasksChanged` event let a plugin react to the change.
+- VS Code caches the list it reads and drops it when `maak.scm` is changed,
+  created or deleted; its task provider fires `onDidChangeTasks`, so
+  `Tasks: Run Task` and the pickers show the new list without reloading the
+  window.
+- `maak-tasks --executable NAME` and `maak-zed --executable NAME` name the maak
+  a generated Zed task runs, and `MAAK_EXECUTABLE` does the same for `maak-zed`
+  and the Helix picker.
+- A Homebrew formula, `packaging/homebrew/Formula/maak.rb`, builds maak from the
+  release archive with Guile, installs the `maak-tasks` and `maak-zed` helpers
+  with the manual page and the completions, and byte-compiles the modules into
+  the Cellar.  It is a formula rather than a cask or a gem: maak is a
+  command-line program built from source, not a macOS app bundle or Ruby code.
+
+*** Changed
+
+- `maak-tasks --words` prints a fifth, tab separated field: the argument's
+  prose.  A reader that took four fields keeps working when the prose is empty
+  and needs one more when it is not; the Helix picker was updated with it.
+- Zed's generated tasks run the executable the helper is given instead of a
+  hard-coded `maak`.
+
+*** Fixed
+
+- The Helix picker showed an optional argument's default even when it had none,
+  because a `0` from the helper read as a value rather than as false.  It now
+  says `RET to omit` and the default only when there is one.
+
 ** v0.19.0 (2026-11-14)
 
 The three items the vision document listed as "in scope and not built yet" are
