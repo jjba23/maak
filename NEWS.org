@@ -14,6 +14,15 @@ Nothing yet.
 
 *[Released]*
 
+** v0.21.1 (2026-11-15)
+
+*** Fixed
+
+- `maak package-bundle` names the bundle with `#:name`, the keyword
+  `(maak bundle)` takes.  It passed the name positionally, so the task failed
+  with `Invalid keyword: maak` before building anything.  The integration suite
+  now runs the task with `-n`, which is the check that would have caught it.
+
 ** v0.21.0 (2026-11-15)
 
 A run is inspectable before and after it happens: a typed plan, a watch with no

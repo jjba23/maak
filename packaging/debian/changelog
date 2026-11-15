@@ -1,3 +1,12 @@
+maak (0.21.1-1) unstable; urgency=medium
+
+  * `maak package-bundle` passes the bundle name as `#:name`, the keyword
+    `(maak bundle)` takes; it was passing it positionally and failed with
+    "Invalid keyword: maak" before building anything.  The integration suite
+    now runs the task in dry-run.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Sun, 15 Nov 2026 13:00:00 +0100
+
 maak (0.21.0-1) unstable; urgency=medium
 
   * `maak --plan TASK` prints the typed plan a run would execute, without
