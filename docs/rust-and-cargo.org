@@ -131,7 +131,7 @@ is meant asks instead:
             (cargo-package-names)))
 #+end_src
 
-~cargo-package~ selects one package by ~#:package~, or the only package when
+~cargo-package~ selects one package by ~#:name~, or the only package when
 the workspace has one; a workspace with several and no name is an error that
 lists them.
 
