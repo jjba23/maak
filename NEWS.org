@@ -14,6 +14,58 @@ Nothing yet.
 
 *[Released]*
 
+** v0.23.0 (2026-11-16)
+
+Rust projects get the helpers Cargo already needs, and a project that wants a
+task list rather than a language can write one in JSON, TOML or YAML.
+
+*** Added
+
+- `(maak cargo)`, a module of Cargo and Rust helpers, re-exported by
+  `(maak maak)`.  `cargo-argv` builds the command line -- global options before
+  the subcommand, the subcommand's own after it, the arguments last -- `cargo`
+  runs it through `run`, and `cargo-output` returns its standard output.
+  `cargo-build`, `cargo-check`, `cargo-test`, `cargo-run`, `cargo-bench`,
+  `cargo-fmt`, `cargo-clippy`, `cargo-doc`, `cargo-clean`, `cargo-fetch`,
+  `cargo-update`, `cargo-publish` and `cargo-install` are one line each over
+  it, and their arguments are cargo's own.
+- `cargo-metadata` parses `cargo metadata` into a string-keyed alist;
+  `cargo-package`, `cargo-package-version`, `cargo-package-names`,
+  `cargo-binaries`, `cargo-target-directory` and `cargo-artifact-path` answer
+  the questions a release task asks.  The queries run even in a dry run,
+  because they read the project rather than changing it.
+- rustup helpers: `rustup-argv`, `rustup`, `rustup-output`,
+  `rustup-active-toolchain`, `rustup-toolchains`, `rustup-install`,
+  `rustup-target-add` and `rustup-component-add`.  The programs are parameters
+  honoured from `MAAK_CARGO`/`CARGO` and `MAAK_RUSTUP`/`RUSTUP`, and a value may
+  carry a wrapper or a toolchain (`"cargo +nightly"`).
+- `(maak formats)`, readers for a documented subset of JSON, TOML and YAML, and
+  `(maak declarative)`, which reads a task list written in one of them.  A task
+  file is discovered when `maak.scm` is absent -- `maak.yaml`, `maak.yml`,
+  `maak.toml` or `maak.json`, in that order -- and `-f` names any of them.
+  `--list`, `--list --json`, `--plan`, `--watch`, `explain` and `-j` work as
+  they do for a Maak file, and `maak-tasks` finds the same candidates.
+- The data schema is `doc`, `command` or `commands`, `depends`, `env`,
+  `directory`, `hidden`, `example` and `allow-failure`.  A list of strings is
+  an argv run without a shell; a string is a shell line.  An unknown key, an
+  unsupported construct or a task with no command is an error, never a guess.
+- `docs/rust-and-cargo.org` and `docs/task-files.org`.
+
+*** Changed
+
+- maak looks for a task file when `./maak.scm` is absent, and the greeting says
+  "Loading tasks from" rather than "Loading tasks from Maak file".
+- `contrib/bin/maak-tasks` searches the same candidates and reads a data file,
+  so the editor integrations keep working.
+- The manual page and the command-line page describe the widened default.
+
+*** Verification
+
+- The Veritas suite is green, with new `formats`, `declarative` and `cargo`
+  specs and two integration cases that run a YAML task file through the
+  launcher.
+- `contrib/test/maak-tasks.sh` still passes all 43 checks.
+
 ** v0.22.0 (2026-11-15)
 
 C and C++ projects can move a Makefile into tasks without losing the pieces

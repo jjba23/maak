@@ -1,3 +1,22 @@
+maak (0.23.0-1) unstable; urgency=medium
+
+  * (maak cargo): Cargo and Rust helpers.  cargo-argv builds the command line,
+    cargo runs it, cargo-output returns its output, and the build/check/test/
+    run/bench/fmt/clippy/doc/clean/fetch/update/publish/install wrappers are
+    one line each.  cargo metadata is read as a value for the package version,
+    the workspace's names, the binary targets, the target directory and an
+    artefact path.  rustup has argv, output and toolchain/target/component
+    helpers.  Programs come from MAAK_CARGO/CARGO and MAAK_RUSTUP/RUSTUP.
+  * (maak formats) and (maak declarative): task files in JSON, TOML and YAML,
+    read when maak.scm is absent (maak.yaml, maak.yml, maak.toml, maak.json)
+    and also usable with -f.  The schema is closed and each reader understands
+    a documented subset, so an unsupported construct is an error rather than a
+    guess.
+  * docs/rust-and-cargo.org and docs/task-files.org; the manual page and the
+    CLI, configuration and task pages describe the widened default.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Mon, 16 Nov 2026 12:00:00 +0100
+
 maak (0.22.0-1) unstable; urgency=medium
 
   * (maak cc): C and C++ build helpers.  compile/compile-argv,
