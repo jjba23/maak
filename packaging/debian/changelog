@@ -1,3 +1,18 @@
+maak (0.24.0-1) unstable; urgency=medium
+
+  * (maak maven) and (maak gradle): argv builders for the Maven lifecycle and
+    Gradle tasks, with poms, settings, profiles, properties, exclusions,
+    threads, daemon/cache/parallel flags and output queries.  Wrapper helpers
+    answer with the checkout's mvnw or gradlew when a task runs.
+  * (maak elisp): Emacs batch argv, byte-compile, checkdoc and ERT, recursive
+    .el discovery, and readers for the Version and Package-Requires headers,
+    the provided feature, lexical-binding and the ends-here footer.
+    elisp-practices lists the conventions a file is missing.
+  * docs/maven-and-gradle.org and docs/emacs-lisp.org; the manual page names
+    MAAK_CARGO, MAAK_RUSTUP, MAAK_MAVEN, MAAK_GRADLE and MAAK_EMACS.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Mon, 16 Nov 2026 18:00:00 +0100
+
 maak (0.23.0-1) unstable; urgency=medium
 
   * (maak cargo): Cargo and Rust helpers.  cargo-argv builds the command line,

@@ -14,6 +14,56 @@ Nothing yet.
 
 *[Released]*
 
+** v0.24.0 (2026-11-16)
+
+Java and Kotlin projects get the Maven and Gradle lifecycle as argv, and an
+Emacs Lisp package gets its batch checks and the conventions it is expected to
+keep.
+
+*** Added
+
+- `(maak maven)`, re-exported by `(maak maak)`: `maven-argv` builds a Maven
+  invocation (pom and settings files, profiles, `-D` properties, threads, the
+  CI flags and the lifecycle goals), `maven` runs it through `run`,
+  `maven-output` returns a report, and `maven-clean`, `-validate`, `-compile`,
+  `-test`, `-package`, `-verify`, `-install`, `-deploy`, `-site`,
+  `-dependency-tree` and `-effective-pom` are one line each.
+- `(maak gradle)`: `gradle-argv` builds a Gradle invocation (project and build
+  files, `-P` properties, `-x` exclusions, the daemon, cache, parallel and
+  rerun flags, warning and console modes, workers), `gradle` runs it,
+  `gradle-output` returns a report, and `gradle-assemble`, `-build`, `-check`,
+  `-test`, `-clean`, `-run`, `-tasks`, `-dependencies`, `-projects` and
+  `-publish` are one line each.
+- `maven-wrapper-command` and `gradle-wrapper-command`: the `mvnw` or `gradlew`
+  a checkout pins, checked when a task runs; `maven-wrapper?` and
+  `gradle-wrapper?` answer whether there is one.  The programs themselves are
+  parameters honoured from `MAAK_MAVEN`/`MAVEN` and `MAAK_GRADLE`/`GRADLE`.
+- `(maak elisp)`: `emacs-batch-argv` builds a `--batch` invocation (load paths,
+  files, `--eval`, `-f`, arguments, `-Q` by default), `emacs-batch` runs it,
+  `emacs-output` and `emacs-capture` return what `princ` printed, and
+  `elisp-quote` writes a string as Lisp data.
+- `elisp-byte-compile` (with `#:warnings-as-errors?`), `elisp-checkdoc` and
+  `elisp-ert` (with ERT's selector as a Lisp expression) are the three checks a
+  package's CI runs, and `elisp-files` finds the `.el` files under a directory.
+- The practice readers: `elisp-header`, `elisp-package-version`,
+  `elisp-package-requires`, `elisp-provides`, `elisp-feature`,
+  `elisp-lexical-binding?` and `elisp-footer?`, plus `elisp-practices`, which
+  answers with the conventions a file is missing, and
+  `elisp-practices-ok?`.  `elisp-version` reports the Emacs it is running.
+- `docs/maven-and-gradle.org` and `docs/emacs-lisp.org`.
+
+*** Changed
+
+- The manual page names the tool variables it was missing: `MAAK_CARGO`,
+  `MAAK_RUSTUP`, `MAAK_MAVEN`, `MAAK_GRADLE` and `MAAK_EMACS`.
+
+*** Verification
+
+- The Veritas suite is green, with new `maven`, `gradle` and `elisp` specs that
+  assert the argv builders, the wrapper checks, the dry-run commands, the
+  output queries and the practice readers from files the spec writes.
+- `contrib/test/maak-tasks.sh` still passes all 43 checks.
+
 ** v0.23.0 (2026-11-16)
 
 Rust projects get the helpers Cargo already needs, and a project that wants a
