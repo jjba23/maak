@@ -1,0 +1,158 @@
+#+title: Maven, Gradle and the JVM
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+Maven and Gradle already know how to build a JVM project: dependency
+resolution, plugins, the compiler and the packaging are their job.  What
+~(maak maven)~ and ~(maak gradle)~ add is the rest of a task: the command line
+as a list a test can assert, the wrapper a checkout pins, and the lifecycle
+named the way the tool names it.
+
+* The helpers
+
+| Helper                                             | What it does                                                     |
+|----------------------------------------------------+------------------------------------------------------------------|
+| ~maven-command~, ~gradle-command~                   | Parameters for the programs, honoured from ~MAAK_MAVEN~, ~MAVEN~, ~MAAK_GRADLE~, ~GRADLE~. |
+| ~maven-argv~, ~gradle-argv~                         | The words of an invocation, built without running it.            |
+| ~maven~, ~gradle~                                   | Run goals or tasks with arguments, through ~run~.                |
+| ~maven-output~, ~gradle-output~                     | Run an argv and return its standard output.                      |
+| ~maven-wrapper?~, ~maven-wrapper-command~           | The ~mvnw~ a checkout pins, and the command that runs it.        |
+| ~gradle-wrapper?~, ~gradle-wrapper-command~         | The ~gradlew~ a checkout pins, and the command that runs it.     |
+| ~maven-clean~, ~-validate~, ~-compile~, ~-test~, ~-package~, ~-verify~, ~-install~, ~-deploy~, ~-site~ | The Maven lifecycle, one task name each. |
+| ~maven-dependency-tree~, ~maven-effective-pom~      | The two reports a Maven task reaches for.                        |
+| ~gradle-assemble~, ~-build~, ~-check~, ~-test~, ~-clean~, ~-run~, ~-tasks~, ~-dependencies~, ~-projects~, ~-publish~ | The Gradle tasks in common use. |
+
+All of them are re-exported by ~(maak maak)~, so a normal Maak file needs only
+its usual import.
+
+* A Maven project
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak maak))
+
+(define (build)
+  "Package the project without running the tests."
+  (maven-package "-DskipTests"))
+
+(define (test)
+  "Run the tests."
+  (maven-test))
+
+(define (verify)
+  "Run the verification phase the CI profile describes."
+  (maven-verify "-Pci"))
+
+(define (ci)
+  "What CI runs, in order."
+  (test)
+  (verify))
+#+end_src
+
+A wrapper passes its arguments straight to Maven, so ~-DskipTests~,
+~-Pci~ and a plugin goal are the words Maven documents.  The lifecycle names are
+the phases, so a task called ~package~ is ~maven-package~ and not a second
+implementation of packaging.
+
+* A Gradle project
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak maak))
+
+(define (build)
+  "Build every module of the multi-project build."
+  (gradle-build "--parallel"))
+
+(define (test)
+  "Run every module's tests, stopping at the first failure."
+  (gradle-test))
+
+(define (check)
+  "Run the checks and the tests."
+  (gradle-check))
+
+(define (ci)
+  "What CI runs."
+  (gradle "clean" #:arguments '("build" "--no-daemon")))
+#+end_src
+
+A Gradle task word may name a module, as in ~:service:test~; it travels as the
+argument it is, so maak does not have to know the project's layout.
+
+* The structured command line
+
+When an option is a value rather than a word -- a project directory, a
+property, a profile list -- build the argv and hand it to ~run~.  The builder is
+pure, so a test can assert the command line without a JDK installed:
+
+#+begin_src scheme
+(define (maven-release)
+  "Run the Maven release profile with the CI settings."
+  (run (maven-argv '("clean" "verify")
+                   #:profiles '("release")
+                   #:properties '(("skipITs" . "false"))
+                   #:batch-mode? #t
+                   #:no-transfer-progress? #t)))
+
+;; => mvn -B --no-transfer-progress -P release -DskipITs=false clean verify
+#+end_src
+
+#+begin_src scheme
+(define (gradle-release)
+  "Build the service module with the properties a release needs."
+  (run (gradle-argv '("clean" "build")
+                    #:project-dir "service"
+                    #:properties '(("version" . "1.2.3"))
+                    #:no-daemon? #t
+                    #:build-cache? #t)))
+
+;; => gradle --project-dir service -Pversion=1.2.3 --no-daemon --build-cache clean build
+#+end_src
+
+A property is a ~"name=value"~ string or a ~(name . value)~ pair, so the alist a
+task already has goes in unchanged.  The Maven builder takes ~#:threads~, which
+is a number or the string Maven accepts (~"1C"~); the Gradle builder takes
+~#:max-workers~, ~#:warning-mode~ and ~#:console~, and refuses a value the tool
+does not know.
+
+* The wrapper the project pins
+
+A Maven or Gradle checkout usually carries ~mvnw~ or ~gradlew~, which is the
+version the project itself decided on.  ~maven-wrapper-command~ and
+~gradle-wrapper-command~ answer with that program when it exists, and with the
+configured one otherwise:
+
+#+begin_src scheme
+(define (ci)
+  "Run the checks with the wrapper the project pins."
+  (parameterize ((maven-command (maven-wrapper-command)))
+    (maven-verify)))
+#+end_src
+
+The check runs when the task runs, so a ~-C~ into the project still finds the
+wrapper beside its ~pom.xml~.
+
+* What is not here
+
+- *No dependency resolution.*  Maven and Gradle resolve and download; maak runs
+  the command and reports its exit status.
+- *No build-file writer.*  ~pom.xml~ and ~build.gradle~ are the project's; a
+  task that changes one is a task that edits a file, or a command such as
+  ~gradle init~.
+- *No repository credentials.*  They live in Maven's ~settings.xml~ or Gradle's
+  properties, which are the tools' own configuration and stay out of the tree.
+- *No reproducible-build check.*  A task that compares two builds is a task;
+  the tools' own ~--offline~, ~--no-daemon~ and cache flags are the pieces.
+
+* Watching and inspecting a JVM build
+
+The modes documented on [[file:inspect.org][Plans, watches and explanations]] apply
+unchanged: ~maak --plan build~ records the Maven or Gradle command it would run
+without running it, ~maak --watch test~ re-runs the tests when the tree changes,
+and ~maak explain ci~ prints the task graph, the load path and the environment
+the task will read.

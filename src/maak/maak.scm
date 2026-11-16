@@ -26,6 +26,9 @@
   #:use-module (maak watch)
   #:use-module (maak cc)
   #:use-module (maak cargo)
+  #:use-module (maak maven)
+  #:use-module (maak gradle)
+  #:use-module (maak elisp)
   #:use-module (maak i18n)
   #:use-module (maak version)
   #:use-module (maak git)
@@ -166,6 +169,62 @@
                            rustup-install
                            rustup-target-add
                            rustup-component-add
+                           ;; ====== Maven ======
+                           maven-command
+                           maven-wrapper?
+                           maven-wrapper-command
+                           maven-argv
+                           maven
+                           maven-output
+                           maven-clean
+                           maven-validate
+                           maven-compile
+                           maven-test
+                           maven-package
+                           maven-verify
+                           maven-install
+                           maven-deploy
+                           maven-site
+                           maven-dependency-tree
+                           maven-effective-pom
+                           ;; ====== Gradle ======
+                           gradle-command
+                           gradle-wrapper?
+                           gradle-wrapper-command
+                           gradle-argv
+                           gradle
+                           gradle-output
+                           gradle-assemble
+                           gradle-build
+                           gradle-check
+                           gradle-test
+                           gradle-clean
+                           gradle-run
+                           gradle-tasks
+                           gradle-dependencies
+                           gradle-projects
+                           gradle-publish
+                           ;; ====== Emacs Lisp ======
+                           emacs-command
+                           emacs-batch-argv
+                           emacs-batch
+                           emacs-output
+                           emacs-capture
+                           elisp-quote
+                           elisp-version
+                           elisp-files
+                           elisp-byte-compile
+                           elisp-checkdoc
+                           elisp-ert
+                           elisp-header
+                           elisp-package-version
+                           elisp-package-requires
+                           elisp-provides
+                           elisp-feature
+                           elisp-lexical-binding?
+                           elisp-footer?
+                           elisp-practices
+                           elisp-practices-ok?
                            ;; ====== Guix values ======
                            guix-available?
                            guix-channels

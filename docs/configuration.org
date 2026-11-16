@@ -23,6 +23,9 @@ maak is configured three ways, in increasing order of precision: command-line fl
 | ~MAAK_PKG_CONFIG~ | The pkg-config program; ~pkg-config~ by default.                    |
 | ~MAAK_CARGO~      | The cargo program for ~(maak cargo)~; falls back to ~CARGO~, then ~cargo~. |
 | ~MAAK_RUSTUP~     | The rustup program; falls back to ~RUSTUP~, then ~rustup~.          |
+| ~MAAK_MAVEN~      | The Maven program for ~(maak maven)~; falls back to ~MAVEN~, then ~mvn~. |
+| ~MAAK_GRADLE~     | The Gradle program for ~(maak gradle)~; falls back to ~GRADLE~, then ~gradle~. |
+| ~MAAK_EMACS~      | The Emacs program for ~(maak elisp)~; falls back to ~EMACS~, then ~emacs~. |
 | ~MAAK_ELEVATE~    | The program that answers ~#:sudo?~: ~doas~, ~sudo~, or one with options. |
 | ~MAAK_CONTAINER_ENGINE~ | The container engine: ~podman~ or ~docker~.                  |
 | ~MAAK_COMPOSE~    | The Compose program, for example ~podman-compose~ or ~docker compose~. |
@@ -43,6 +46,13 @@ that belongs to a link are not the same decision.  See
 ~MAAK_CARGO~ and ~MAAK_RUSTUP~ are read the same way, and their values may carry
 a wrapper or a toolchain -- ~"cargo +nightly"~ is the usual one.  See
 [[file:rust-and-cargo.org][Rust and Cargo]].
+
+~MAAK_MAVEN~, ~MAAK_GRADLE~ and ~MAAK_EMACS~ are read the same way too, and a
+value may carry flags.  A checkout's ~mvnw~ or ~gradlew~ is not chosen through
+the environment: ~maven-wrapper-command~ and ~gradle-wrapper-command~ answer
+with it, and a task opts in with ~parameterize~.  See
+[[file:maven-and-gradle.org][Maven, Gradle and the JVM]] and
+[[file:emacs-lisp.org][Emacs Lisp packages]].
 
 A project with no ~maak.scm~ may keep its tasks in ~maak.yaml~, ~maak.yml~,
 ~maak.toml~ or ~maak.json~ instead; the variables below are read for a task file

@@ -368,6 +368,46 @@ The pkg\-config program the
 .B (maak cc)
 queries run; by default
 .BR pkg-config .
+.TP
+.B MAAK_CARGO
+The cargo program the
+.B (maak cargo)
+helpers run, falling back to
+.B CARGO
+and then
+.BR cargo .
+The value may carry flags or a toolchain, as in
+.BR "cargo +nightly" .
+.TP
+.B MAAK_RUSTUP
+The rustup program, falling back to
+.B RUSTUP
+and then
+.BR rustup .
+.TP
+.B MAAK_MAVEN
+The Maven program the
+.B (maak maven)
+helpers run, falling back to
+.B MAVEN
+and then
+.BR mvn .
+.TP
+.B MAAK_GRADLE
+The Gradle program the
+.B (maak gradle)
+helpers run, falling back to
+.B GRADLE
+and then
+.BR gradle .
+.TP
+.B MAAK_EMACS
+The Emacs program the
+.B (maak elisp)
+helpers run, falling back to
+.B EMACS
+and then
+.BR emacs .
 .SH TASK AUTHORING
 A task is an ordinary procedure.  Its docstring is shown by
 .B \-\-list

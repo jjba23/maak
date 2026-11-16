@@ -1,0 +1,165 @@
+#+title: Emacs Lisp packages
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+An Emacs Lisp package's automation is three commands -- byte-compile it, run its
+ERT tests, and read what checkdoc says -- plus the conventions the file itself
+is expected to keep.  ~(maak elisp)~ puts both halves in one place, so the
+table of a package's tasks is a Maak file rather than a shell script around
+~emacs --batch~.
+
+Everything runs Emacs with ~--batch~ and ~-Q~ by default: a package's tests
+should not depend on the machine's init file, and a CI run should not either.
+
+* The helpers
+
+| Helper                                      | What it does                                                            |
+|---------------------------------------------+-------------------------------------------------------------------------+
+| ~emacs-command~                              | The program, honoured from ~MAAK_EMACS~ then ~EMACS~; a value may carry flags. |
+| ~emacs-batch-argv~                           | The words of a batch invocation, built without running it.              |
+| ~emacs-batch~, ~emacs-output~, ~emacs-capture~ | Run it, or run it and return what it printed.                        |
+| ~elisp-quote~                                | A string as an Emacs Lisp literal, for an expression built by a task.   |
+| ~elisp-version~                              | The Emacs version the configured program reports.                       |
+| ~elisp-files~                                | Every ~.el~ file under a directory, recursively and sorted.             |
+| ~elisp-byte-compile~                         | Byte-compile a list of files, optionally failing on a warning.          |
+| ~elisp-checkdoc~                             | Run checkdoc over a list of files.                                      |
+| ~elisp-ert~                                  | Load test files and run ERT, with a selector.                           |
+| ~elisp-header~, ~elisp-package-version~, ~elisp-package-requires~ | The header fields a package is described by.        |
+| ~elisp-provides~, ~elisp-feature~            | The feature or features a file provides.                                |
+| ~elisp-lexical-binding?~, ~elisp-footer?~    | The two conventions that are easiest to forget.                         |
+| ~elisp-practices~, ~elisp-practices-ok?~     | Every convention a file is missing, as a list of sentences.             |
+
+All of them are re-exported by ~(maak maak)~, so a normal Maak file needs only
+its usual import.
+
+* A package's tasks
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak maak))
+
+(define (compile)
+  "Byte-compile the sources, failing on a warning."
+  (elisp-byte-compile (elisp-files "lisp") #:warnings-as-errors? #t))
+
+(define (checkdoc)
+  "Read what checkdoc says about the sources."
+  (elisp-checkdoc (elisp-files "lisp")))
+
+(define (test)
+  "Run the ERT tests against the sources in lisp/."
+  (elisp-ert (elisp-files "test") #:load-paths '("lisp")))
+
+(define (ci)
+  "What CI runs, in order."
+  (compile)
+  (test)
+  (checkdoc))
+#+end_src
+
+~elisp-byte-compile~ writes the ~.elc~ files beside the sources, as
+~batch-byte-compile~ does.  The compile is a gate when
+~#:warnings-as-errors?~ is given; checkdoc reports and does not fail the
+command.
+
+* The batch command
+
+~emacs-batch-argv~ is the pure builder.  Its keywords are the pieces of an
+Emacs batch invocation:
+
+#+begin_src scheme
+(emacs-batch-argv #:load-paths '("lisp")
+                  #:evals '("(princ emacs-version)"))
+;; => ("emacs" "--batch" "-Q" "-L" "lisp" "--eval" "(princ emacs-version)")
+
+(emacs-batch-argv #:load-files '("test/foo-tests.el")
+                  #:evals '("(progn (require 'ert) (ert-run-tests-batch-and-exit t))"))
+;; => ("emacs" "--batch" "-Q" "-l" "test/foo-tests.el" "--eval" ...)
+#+end_src
+
+~emacs-batch~ runs it, and ~emacs-capture~ runs it and returns what ~princ~
+printed:
+
+#+begin_src scheme
+(emacs-capture #:evals '("(princ emacs-version)"))
+;; => "30.1"
+#+end_src
+
+A function such as ~batch-byte-compile~ reads the words after ~-f~, which is
+why ~#:arguments~ is placed last.
+
+* ERT selectors
+
+~elisp-ert~ takes ERT's selector as an Emacs Lisp expression, ~t~ by default, so
+every test runs.  A tag selector is the form it is, and a string selector is
+written quoted for Lisp:
+
+#+begin_src scheme
+(elisp-ert '("test/foo-tests.el") #:selector "(tag smoke)")
+(elisp-ert '("test/foo-tests.el") #:selector "\"integration\"")
+#+end_src
+
+The expression is inserted as written, which is safe because it comes from the
+Maak file rather than from a report.  Emacs exits non-zero when a test fails.
+
+* The packaging practices
+
+An Emacs Lisp file is expected to keep a handful of conventions, and the
+helpers read them from the file rather than run Emacs:
+
+#+begin_src scheme
+(elisp-package-version "foo.el")        ;; => "1.2.3"
+(elisp-package-requires "foo.el")       ;; => "((emacs \"27.1\"))"
+(elisp-provides "foo.el")               ;; => ("foo")
+(elisp-feature "foo.el")                ;; => "foo"
+(elisp-lexical-binding? "foo.el")       ;; => #t
+(elisp-footer? "foo.el")                ;; => #t
+(elisp-practices "foo.el")              ;; => ()
+#+end_src
+
+~elisp-practices~ answers with the conventions a file is missing: lexical
+binding on the first line, a ~;; Version:~ header, a ~;;; Commentary:~ section, a
+~;;; Code:~ section, a ~(provide ...)~ form, and the ~;;; foo.el ends here~
+footer.  A gate is a task of a few lines:
+
+#+begin_src scheme
+(define (check-practices)
+  "Fail when a source file is missing a packaging convention."
+  (let ((bad (filter (lambda (file)
+                       (not (elisp-practices-ok? file)))
+                     (elisp-files "lisp"))))
+    (unless (null? bad)
+      (task-error "~a file(s) miss a packaging convention: ~a"
+                  #:args (list (length bad)
+                               (string-join bad ", "))))))
+#+end_src
+
+A version read from the header is what a release task tags, so the number is
+written once in the file the package is:
+
+#+begin_src scheme
+(define (tag)
+  "Tag the version the package header declares."
+  (git-tag (string-append "v" (elisp-package-version "foo.el"))))
+#+end_src
+
+* What is not here
+
+- *No package.el installation.*  ~package-install~, ~package-lint~ and
+  ~package-build~ are commands a task runs; they are not reimplemented.
+- *No tar package or ELPA archive.*  A task that builds one calls the tool that
+  does; the helpers stop at compiling and testing.
+- *No editor integration.*  How maak itself is driven from Emacs is
+  [[file:editors.org][Editors, shells and the REPL]]; this page is about building an
+  Emacs Lisp package with maak.
+
+* Watching and inspecting an Emacs Lisp build
+
+The modes documented on [[file:inspect.org][Plans, watches and explanations]] apply
+unchanged: ~maak --plan compile~ records the Emacs invocation without running
+it, ~maak --watch test~ re-runs ERT when the tree changes, and ~maak explain ci~
+prints the task graph, the load path and the environment the task will read.
