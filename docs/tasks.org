@@ -22,6 +22,10 @@ Tasks can:
 
 You extend maak the same way you extend any Scheme program: by writing more Scheme.
 
+A project that does not want the language can describe a smaller task list in
+JSON, TOML or YAML instead; see
+[[file:task-files.org][Task files in JSON, TOML and YAML]].
+
 A *value* is not a task, and neither is a parameter. ~(define deb-packages (make-parameter '()))~ returns something callable, but it is a value a task reads rather than a task, so it never appears in a listing and cannot be run by name.
 
 ** Exports decide what is runnable

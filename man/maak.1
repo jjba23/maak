@@ -32,6 +32,12 @@ loads
 .B ./maak.scm
 and runs the task named
 .BR default .
+When that file is absent it reads a task file instead, the first of
+.BR ./maak.yaml ,
+.BR ./maak.yml ,
+.B ./maak.toml
+or
+.BR ./maak.json .
 A command line that asks only for the help screen or the version reads no Maak
 file at all, so
 .B maak \-\-version
@@ -137,8 +143,9 @@ argument like any other.
 .BR \-f ", " \-\-file " " FILE
 Load
 .I FILE
-instead of
-.BR ./maak.scm .
+instead of the file
+.B maak
+would look for.  It may be a Maak file or a task file in JSON, TOML or YAML.
 .TP
 .BR \-e ", " \-\-env\-file " " FILE
 Read
@@ -821,6 +828,13 @@ The Maak file was missing, a task failed, or an option was invalid.
 .TP
 .B ./maak.scm
 The default Maak file.
+.TP
+.BR ./maak.yaml ", " ./maak.yml ", " ./maak.toml ", " ./maak.json
+Task files read when
+.B ./maak.scm
+is absent.  Each describes tasks as a name, a docstring and one or more
+commands, and understands a documented subset of its format; an unsupported
+construct is an error.
 .TP
 .B ./.env
 Read before the Maak file when no

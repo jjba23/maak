@@ -12,7 +12,7 @@ maak shares Make's command line wherever the two answer the same question, so a 
 
 | ~make~                       | maak                                                              |
 |------------------------------+-------------------------------------------------------------------|
-| ~-f FILE~                     | ~-f/--file FILE~, and ~./maak.scm~ when it is not given            |
+| ~-f FILE~                     | ~-f/--file FILE~, and ~./maak.scm~ (or a YAML, TOML or JSON task file) when it is not given |
 | ~-C DIR~                      | ~-C/--directory DIR~, which also prints the directory it entered   |
 | ~-n/--dry-run~                | ~-n/--dry-run~                                                     |
 | ~-s/--silent~                 | ~-q/--quiet~ (Make's own ~-q~ asks a different question)            |

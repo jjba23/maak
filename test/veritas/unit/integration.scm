@@ -73,6 +73,7 @@
 (define explain-fixture "test/maak/fixtures/explain.scm")
 (define parallel-fixture "test/maak/fixtures/parallel.scm")
 (define order-fixture "test/maak/fixtures/order.scm")
+(define data-fixture "test/maak/fixtures/data.yaml")
 (define subdir "test/maak/fixtures/subdir")
 
 (define (unique-path name)
@@ -235,6 +236,23 @@ that a case can ask about it alongside the status of the run."
                                #:got (list (status-of result)
                                            (said? result "stdout" "ok-task-ran")
                                            (string=? (stderr-of result) "")))))
+
+         (test "a task file in YAML is listed like a Maak file"
+               (let ((result (launcher-run "-f" data-fixture
+                                           "--no-banner" "--list")))
+                 (assert-equal #:expect (list 0 #t #t)
+                               #:got (list (status-of result)
+                                           (said? result "stdout" "build:")
+                                           (said? result "stdout"
+                                                  "needs: build")))))
+
+         (test "a task of a YAML task file is planned with the commands it declares"
+               (let ((result (launcher-run "-f" data-fixture
+                                           "--no-banner" "--plan" "test")))
+                 (assert-equal #:expect (list 0 #t #t)
+                               #:got (list (status-of result)
+                                           (said? result "stdout" "echo building")
+                                           (said? result "stdout" "echo testing")))))
 
          (test "a failing task exits non-zero and leaves its message on standard error"
                (let ((result (launcher-run "-f" cli-fixture

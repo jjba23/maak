@@ -33,6 +33,7 @@
   #:use-module (maak maak)
   #:use-module (maak dsl)
   #:use-module (maak tasks)
+  #:use-module (maak declarative)
   #:use-module (maak version)
   #:use-module (maak plan)
   #:use-module (maak watch)
@@ -292,16 +293,30 @@ separator as the end of the options, so it is removed here."
 (define (resolve-maak-file file)
   "Return the absolute path of the maak file to load, or raise a maak error.
 
-FILE defaults to `maak-default-file' when the command line did not name one.
-The path is canonicalised because `load' resolves a relative name against the
-directory of the module that calls it -- from this module, `./maak.scm' would
-be searched for as `maak/maak.scm' and could load a completely different file."
-  (let ((path (or file maak-default-file)))
+FILE defaults to `maak-default-file' when the command line did not name one,
+and a checkout with no `maak.scm' may hold one of the task files in JSON, TOML or
+YAML instead.  The path is canonicalised because `load' resolves a relative
+name against the directory of the module that calls it -- from this module,
+`./maak.scm' would be searched for as `maak/maak.scm' and could load a
+completely different file."
+  (define (default-path)
+    (or (find file-exists?
+              (cons maak-default-file declarative-task-files))
+        maak-default-file))
+  (let ((path (or file (default-path))))
     (unless (file-exists? path)
       (raise-maak-error
        (format #f "Maak file not found: ~a" path)
-       #:hint "Create it, or name another one with -f/--file."))
+       #:hint (format #f
+                      "Create it, or name another one with -f/--file.  maak also reads ~a."
+                      (string-join declarative-task-files ", "))))
     (canonicalize-path path)))
+
+(define (load-maak-file file)
+  "Load FILE: a Scheme Maak file, or a task file in JSON, TOML or YAML."
+  (if (declarative-file? file)
+      (load-task-file file)
+      (load file)))
 
 (define (print-help resources)
   "Print the help screen, taken from `help.txt' in RESOURCES when available."
@@ -404,10 +419,11 @@ one line naming the tasks that did not."
   "Return the tasks FILE defines, as the description an editor reads.
 
 FILE is read as well as loaded: see the note above for which reader answers
-what.  The tasks come in the file's own order, which is the order the helper
-that editors already run prints, and a task the file does not spell out follows
-those it does, by name."
-  (let* ((written (static-tasks file))
+what.  A task file in JSON, TOML or YAML describes its tasks itself, because
+there is no lambda list to read out of a loaded procedure."
+  (if (declarative-file? file)
+      (task-file-descriptions file)
+      (let* ((written (static-tasks file))
          (loaded (map (lambda (task)
                         (let* ((name (symbol->string (car task)))
                                (proc (variable-ref (cdr task)))
@@ -440,7 +456,7 @@ those it does, by name."
                    loaded)
            (lambda (a b)
              (string<? (task-description-name a)
-                       (task-description-name b)))))))
+                       (task-description-name b))))))))
 
 ;; ====== Loading the Maak file ======
 
@@ -490,7 +506,9 @@ win."
   (let ((proc (get-module-var task)))
     (unless (and proc (assoc task (resolve-maak-tasks)))
       (unknown-task-error task))
-    (let* ((graph (static-call-graph file))
+    (let* ((graph (if (declarative-file? file)
+                      (task-file-call-graph file)
+                      (static-call-graph file)))
            (calls (or (assoc-ref graph task) '()))
            (called-by (called-by-entries graph task)))
       (display
@@ -531,7 +549,7 @@ fixed is exactly when it should keep going."
                 (catch #t
                   (lambda ()
                     (reset-maak-module!)
-                    (load file)
+                    (load-maak-file file)
                     (report-failed-tasks
                      (if (> jobs 1)
                          (run-tasks-parallel tasks
@@ -677,12 +695,12 @@ fixed is exactly when it should keep going."
              (log-separator)
              (log-info "Maak ~a: the infinitely extensible command runner\n"
                        maak-version)
-             (log-info "Loading tasks from Maak file: ~a\n" file))
+             (log-info "Loading tasks from: ~a\n" file))
            ;; A watch loads the file on every run, inside the loop; loading it
            ;; here as well would load it twice before the first run.
            (unless should-watch
              (reset-maak-module!)
-             (load file))
+             (load-maak-file file))
            (cond
              (should-explain
               (explain-task file (car tasks) base-env env-files load-paths)

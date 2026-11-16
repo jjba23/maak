@@ -351,9 +351,23 @@ elif [ "${needs_maak_file}" = no ]; then
 elif [ -f ./maak.scm ]; then
   guile_cmd_args+=("--file" "$(realpath ./maak.scm)")
 else
-  log_error "No Maak file found: './maak.scm'"
-  log_info "Create one, or name another with -f/--file. Run 'maak --help' for the options."
-  exit 1
+  # A project may keep its tasks in a data file instead.  The order is the one
+  # `resolve-maak-file` uses, so the two front ends agree about which file a
+  # directory holds when it has more than one.
+  task_file=""
+  for candidate in maak.yaml maak.yml maak.toml maak.json; do
+    if [ -f "./${candidate}" ]; then
+      task_file="${candidate}"
+      break
+    fi
+  done
+  if [ -n "${task_file}" ]; then
+    guile_cmd_args+=("--file" "$(realpath "./${task_file}")")
+  else
+    log_error "No Maak file found: './maak.scm', './maak.yaml', './maak.toml' or './maak.json'"
+    log_info "Create one, or name another with -f/--file. Run 'maak --help' for the options."
+    exit 1
+  fi
 fi
 
 # ====== The task list, and the arguments it is given ======

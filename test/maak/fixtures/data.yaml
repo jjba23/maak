@@ -1,0 +1,12 @@
+version: 1
+tasks:
+  default:
+    doc: Say hello.
+    command: [echo, hello]
+  build:
+    doc: Build it.
+    command: [echo, building]
+  test:
+    doc: Test it, after building.
+    depends: [build]
+    command: [echo, testing]

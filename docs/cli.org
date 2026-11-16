@@ -12,7 +12,7 @@
 
 | Short | Long                   | Argument | Description                                                                    |
 |-------+------------------------+----------+--------------------------------------------------------------------------------|
-| ~-f~  | ~--file~               | ~FILE~   | Maak file to load (defaults to ~./maak.scm~).                                   |
+| ~-f~  | ~--file~               | ~FILE~   | Maak file or task file to load (defaults to ~./maak.scm~, then a task file in YAML, TOML or JSON). |
 | ~-C~  | ~--directory~          | ~DIR~    | Change to ~DIR~ before the Maak file is read (repeatable; ~:~-separated allowed). |
 | ~-e~  | ~--env-file~           | ~FILE~   | Read ~NAME=VALUE~ assignments from ~FILE~ (repeatable; ~:~-separated allowed).   |
 |       | ~--no-env-file~        | None     | Read no environment file at all, whatever the environment says.                |
@@ -35,6 +35,11 @@
 |       | ~--debug~              | None     | Print the Guile backtrace on error (same as ~MAAK_DEBUG=1~).                     |
 
 A manual page is installed with the program, so ~man maak~ shows the same options without leaving the terminal. In a checkout, ~maak man~ previews ~man/maak.1~.
+
+A run looks for ~./maak.scm~ first, and then for ~maak.yaml~, ~maak.yml~,
+~maak.toml~ or ~maak.json~ in the same directory.  The first file that exists is
+the task list; [[file:task-files.org][Task files in JSON, TOML and YAML]] has the
+schema and the limits.
 
 The greeting banner is printed by default. ~--no-banner~ keeps a run's output free of decoration, which is what a script wants, and ~MAAK_NO_BANNER=1~ does the same from the environment. ~--banner~ turns it back on, which is handy when the variable lives in a shell profile.
 

@@ -65,8 +65,8 @@
 
 Print the tasks of a Maak file, as JSON.
 
-  -f, --file FILE        read FILE instead of looking for maak.scm
-  -C, --directory DIR    look for maak.scm in DIR and its parents
+  -f, --file FILE        read FILE instead of looking for a Maak file
+  -C, --directory DIR    look for a Maak file in DIR and its parents
       --names            print one task name per line, in file order
       --fzf              print name, signature and first docstring line, tab
                          separated, for a picker
@@ -101,15 +101,22 @@ leave it out with `task-metadata!' is left out here too.")
        program-name))
 
 (use-modules (maak tasks)
+             (maak declarative)
              (maak dsl))
 
 ;;; Reading the Maak file
 
 (define (maak-file-in directory)
-  "Return the path of the maak.scm in DIRECTORY or its parents, or #f."
+  "Return the path of the Maak file in DIRECTORY or its parents, or #f.
+
+The candidates are the Scheme file first and then the task files in JSON, TOML
+and YAML, which is the order `maak` itself resolves them in."
   (let loop ((dir directory))
-    (let ((candidate (in-vicinity dir "maak.scm")))
-      (cond ((file-exists? candidate) candidate)
+    (let ((candidate
+           (or (find file-exists?
+                     (map (lambda (name) (in-vicinity dir name))
+                          (cons "maak.scm" declarative-task-files))))))
+      (cond (candidate candidate)
             (else
              (let ((parent (dirname dir)))
                (and (not (string=? parent dir)) (loop parent))))))))
@@ -119,7 +126,10 @@ leave it out with `task-metadata!' is left out here too.")
   (unless (file-exists? path)
     (die "~a is not a file" path))
   (catch #t
-    (lambda () (static-tasks path))
+    (lambda ()
+      (if (declarative-file? path)
+          (task-file-descriptions path)
+          (static-tasks path)))
     (lambda (key . vals)
       (let ((error (find-maak-error key vals)))
         (die "~a" (if error
@@ -148,10 +158,10 @@ leave it out with `task-metadata!' is left out here too.")
                                             (maak-file-in
                                              (canonicalize-path directory)))))
                             (or found
-                                (die "no maak.scm in ~a or its parents" directory))))
+                                (die "no Maak file in ~a or its parents" directory))))
                          (else
                           (or (maak-file-in (getcwd))
-                              (die "no maak.scm in ~a or its parents" (getcwd))))))
+                              (die "no Maak file in ~a or its parents" (getcwd))))))
              (tasks (tasks-of path)))
         (case mode
           ((json) (display (tasks-json tasks path)) (newline))

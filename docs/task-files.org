@@ -1,0 +1,169 @@
+#+title: Task files in JSON, TOML and YAML
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+A Maak file is Scheme, and Scheme is the whole language.  Some projects do not
+want a language: they want a list of tasks, reviewable by someone who does not
+write Guile, and manageable by a script that emits JSON.  maak reads those too.
+
+A task file describes less than a Maak file, on purpose.  There are no
+arguments, no conditions and no loops.  A task is a name, a docstring, one or
+more commands, and the declarations ~task-metadata!~ already carries.  When the
+list needs a condition, that is the moment to write the Maak file.
+
+* Which file maak reads
+
+~maak~ looks in the current directory, in this order:
+
+1. ~maak.scm~, the Maak file;
+2. ~maak.yaml~ or ~maak.yml~;
+3. ~maak.toml~;
+4. ~maak.json~.
+
+The first one that exists is the task list.  ~-f/--file~ names any of them
+outright, and ~-C/--directory~ chooses the directory before the search starts.
+Everything else works as it does for a Maak file: ~--list~, ~--list --json~,
+~--plan~, ~--watch~, ~explain~, ~-j~ and ~-n~.  The editor helper
+~maak-tasks~ searches the same candidates, so a data file's tasks appear in every
+integration.
+
+* The schema
+
+The top level is a mapping with a ~tasks~ table and an optional ~version~ of
+~1~.  Each task is a mapping whose keys are:
+
+| Key             | Type                       | What it does                                      |
+|-----------------+----------------------------+---------------------------------------------------|
+| ~doc~           | string                     | The docstring ~--list~ prints.                    |
+| ~command~       | string or list of strings  | One command.                                      |
+| ~commands~      | list                       | Several commands, run in order.                   |
+| ~depends~       | string or list of strings  | Tasks that must finish first.                     |
+| ~env~           | mapping of strings         | Environment variables for every command of the task. |
+| ~directory~     | string                     | Directory the commands run in.                    |
+| ~hidden~        | boolean                    | Leave the task out of the listings but still run it. |
+| ~example~       | string                     | An invocation a picker shows.                     |
+| ~allow-failure~ | boolean                    | A non-zero exit does not raise; the task can decide. |
+
+A task gives exactly one of ~command~ or ~commands~.  A *list* of strings is a
+program and its arguments, run without a shell, exactly as ~run~ takes them; a
+*string* is one shell line, as ~$~ takes it.  That distinction is the whole
+safety story: a list cannot be split by a path with a space in it, and a string
+is only for the lines that need a shell -- pipes, redirections and globs.
+
+The schema is closed.  An unknown key is an error naming the key, not something
+ignored, because a file that says something maak does not read is a file whose
+author believes something false.
+
+* YAML
+
+#+begin_src yaml
+version: 1
+tasks:
+  default:
+    doc: Build the project.
+    command: [cargo, build, --release]
+  test:
+    doc: Run the tests after building.
+    depends: [default]
+    commands:
+      - [cargo, test]
+      - [cargo, clippy, --, -D, warnings]
+  clean:
+    doc: Remove the build artefacts.
+    command: cargo clean
+    hidden: true
+#+end_src
+
+#+begin_src shell
+maak test
+#+end_src
+
+* TOML
+
+The same tasks, as tables.  A table header is how TOML spells the nesting:
+
+#+begin_src toml
+version = 1
+
+[tasks.default]
+doc = "Build the project."
+command = ["cargo", "build", "--release"]
+
+[tasks.test]
+doc = "Run the tests after building."
+depends = ["default"]
+commands = [["cargo", "test"], ["cargo", "clippy", "--", "-D", "warnings"]]
+
+[tasks.test.env]
+RUST_BACKTRACE = "1"
+
+[tasks.clean]
+doc = "Remove the build artefacts."
+command = "cargo clean"
+hidden = true
+#+end_src
+
+* JSON
+
+JSON has no tables, so ~tasks~ is an object and a task is an object too:
+
+#+begin_src json
+{
+  "version": 1,
+  "tasks": {
+    "build": {
+      "doc": "Build the project.",
+      "command": ["cargo", "build"]
+    },
+    "test": {
+      "depends": ["build"],
+      "command": ["cargo", "test"]
+    }
+  }
+}
+#+end_src
+
+A list of task tables also works, for a generator that finds a mapping awkward:
+
+#+begin_src json
+{
+  "tasks": [
+    {"name": "build", "command": ["cargo", "build"]},
+    {"name": "test", "depends": ["build"], "command": ["cargo", "test"]}
+  ]
+}
+#+end_src
+
+* What the readers accept
+
+Each reader understands a documented subset and refuses the rest, because a
+value that was guessed at is a command nobody wrote.  An unsupported construct
+is a maak error with its line.
+
+- *JSON* is read whole: objects, arrays, strings with escapes including
+  surrogate pairs, numbers, ~true~, ~false~ and ~null~.  A duplicate key and a
+  trailing comma are errors.
+- *TOML* is read as tables, arrays, inline tables, basic and literal strings,
+  integers, floats and booleans.  Arrays of tables (~[[name]]~), multi-line
+  strings and dotted keys are refused; a date or a time comes back as the text
+  it was written as.
+- *YAML* is read as block mappings and sequences, flow sequences and mappings,
+  quoted and plain scalars, and comments.  Anchors, aliases, tags, directives,
+  multi-line scalars and a second document are refused.
+
+* What a task file cannot do
+
+- *No arguments.*  A task takes the words after its name in a Maak file; a data
+  file has no lambda list to describe them.
+- *No conditions or loops.*  A command is a command; a task that computes
+  something is Scheme.
+- *No composition beyond ~depends~.*  One task cannot call another, because
+  there is nothing to call.
+
+Reaching for one of those is the signal to move the task list to ~maak.scm~.
+The two are not exclusive forever: a project can start in YAML and move a task
+at a time into Scheme, and ~-f~ keeps both files usable side by side.
