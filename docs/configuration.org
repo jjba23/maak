@@ -21,6 +21,8 @@ maak is configured three ways, in increasing order of precision: command-line fl
 | ~MAAK_CXX~        | The C++ compiler for ~(maak cc)~; falls back to ~CXX~, then ~c++~.    |
 | ~MAAK_AR~         | The archiver for ~(maak cc)~; falls back to ~AR~, then ~ar~.          |
 | ~MAAK_PKG_CONFIG~ | The pkg-config program; ~pkg-config~ by default.                    |
+| ~MAAK_CARGO~      | The cargo program for ~(maak cargo)~; falls back to ~CARGO~, then ~cargo~. |
+| ~MAAK_RUSTUP~     | The rustup program; falls back to ~RUSTUP~, then ~rustup~.          |
 | ~MAAK_ELEVATE~    | The program that answers ~#:sudo?~: ~doas~, ~sudo~, or one with options. |
 | ~MAAK_CONTAINER_ENGINE~ | The container engine: ~podman~ or ~docker~.                  |
 | ~MAAK_COMPOSE~    | The Compose program, for example ~podman-compose~ or ~docker compose~. |
@@ -37,6 +39,15 @@ are *not* read automatically: a task says which one reaches which command with
 ~(environment-flags "CFLAGS")~, because a flag that belongs to a compile and one
 that belongs to a link are not the same decision.  See
 [[file:c-and-cpp.org][C, C++ and Make/Automake]].
+
+~MAAK_CARGO~ and ~MAAK_RUSTUP~ are read the same way, and their values may carry
+a wrapper or a toolchain -- ~"cargo +nightly"~ is the usual one.  See
+[[file:rust-and-cargo.org][Rust and Cargo]].
+
+A project with no ~maak.scm~ may keep its tasks in ~maak.yaml~, ~maak.yml~,
+~maak.toml~ or ~maak.json~ instead; the variables below are read for a task file
+exactly as they are for a Maak file.  See
+[[file:task-files.org][Task files in JSON, TOML and YAML]].
 
 * Parameters: dry-run, quiet, banner, escalation
 

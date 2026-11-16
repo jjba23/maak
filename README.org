@@ -95,6 +95,8 @@ Start with the quick start, or open the whole [[file:docs/index.org][documentati
 | [[file:docs/cli.org][The command line]] | Every option, the grammar of tasks and arguments, =--list= output. |
 | [[file:docs/configuration.org][Configuration]] | Environment variables, and the parameters behind dry-run and quiet. |
 | [[file:docs/builtins.org][The built-in toolkit]] | =run=, pipelines, jobs, file helpers, =task-error=, gettext. |
+| [[file:docs/rust-and-cargo.org][Rust and Cargo]] | Cargo and rustup helpers, the structured command line, metadata as a value, artefact paths. |
+| [[file:docs/task-files.org][Task files in JSON, TOML and YAML]] | A task list without the language: the schema, the formats, their limits. |
 | [[file:docs/guix-and-nix.org][Guix, Nix and reproducibility]] | The helpers that build the command line, and the ones that return values. |
 | [[file:docs/why-maak.org][Why maak, and why Lisp]] | What Make cannot do, and the table of Make flags that did carry over. |
 | [[file:docs/editors.org][Editors, shells and the REPL]] | maak.el and the seven integrations, the shell completions, the REPL workflow. |

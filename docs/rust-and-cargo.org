@@ -1,0 +1,198 @@
+#+title: Rust and Cargo
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+Cargo already knows how to build a crate: the profiles, the dependency graph,
+the incremental cache and the lock file are its job, and maak adds no second
+build engine beside it.  What ~(maak cargo)~ adds is the other half of a
+release task -- the program and its arguments as a list, the version and the
+artefacts ~cargo metadata~ knows, the toolchains rustup manages -- so a crate's
+automation is a Maak file rather than a shell script around ~cargo~.
+
+* The helpers
+
+| Helper                                             | What it does                                                     |
+|----------------------------------------------------+------------------------------------------------------------------|
+| ~cargo-command~, ~rustup-command~                   | Parameters for the programs, honoured from ~MAAK_CARGO~, ~CARGO~, ~MAAK_RUSTUP~, ~RUSTUP~. |
+| ~cargo-argv~                                        | The words of a cargo invocation, built without running it.       |
+| ~cargo~                                             | Run a subcommand with arguments, through ~run~.                  |
+| ~cargo-output~                                      | Run an argv and return its standard output.                      |
+| ~cargo-build~, ~cargo-check~, ~cargo-test~, ~cargo-run~ | The commands a task reaches for, with their own options passed through. |
+| ~cargo-bench~, ~cargo-fmt~, ~cargo-clippy~, ~cargo-doc~ | Benches, formatting, lints and documentation.                  |
+| ~cargo-clean~, ~cargo-fetch~, ~cargo-update~, ~cargo-publish~, ~cargo-install~ | The release and maintenance commands. |
+| ~cargo-metadata~                                    | ~cargo metadata~ as parsed JSON, a string-keyed alist.           |
+| ~cargo-package~, ~cargo-package-version~, ~cargo-package-names~, ~cargo-binaries~ | The package a task means, its version, the workspace's members and its binary targets. |
+| ~cargo-target-directory~, ~cargo-artifact-path~    | Where cargo writes its artefacts, and one artefact's path.       |
+| ~rustup-argv~, ~rustup~, ~rustup-output~            | rustup itself, with the argv builders the rest of maak uses.     |
+| ~rustup-active-toolchain~, ~rustup-toolchains~      | The toolchain in use here, and the installed ones.               |
+| ~rustup-install~, ~rustup-target-add~, ~rustup-component-add~ | Install a toolchain, a target or a component.           |
+
+All of them are re-exported by ~(maak maak)~, so a normal Maak file needs only
+its usual import.
+
+* A crate's tasks
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak maak))
+
+(define (build)
+  "Build the crate in release mode."
+  (cargo-build "--release"))
+
+(define (test)
+  "Run the tests."
+  (cargo-test))
+
+(define (fmt)
+  "Format the sources."
+  (cargo-fmt))
+
+(define (lint)
+  "Lint with clippy, denying warnings."
+  (cargo-clippy "--" "-D" "warnings"))
+
+(define (ci)
+  "What CI runs, in order."
+  (fmt)
+  (lint)
+  (test)
+  (build))
+#+end_src
+
+A wrapper passes its arguments straight to cargo, so ~--release~,
+~--workspace~, ~--all-features~ and the rest are the ones cargo documents.
+Nothing is split twice: ~"--" "-D" "warnings"~ reaches clippy as the three words
+cargo expects after its own separator.
+
+* The structured command line
+
+When an option is a value rather than a word -- a feature list, a package, a
+profile -- build the argv and hand it to ~run~.  ~cargo-argv~ is pure, so the
+command line can be asserted in a test without a Rust toolchain:
+
+#+begin_src scheme
+(define (build-release)
+  "Build the workspace's app package with the features a release needs."
+  (run (cargo-argv "build"
+                   #:release? #t
+                   #:package "app"
+                   #:features '("openssl" "serde")
+                   #:manifest-path "Cargo.toml")))
+
+;; => cargo build --package app --features openssl,serde --release
+#+end_src
+
+Global options -- ~--manifest-path~, ~--offline~, ~--locked~, ~--frozen~,
+~--jobs~, ~--color~ and the verbosity -- come before the subcommand; the
+subcommand's own options come after it; and ~#:arguments~ is appended last, so
+an option this builder does not name still reaches cargo.  ~#:release?~ and
+~#:profile~ cannot both be given, because cargo spells the release profile both
+ways.
+
+* The version, the artefacts and the workspace
+
+~cargo metadata~ is JSON, and ~cargo-metadata~ parses it.  It runs even in a dry
+run, like pkg-config: it reads the project rather than changing it, and a plan
+that left out the version a publish would use is a plan of a different release.
+
+#+begin_src scheme
+(define (version)
+  "Print the version cargo reports."
+  (log-info "~a\n" (cargo-package-version)))
+
+(define (install)
+  "Build the release binary and install it under PREFIX."
+  (cargo-build "--release")
+  (install-file (cargo-artifact-path "app" #:release? #t)
+                (string-append (or (getenv "PREFIX") "/usr/local") "/bin/app")
+                #:mode "755"))
+#+end_src
+
+~cargo-artifact-path~ composes the path from the target directory cargo
+reports, so a workspace that sets ~CARGO_TARGET_DIR~ answers with the directory
+cargo will really use; ~#:triple~ names a cross-compilation target's
+subdirectory.  ~cargo-target-directory~ is the same answer without the file.
+
+A workspace has several packages, and a query that would have to guess which one
+is meant asks instead:
+
+#+begin_src scheme
+(define (binaries)
+  "List the binary targets of every package in the workspace."
+  (for-each (lambda (package)
+              (for-each (lambda (name)
+                          (log-info "~a: ~a\n" package name))
+                        (cargo-binaries #:package package)))
+            (cargo-package-names)))
+#+end_src
+
+~cargo-package~ selects one package by ~#:package~, or the only package when
+the workspace has one; a workspace with several and no name is an error that
+lists them.
+
+* rustup
+
+A toolchain is a thing a task installs as much as a thing a developer has.  The
+helpers pass their words to rustup the same way the cargo ones do:
+
+#+begin_src scheme
+(define (toolchain)
+  "Install the components a lint job needs."
+  (rustup-component-add "clippy")
+  (rustup-component-add "rustfmt"))
+
+(define (wasm)
+  "Add the WebAssembly target to the active toolchain."
+  (rustup-target-add "wasm32-unknown-unknown"))
+
+(define (nightly)
+  "Install the nightly toolchain."
+  (rustup-install "nightly"))
+#+end_src
+
+~rustup-active-toolchain~ returns the first word of
+~rustup show active-toolchain~, and ~rustup-toolchains~ the names
+~rustup toolchain list~ prints.
+
+* Pinning a program
+
+~cargo-command~ and ~rustup-command~ are parameters.  A value may carry a
+wrapper or a toolchain, split the way an unquoted shell word is split, so a task
+can pin a nightly for one command without changing what the rest of the run
+uses:
+
+#+begin_src scheme
+(parameterize ((cargo-command "cargo +nightly"))
+  (cargo-build "--all-features"))
+#+end_src
+
+A bare ~CARGO~ in the environment is honoured the way ~CC~ is for the C helpers,
+and ~MAAK_CARGO~ wins over it; ~MAAK_RUSTUP~ is the rustup equivalent.  See
+[[file:configuration.org][Configuration]].
+
+* What is not here
+
+- *No second build engine.*  Cargo decides what is up to date; maak runs the
+  command the task names and reports its exit status.  There is no
+  ~cargo-build~ that decides not to run, and no cache beside cargo's.
+- *No Cargo.toml writer.*  ~cargo metadata~ reads it; changing it is a task's
+  own edit, or ~cargo add~ as a command.
+- *No vendoring or registry logic.*  ~cargo vendor~, ~cargo login~ and
+  ~cargo publish~ are commands a task runs; the credentials stay in cargo's own
+  configuration and out of the tree.
+- *No cross-compilation setup.*  ~#:target~, ~#:triple~ and
+  ~rustup-target-add~ are the pieces; the linker configuration for a target is
+  cargo's and the system's business.
+
+* Watching and inspecting a Rust build
+
+The modes documented on [[file:inspect.org][Plans, watches and explanations]] apply
+unchanged: ~maak --plan build~ records the cargo command it would run without
+running it, ~maak --watch test~ re-runs the tests when the tree changes, and
+~maak explain test~ prints the task graph, the load path and the environment the
+task will read.

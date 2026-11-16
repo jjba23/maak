@@ -25,6 +25,7 @@
   #:use-module (maak bundle)
   #:use-module (maak watch)
   #:use-module (maak cc)
+  #:use-module (maak cargo)
   #:use-module (maak i18n)
   #:use-module (maak version)
   #:use-module (maak git)
@@ -131,6 +132,40 @@
                            pkg-config-libs
                            pkg-config-exists?
                            pkg-config-version
+                           ;; ====== Cargo and Rust ======
+                           cargo-command
+                           rustup-command
+                           cargo-argv
+                           cargo
+                           cargo-output
+                           cargo-metadata
+                           cargo-package
+                           cargo-package-version
+                           cargo-package-names
+                           cargo-binaries
+                           cargo-target-directory
+                           cargo-artifact-path
+                           cargo-build
+                           cargo-check
+                           cargo-test
+                           cargo-run
+                           cargo-bench
+                           cargo-fmt
+                           cargo-clippy
+                           cargo-doc
+                           cargo-clean
+                           cargo-fetch
+                           cargo-update
+                           cargo-publish
+                           cargo-install
+                           rustup-argv
+                           rustup
+                           rustup-output
+                           rustup-active-toolchain
+                           rustup-toolchains
+                           rustup-install
+                           rustup-target-add
+                           rustup-component-add
                            ;; ====== Guix values ======
                            guix-available?
                            guix-channels
