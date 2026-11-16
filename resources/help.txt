@@ -50,11 +50,12 @@ Tasks, and the arguments they are given:
 
 Options:
     -f, --file FILE
-        Specify the path to the Maak file (defaults to ./maak.scm).
+        Specify the path to the Maak file or task file (defaults to
+        ./maak.scm, then maak.yaml, maak.yml, maak.toml or maak.json).
 
     -C, --directory DIR
         Change to DIR before the Maak file is read.  A relative --file, the
-        default ./maak.scm and the .env read beside it are then looked up
+        default Maak file and the .env read beside it are then looked up
         inside DIR, and each directory entered is reported.  Repeat the flag,
         or separate several directories with ':', to enter them in order.
 
