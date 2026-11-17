@@ -1,0 +1,198 @@
+#+title: Python, uv and pyproject
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+uv already knows how to build a Python project: the interpreter, the virtual
+environment, the lock file and the wheel are its job, and maak adds no second
+environment manager beside it.  What ~(maak python)~ adds is the other half of a
+task -- the program and its arguments as a list, the two questions a release
+asks of ~pyproject.toml~, and the four checks a Python CI runs -- so a project's
+automation is a Maak file rather than a shell script around ~uv~.
+
+* The helpers
+
+| Helper                                            | What it does                                                    |
+|---------------------------------------------------+-----------------------------------------------------------------|
+| ~uv-command~, ~uvx-command~, ~python-command~      | Parameters for the programs, honoured from ~MAAK_UV~, ~UV~, ~MAAK_UVX~, ~UVX~, ~MAAK_PYTHON~, ~PYTHON~. |
+| ~uv-argv~                                          | The words of a uv invocation, built without running it.          |
+| ~uv~                                               | Run a subcommand, forwarding its options to ~uv-argv~.           |
+| ~uv-output~, ~uv-version~                          | Run an argv and return its output, or the version uv reports.    |
+| ~uvx-argv~, ~uvx~                                  | Run a tool in a temporary environment, as ~uvx ruff~ does.       |
+| ~uv-init~, ~uv-sync~, ~uv-lock~, ~uv-run~          | The commands a task reaches for first.                           |
+| ~uv-add~, ~uv-remove~, ~uv-tree~, ~uv-export~      | Dependencies as commands rather than edits.                      |
+| ~uv-build~, ~uv-publish~, ~uv-venv~                | The release and environment commands.                            |
+| ~uv-pip~, ~uv-python~                              | The two subcommands uv spells differently; passed through.       |
+| ~python-argv~, ~python~, ~python-module~           | The interpreter itself, with ~-m~ and ~-I~ named properly.        |
+| ~python-output~, ~python-version~                  | What the interpreter prints: its version, or what a script said.  |
+| ~pyproject-file~, ~pyproject-data~                 | The file, as a parameter and as parsed data.                     |
+| ~python-project~, ~python-project-name~, ~python-project-version~ | The table a package is described in, and its two facts. |
+| ~python-requires-python~, ~python-project-scripts~, ~python-build-backend~ | The interpreter constraint, the console scripts, the backend. |
+| ~python-test~, ~python-lint~, ~python-format~, ~python-type-check~ | The checks, one line each.                    |
+| ~python-check~                                     | The lint, the type check and the tests, in that order.           |
+
+All of them are re-exported by ~(maak maak)~, so a normal Maak file needs only
+its usual import.
+
+* A project's tasks
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak maak))
+
+(define (install)
+  "Install the dependencies exactly as the lock file records them."
+  (uv-sync))
+
+(define (test)
+  "Run the tests."
+  (python-test))
+
+(define (lint)
+  "Lint the project."
+  (python-lint))
+
+(define (check)
+  "What CI runs: the lint, the type check and the tests."
+  (python-check))
+
+(define (build)
+  "Build the wheel and the sdist into dist/."
+  (uv-build))
+
+(define (release)
+  "Publish the built distributions to the index uv is configured for."
+  (uv-publish))
+#+end_src
+
+A wrapper passes its arguments straight to uv, so ~--extra~, ~--all-extras~,
+~--group~ and the rest are the ones uv documents.  Nothing is split twice:
+~(uv-run "pytest" "-q")~ is three words of argv, and ~pytest~ and ~-q~ reach the
+runner as you wrote them.
+
+* The structured command line
+
+When an option is a value rather than a word -- a project directory, an
+interpreter, an environment file -- build the argv and hand it to ~run~.
+~uv-argv~ is pure, so the command line can be asserted in a test without uv
+installed:
+
+#+begin_src scheme
+(define (sync-here)
+  "Synchronise this project's environment from the lock file, with 3.12."
+  (run (uv-argv "sync" #:frozen? #t #:python "3.12" #:no-progress? #t)))
+
+;; => uv sync --frozen --python 3.12 --no-progress
+#+end_src
+
+The options uv documents for the program as a whole -- ~--project~,
+~--directory~, ~--cache-dir~, ~--offline~, ~--no-cache~, ~--no-progress~,
+~--refresh~, the verbosity and ~--color~ -- come before the subcommand.  The
+ones uv documents for the commands that read the project -- ~--frozen~,
+~--locked~, ~--no-sync~, ~--env-file~ and ~--python~ -- come after it.  The
+arguments are appended last, so an option this builder does not name still
+reaches uv.
+
+~#:verbose~ is ~#t~ for one ~-v~ or a positive number for that many, the way
+the cargo builder spells it.
+
+* The version, the name and the checks
+
+Two questions a release task asks are answered from ~pyproject.toml~ rather than
+from a command: what is this package called, and what version is it.
+
+#+begin_src scheme
+(define (tag)
+  "Tag the release with the version pyproject.toml gives it."
+  (git-tag (string-append "v" (python-project-version))))
+
+(define (report)
+  "Show what the project says about itself."
+  (log-info "~a ~a (Python ~a)\n"
+            (python-project-name)
+            (python-project-version)
+            (or (python-requires-python) "any")))
+
+(define (scripts)
+  "List the console scripts the package installs."
+  (for-each (lambda (name) (log-info "~a\n" name))
+            (python-project-scripts)))
+#+end_src
+
+The file is read with the reader documented on
+[[file:task-files.org][Task files in JSON, TOML and YAML]], so a multi-line
+dependency list and a ~[[tool.uv.index]]~ table are read rather than refused.
+Reading runs even in a dry run, like pkg-config: it describes the project rather
+than changing it.
+
+A project that lists ~"version"~ in ~[project] dynamic~ has no version in the
+file -- the build backend computes it -- and ~python-project-version~ raises
+rather than guessing at what the backend would answer.  Such a task asks
+~uv~ itself:
+
+#+begin_src scheme
+(define (version)
+  "Print the version uv reports for the project."
+  (log-info "~a\n" (string-trim-both (uv-output (uv-argv "version" "--short")))))
+#+end_src
+
+~pyproject-file~ is a parameter, so a task can point the readers at another
+project without changing where it runs; ~pyproject-data~ is the whole file as
+data, for the fields these helpers do not name.
+
+The four checks are the tools a Python project usually declares as development
+dependencies, run through ~uv run~ so that the version the lock file pinned is
+the one that runs:
+
+- ~python-test~ runs ~pytest~;
+- ~python-lint~ runs ~ruff check~ over the project;
+- ~python-format~ runs ~ruff format~ over the project;
+- ~python-type-check~ runs ~mypy~ over the project.
+
+Each takes the arguments of the tool it runs, and the words a caller gives
+replace the default path rather than adding to it -- ~(python-lint "src")~
+checks ~src~ and nothing else.  A project that uses black, flake8 or pyright
+writes the ~uv-run~ call itself:
+
+#+begin_src scheme
+(define (lint)
+  "Lint with flake8 instead of ruff."
+  (uv-run "flake8" "src"))
+#+end_src
+
+* Pinning a program
+
+~uv-command~, ~uvx-command~ and ~python-command~ are parameters.  A value may
+carry flags, split the way an unquoted shell word is split, so a task can pin a
+preview build for one command without changing what the rest of the run uses:
+
+#+begin_src scheme
+(parameterize ((uv-command "uv --preview"))
+  (uv-sync))
+#+end_src
+
+A bare ~UV~ or ~PYTHON~ in the environment is honoured, and ~MAAK_UV~ or
+~MAAK_PYTHON~ wins over it.  See [[file:configuration.org][Configuration]].
+
+* What is not here
+
+- *No second environment manager.*  The lock file, the virtual environment and
+  the interpreter are uv's.  There is no ~uv-sync~ that decides not to run, and
+  no cache beside uv's.
+- *No pyproject writer.*  The readers answer; changing the file is a task's own
+  edit, or ~uv add~ and ~uv remove~ as commands.
+- *No publishing credentials.*  ~uv-publish~ runs the command; the token stays
+  in uv's own configuration and out of the tree.
+- *No tool versions of its own.*  The checks run what the project declares.  A
+  project that wants a tool without declaring it writes ~uv run --with~.
+
+* Watching and inspecting a Python build
+
+The modes documented on [[file:inspect.org][Plans, watches and explanations]] apply
+unchanged: ~maak --plan test~ records the uv command it would run without
+running it, ~maak --watch test~ re-runs the tests when the tree changes, and
+~maak explain test~ prints the task graph, the load path and the environment the
+task will read.

@@ -23,6 +23,8 @@ continues.
 | [[file:builtins.org][The built-in toolkit]] | =run=, pipelines, jobs, file helpers, =task-error=, string helpers and the gettext workflow. |
 | [[file:c-and-cpp.org][C, C++ and Make/Automake]] | The compile, link, static-library and pkg-config helpers, and how a Makefile's targets, variables and pattern rules become tasks. |
 | [[file:rust-and-cargo.org][Rust and Cargo]] | The cargo helpers, the structured command line, `cargo metadata` as a value, artefact paths, and rustup. |
+| [[file:python.org][Python, uv and pyproject]] | The uv helpers, the structured command line, the name and version a release reads, and the four CI checks. |
+| [[file:frontend.org][Frontend projects: npm, pnpm and yarn]] | One set of procedures over three package managers, the verbs each one spells differently, and the package.json a release reads. |
 | [[file:task-files.org][Task files in JSON, TOML and YAML]] | A task list without the language: the schema, the three formats, the supported subset of each, and what a data file cannot do. |
 | [[file:maven-and-gradle.org][Maven, Gradle and the JVM]] | The Maven lifecycle and Gradle tasks as argv, the wrapper a checkout pins, and the reports a JVM task reaches for. |
 | [[file:emacs-lisp.org][Emacs Lisp packages]] | Byte-compiling, ERT and checkdoc in batch, and the headers, provides and footer a package is expected to keep. |

@@ -1,0 +1,174 @@
+#+title: Frontend projects: npm, pnpm and yarn
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+The three package managers agree on what a JavaScript project is and disagree on
+how to spell half the verbs: ~npm ci~ against ~pnpm install
+--frozen-lockfile~ against ~yarn install --immutable~, ~npm install~ against
+~pnpm add~, ~npm exec --~ against ~pnpm exec~.  ~(maak frontend)~ exists for
+that disagreement.  A task says what it means, and the manager the checkout pins
+supplies the words.
+
+* Which manager a project uses
+
+The lock file is the answer, because it is the file the manager itself wrote:
+
+| Lock file            | Manager |
+|----------------------+---------|
+| ~package-lock.json~  | npm     |
+| ~pnpm-lock.yaml~     | pnpm    |
+| ~yarn.lock~          | yarn    |
+| none of them         | npm     |
+
+~detect-package-manager~ reads that answer from a directory, and
+~package-manager~ is the parameter holding it.  It holds a *program* rather than
+a name, so a wrapper is allowed the way ~"cargo +nightly"~ is for the cargo
+helpers, and the last word is the manager:
+
+#+begin_src scheme
+(define (install)
+  "Install with the pnpm that corepack pins, whatever the lock file says."
+  (parameterize ((package-manager "corepack pnpm"))
+    (frontend-install)))
+
+(define (pnpm-check)
+  "Ask which manager this checkout answers with."
+  (log-info "~a\n" (package-manager-kind)))
+#+end_src
+
+A name that is not npm, pnpm or yarn is a maak error rather than a guess,
+because the verbs differ and a wrong one would install something the project did
+not ask for.  ~MAAK_PACKAGE_MANAGER~ sets the program for a whole run.  See
+[[file:configuration.org][Configuration]].
+
+* The helpers
+
+| Helper                                              | What it does                                                  |
+|-----------------------------------------------------+---------------------------------------------------------------|
+| ~package-manager~, ~detect-package-manager~, ~package-manager-kind~ | The program in use, the lock-file answer, and which of the three it is. |
+| ~frontend-argv~                                     | The words of a manager invocation, built without running it.   |
+| ~frontend~, ~frontend-output~                       | Run a command, or return what one printed.                     |
+| ~frontend-install~                                  | ~install~: the dependencies as the lock file and the manifests describe them. |
+| ~frontend-ci~                                       | The frozen install a CI run wants: ~npm ci~, ~pnpm install --frozen-lockfile~, ~yarn install --immutable~. |
+| ~frontend-add~, ~frontend-remove~                   | A dependency, with the manager's own verb and its development flag. |
+| ~frontend-run~                                      | A package.json script, with the words the script takes.        |
+| ~frontend-exec~                                     | A binary from ~node_modules~: ~npm exec --~, ~pnpm exec~, ~yarn exec~. |
+| ~frontend-publish~                                  | The publish command, including Yarn 2's ~yarn npm publish~.    |
+| ~frontend-build~, ~frontend-test~, ~frontend-lint~, ~frontend-format~ | The scripts a web build usually has.       |
+| ~frontend-check~                                    | The lint, the test and the build, in that order.               |
+| ~package-json-file~, ~package-json~                 | The file, as a parameter and as parsed data.                   |
+| ~package-name~, ~package-version~                   | The two fields a release task reads.                           |
+| ~package-scripts~                                   | The names of the scripts the project defines.                  |
+| ~package-dependencies~, ~package-dev-dependencies~  | The declared dependencies, with the ranges the file gives them. |
+
+All of them are re-exported by ~(maak maak)~, so a normal Maak file needs only
+its usual import.
+
+* A frontend's tasks
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak maak))
+
+(define (install)
+  "Install the dependencies."
+  (frontend-install))
+
+(define (dev)
+  "Start the development server."
+  (frontend-run "dev"))
+
+(define (test)
+  "Run the tests once, the way CI does."
+  (frontend-run "test" "--" "--run"))
+
+(define (build)
+  "Build the bundle."
+  (frontend-build))
+
+(define (ci)
+  "What CI runs: a frozen install, then the checks."
+  (frontend-ci)
+  (frontend-check))
+#+end_src
+
+* The words each manager spells differently
+
+The wrappers cover the verbs that differ; ~frontend-argv~ is there for the ones
+this module does not name, and it takes the same answers:
+
+#+begin_src scheme
+(define (outdated)
+  "Ask the manager what is behind, in the manager's own words."
+  (frontend '("outdated")))
+#+end_src
+
+The differences the wrappers do spell out:
+
+| Task               | npm              | pnpm                             | yarn                             |
+|--------------------+------------------+----------------------------------+----------------------------------|
+| frozen install     | ~npm ci~         | ~pnpm install --frozen-lockfile~ | ~yarn install --immutable~ (Yarn 1: ~--frozen-lockfile~) |
+| add a dependency   | ~npm install~    | ~pnpm add~                       | ~yarn add~                       |
+| development flag   | ~--save-dev~     | ~--save-dev~                     | ~--dev~                          |
+| remove             | ~npm uninstall~  | ~pnpm remove~                    | ~yarn remove~                    |
+| run a script       | ~npm run~        | ~pnpm run~                       | ~yarn run~                       |
+| run a binary       | ~npm exec --~    | ~pnpm exec~                      | ~yarn exec~                      |
+| publish            | ~npm publish~    | ~pnpm publish~                   | ~yarn npm publish~ (Yarn 1: ~yarn publish~) |
+| point at a directory | ~--prefix~     | ~--dir~                          | ~--cwd~                          |
+
+Yarn 1 and Yarn 2 disagree about the frozen install and the publish, and the
+checkout says which one it is: a project with ~.yarnrc.yml~ is running a Yarn
+that reads it, and gets the Yarn 2 spelling.
+
+~frontend-argv~ is pure, so a test can assert the command line without a single
+package installed:
+
+#+begin_src scheme
+(frontend-argv '("run" "build") #:directory "web")
+;; with MAAK_PACKAGE_MANAGER=pnpm:
+;; => ("pnpm" "--dir" "web" "run" "build")
+#+end_src
+
+* The package.json
+
+The fields a release task reads are answered from ~package.json~ itself, without
+starting Node:
+
+#+begin_src scheme
+(define (tag)
+  "Tag the release with the version package.json gives it."
+  (git-tag (string-append "v" (package-version))))
+
+(define (scripts)
+  "List the scripts this project defines."
+  (for-each (lambda (name) (log-info "~a\n" name))
+            (package-scripts)))
+#+end_src
+
+~package-json-file~ is a parameter, so a task can read a workspace member's
+manifest without changing where it runs.  A file that is not a JSON object, or
+one without the field a helper asked for, is a maak error naming what is missing
+rather than an empty string.
+
+* What is not here
+
+- *No second bundler.*  The scripts in ~package.json~ are the build's own
+  description, and a task runs one.  There is no ~frontend-build~ that decides
+  which tool the project uses.
+- *No dependency resolution.*  The lock file is the manager's; maak never writes
+  it and never picks a version range.
+- *No node_modules layout.*  Which package ends up where is the manager's
+  business; ~frontend-exec~ runs a binary the way that manager says to.
+- *No registry credentials.*  ~frontend-publish~ runs the command; the token
+  stays in ~.npmrc~ and out of the tree.
+
+* Watching and inspecting a frontend build
+
+The modes documented on [[file:inspect.org][Plans, watches and explanations]] apply
+unchanged: ~maak --plan build~ records the short command it would run without
+running it, ~maak --watch build~ rebuilds when the tree changes, and
+~maak explain ci~ prints the task graph and the environment it will read.

@@ -96,6 +96,8 @@ Start with the quick start, or open the whole [[file:docs/index.org][documentati
 | [[file:docs/configuration.org][Configuration]] | Environment variables, and the parameters behind dry-run and quiet. |
 | [[file:docs/builtins.org][The built-in toolkit]] | =run=, pipelines, jobs, file helpers, =task-error=, gettext. |
 | [[file:docs/rust-and-cargo.org][Rust and Cargo]] | Cargo and rustup helpers, the structured command line, metadata as a value, artefact paths. |
+| [[file:docs/python.org][Python, uv and pyproject]] | uv helpers, the version and name a release reads, and the four CI checks. |
+| [[file:docs/frontend.org][Frontend projects]] | npm, pnpm and yarn behind one set of procedures, and the package.json a release reads. |
 | [[file:docs/task-files.org][Task files in JSON, TOML and YAML]] | A task list without the language: the schema, the formats, their limits. |
 | [[file:docs/maven-and-gradle.org][Maven, Gradle and the JVM]] | The Maven lifecycle and Gradle tasks as argv, wrapper detection, and the JVM reports. |
 | [[file:docs/emacs-lisp.org][Emacs Lisp packages]] | Byte-compiling, ERT and checkdoc in batch, and the packaging conventions. |

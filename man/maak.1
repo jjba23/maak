@@ -408,6 +408,39 @@ helpers run, falling back to
 .B EMACS
 and then
 .BR emacs .
+.TP
+.B MAAK_UV
+The uv program the
+.B (maak python)
+helpers run, falling back to
+.B UV
+and then
+.BR uv .
+.TP
+.B MAAK_UVX
+The uvx program, falling back to
+.B UVX
+and then
+.BR uvx .
+.TP
+.B MAAK_PYTHON
+The Python interpreter, falling back to
+.B PYTHON
+and then
+.BR python3 .
+.TP
+.B MAAK_PACKAGE_MANAGER
+The package manager the
+.B (maak frontend)
+helpers run: one of
+.BR npm ,
+.BR pnpm
+or
+.BR yarn ,
+or a command whose last word is one of them, as in
+.BR "corepack pnpm" .
+Without it the lock file decides, and a directory with none of them means
+.BR npm .
 .SH TASK AUTHORING
 A task is an ordinary procedure.  Its docstring is shown by
 .B \-\-list

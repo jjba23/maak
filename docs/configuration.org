@@ -23,6 +23,10 @@ maak is configured three ways, in increasing order of precision: command-line fl
 | ~MAAK_PKG_CONFIG~ | The pkg-config program; ~pkg-config~ by default.                    |
 | ~MAAK_CARGO~      | The cargo program for ~(maak cargo)~; falls back to ~CARGO~, then ~cargo~. |
 | ~MAAK_RUSTUP~     | The rustup program; falls back to ~RUSTUP~, then ~rustup~.          |
+| ~MAAK_UV~         | The uv program for ~(maak python)~; falls back to ~UV~, then ~uv~.  |
+| ~MAAK_UVX~        | The uvx program; falls back to ~UVX~, then ~uvx~.                   |
+| ~MAAK_PYTHON~     | The interpreter ~(maak python)~ runs; falls back to ~PYTHON~, then ~python3~. |
+| ~MAAK_PACKAGE_MANAGER~ | The frontend package manager: ~npm~, ~pnpm~, ~yarn~, or a wrapper such as ~"corepack pnpm"~. |
 | ~MAAK_MAVEN~      | The Maven program for ~(maak maven)~; falls back to ~MAVEN~, then ~mvn~. |
 | ~MAAK_GRADLE~     | The Gradle program for ~(maak gradle)~; falls back to ~GRADLE~, then ~gradle~. |
 | ~MAAK_EMACS~      | The Emacs program for ~(maak elisp)~; falls back to ~EMACS~, then ~emacs~. |
@@ -53,6 +57,19 @@ the environment: ~maven-wrapper-command~ and ~gradle-wrapper-command~ answer
 with it, and a task opts in with ~parameterize~.  See
 [[file:maven-and-gradle.org][Maven, Gradle and the JVM]] and
 [[file:emacs-lisp.org][Emacs Lisp packages]].
+
+~MAAK_UV~, ~MAAK_UVX~ and ~MAAK_PYTHON~ are read the same way, so a value may
+carry flags (~"uv --preview"~).  See [[file:python.org][Python, uv and pyproject]].
+
+~MAAK_PACKAGE_MANAGER~ is read once, when the library loads, because it decides
+which *verbs* the frontend helpers use and not only which program they run: it
+is the answer ~(package-manager-kind)~ gives.  Without it, the answer comes from
+the lock file in the directory maak runs in -- ~package-lock.json~ for npm,
+~pnpm-lock.yaml~ for pnpm, ~yarn.lock~ for yarn -- and an empty directory means
+npm.  A value may carry a wrapper, as in ~"corepack pnpm"~, and the last word is
+the manager.  A task that wants another manager for one call writes
+~(parameterize ((package-manager "pnpm")) ...)~.  See
+[[file:frontend.org][Frontend projects: npm, pnpm and yarn]].
 
 A project with no ~maak.scm~ may keep its tasks in ~maak.yaml~, ~maak.yml~,
 ~maak.toml~ or ~maak.json~ instead; the variables below are read for a task file

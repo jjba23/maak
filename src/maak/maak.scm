@@ -26,6 +26,8 @@
   #:use-module (maak watch)
   #:use-module (maak cc)
   #:use-module (maak cargo)
+  #:use-module (maak python)
+  #:use-module (maak frontend)
   #:use-module (maak maven)
   #:use-module (maak gradle)
   #:use-module (maak elisp)
@@ -169,6 +171,73 @@
                            rustup-install
                            rustup-target-add
                            rustup-component-add
+                           ;; ====== Python ======
+                           uv-command
+                           uvx-command
+                           python-command
+                           uv-argv
+                           uv
+                           uv-output
+                           uv-version
+                           uvx-argv
+                           uvx
+                           uv-init
+                           uv-sync
+                           uv-lock
+                           uv-run
+                           uv-add
+                           uv-remove
+                           uv-tree
+                           uv-export
+                           uv-build
+                           uv-publish
+                           uv-venv
+                           uv-pip
+                           uv-python
+                           python-argv
+                           python
+                           python-output
+                           python-version
+                           python-module
+                           pyproject-file
+                           pyproject-data
+                           python-project
+                           python-project-name
+                           python-project-version
+                           python-requires-python
+                           python-project-scripts
+                           python-build-backend
+                           python-test
+                           python-lint
+                           python-format
+                           python-type-check
+                           python-check
+                           ;; ====== Frontend ======
+                           package-manager
+                           detect-package-manager
+                           package-manager-kind
+                           frontend-argv
+                           frontend
+                           frontend-output
+                           frontend-install
+                           frontend-ci
+                           frontend-add
+                           frontend-remove
+                           frontend-run
+                           frontend-exec
+                           frontend-publish
+                           frontend-build
+                           frontend-test
+                           frontend-lint
+                           frontend-format
+                           frontend-check
+                           package-json-file
+                           package-json
+                           package-name
+                           package-version
+                           package-scripts
+                           package-dependencies
+                           package-dev-dependencies
                            ;; ====== Maven ======
                            maven-command
                            maven-wrapper?
