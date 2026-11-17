@@ -35,7 +35,14 @@
   #:use-module (srfi srfi-1)
   #:use-module (srfi srfi-13)
   #:use-module (maak dsl)
-  #:export (watch-files watch-snapshot watch-changed? watch-tree watch-interval))
+  #:export (watch-files
+            walk-files
+            directory?
+            watch-snapshot
+            watch-changed?
+            watch-tree
+            watch-interval
+            watch-relist))
 
 ;; Directories whose contents are never a source file worth rebuilding for.
 (define ignored-directories
@@ -55,15 +62,26 @@
     (lambda () (eq? 'directory (stat:type (lstat path))))
     (lambda args #f)))
 
-(define (walk-files root)
-  "Return every regular file under ROOT, skipping the ignored directories."
+(define* (walk-files root #:key (extensions #f) (exclude '()))
+  "Return every regular file under ROOT, skipping the ignored directories.
+
+EXTENSIONS, when a list, keeps only the names ending in one of them, and
+EXCLUDE names directories to prune at any depth.  The two deliverables a watch
+and a lint both need -- what the tree is, and which directories are never a
+source file -- are decided here and nowhere else, so `(maak sift)' asks for this
+walk rather than writing a second one with its own list."
   (let descend ((directory root))
     (append-map (lambda (name)
                   (let ((path (in-vicinity directory name)))
                     (cond
-                      ((ignored-entry? name) '())
+                      ((or (ignored-entry? name) (member name exclude)) '())
                       ((directory? path) (descend path))
-                      ((regular-file? path) (list path))
+                      ((and (regular-file? path)
+                            (or (not extensions)
+                                (any (lambda (extension)
+                                       (string-suffix? extension name))
+                                     extensions)))
+                       (list path))
                       (else '()))))
                 (or (scandir directory
                              (lambda (name)
@@ -183,3 +201,35 @@ not turn into a watch that never notices anything."
                      given)
              #:hint "Set it to a number such as 1, or unset it for the default."))
           seconds))))
+
+(define* (watch-relist #:key (root ".") (program "./scripts/maak")
+                       (arguments '("--list")) (interval (watch-interval)))
+  "Re-run a task listing now, and again whenever ROOT changes.
+
+This is the `dev' and `hot-reload' task that most Maak files spell out by hand:
+a watch whose action is a listing, where a broken edit is reported and the
+watch carries on, because the next save is how it gets fixed.  PROGRAM is the
+maak to run -- a checkout's launcher by default -- and ARGUMENTS are its words,
+`--list' unless the task wants something else.
+
+@example
+(define (dev)
+  \"Watch the tree and re-list the tasks on every change.\"
+  (watch-relist))
+
+(define (test-watch)
+  \"Re-run the suite on every change, instead of re-listing.\"
+  (watch-relist #:arguments '((\"test\"))))
+@end example"
+  (watch-tree
+   root
+   (lambda ()
+     (catch #t
+       (lambda () (run (append (list program) arguments)))
+       (lambda (key vals)
+         ;; A broken edit must not end the watch: the next save is how the
+         ;; file gets fixed, and a watch that died is a watch nobody watches.
+         (format (current-error-port)
+                 "\nmaak: the listing failed: ~a\n"
+                 (exception->message key vals)))))
+   #:interval interval))

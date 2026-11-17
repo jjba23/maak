@@ -1,0 +1,77 @@
+#+title: Running a Veritas suite
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+[[https://codeberg.org/jjba23/veritas][Veritas]] is the test framework maak and its siblings are written with, and
+every one of their Maak files spells the same invocation out by hand: four
+variables the runner reads, the library and the specs on guile's load path, and
+one expression that exits with the runner's status.
+
+#+begin_src scheme
+(define (test)
+  "Run the project's unit test suite."
+  (veritas-test))
+#+end_src
+
+* What the invocation is
+:PROPERTIES:
+:CUSTOM_ID: invocation
+:END:
+
+~veritas-test-argv~ returns the words without running them:
+
+#+begin_src scheme
+(veritas-test-argv)
+@result{} ("guile" "-L" "./src" "-L" "./test"
+           "-c" "(exit ((@ (veritas runner) run-tests)))")
+#+end_src
+
+The load paths come first so the checkout is searched before any installed copy
+of the library: a suite that tested a packaged maak would be a suite about a
+different library.  ~#:guile~ names the interpreter, ~#:load-paths~ the
+directories, and ~#:expression~ the form -- the exit matters, because that is
+what carries the runner's status out of guile and into the task.
+
+~veritas-env~ is the four variables as ~NAME=VALUE~ strings:
+
+#+begin_src scheme
+(veritas-env)
+@result{} ("VERITAS_TEST_MODULE=veritas" "VERITAS_TEST_TOP_DIR=test"
+           "VERITAS_TEST_TYPE=unit" "VERITAS_RUN_BENCHMARKS=false")
+#+end_src
+
+~#:module~, ~#:top-dir~, ~#:type~ and ~#:benchmarks?~ are the runner's own
+vocabulary, so a project with integration specs beside its unit specs says so:
+
+#+begin_src scheme
+(define (integration-test)
+  "Run the specs under test/integration."
+  (veritas-test #:type "integration"))
+#+end_src
+
+* Inside a manifest shell
+:PROPERTIES:
+:CUSTOM_ID: manifest-shell
+:END:
+
+The other half of the pattern is the same invocation *inside* a pinned
+environment.  ~manifest-shell~ and ~time-machine-manifest-shell~ join their
+arguments into one command line, which a shell then splits again: an expression
+with spaces and parentheses would arrive as three arguments and guile would
+report a syntax error instead of running a suite.  ~veritas-shell-command~
+quotes it, which is the whole difference between the two shapes.
+
+#+begin_src scheme
+(define (test)
+  "Run the suite in the environment the manifest declares."
+  (time-machine-manifest-shell
+   (veritas-shell-command)
+   #:channels "channels.scm" #:manifest "manifest.scm" #:verbose? #t))
+#+end_src
+
+Use ~veritas-test-argv~ with ~run~, which starts guile without a shell and needs
+no quoting; use ~veritas-shell-command~ when a shell is what runs it.

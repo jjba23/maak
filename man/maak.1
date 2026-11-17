@@ -2,7 +2,7 @@
 .\" Copyright (C) Josep Bigorra <jjbigorra@gmail.com>
 .\"
 .\" SPDX-License-Identifier: MIT
-.TH MAAK 1 "2026" "maak 0.25.0" "User Commands"
+.TH MAAK 1 "2026" "maak 1.0.0" "User Commands"
 .SH NAME
 maak \- run project tasks written in GNU Guile Scheme
 .SH SYNOPSIS
@@ -378,6 +378,16 @@ and then
 .BR cargo .
 The value may carry flags or a toolchain, as in
 .BR "cargo +nightly" .
+.TP
+.B MAAK_SIFT
+The sift program the
+.B (maak sift)
+helpers run, falling back to
+.B SIFT
+and then
+.BR sift .
+A path may replace the program, which is how a project lints itself with the
+sift in its own checkout.
 .TP
 .B MAAK_RUSTUP
 The rustup program, falling back to
@@ -1030,4 +1040,4 @@ at the project homepage listed below.
 .SH LICENSE
 Maak is licensed under the MIT License, as is this manual page.
 .PP
-Homepage: https://codeberg.org/jjba23/maak
+Homepage: https://github.com/jjba23/maak

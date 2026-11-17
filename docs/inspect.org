@@ -90,6 +90,16 @@ MAAK_WATCH_INTERVAL=0.5 maak --watch test
 ~MAAK_WATCH_INTERVAL~ is the number of seconds between looks, one by default;
 a value that is not a positive number is an error.  Ctrl-C stops the watch.
 
+A Maak file that wants a watch of its own calls ~watch-relist~, which is the
+`dev' task most of them spell out by hand: it runs a listing now and again on
+every change, and a broken edit is reported rather than ending the watch.
+
+#+begin_src scheme
+(define (dev)
+  "Watch the tree and re-list the tasks on every change."
+  (watch-relist))
+#+end_src
+
 * Explaining a task
 
 ~maak explain TASK~ prints the task's composition, the environment a run would

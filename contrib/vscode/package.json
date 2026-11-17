@@ -7,7 +7,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://codeberg.org/jjba23/maak"
+    "url": "https://github.com/jjba23/maak"
   },
   "engines": {
     "vscode": "^1.75.0"

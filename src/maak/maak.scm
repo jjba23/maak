@@ -38,6 +38,8 @@
   #:use-module (maak container)
   #:use-module (maak niri)
   #:use-module (maak net)
+  #:use-module (maak sift)
+  #:use-module (maak veritas)
   #:re-export (log-message log-info
                            log-error
                            log-separator
@@ -115,6 +117,7 @@
                            watch-changed?
                            watch-tree
                            watch-interval
+                           watch-relist
                            ;; ====== C and C++ ======
                            c-compiler
                            cxx-compiler
@@ -553,6 +556,23 @@
                            wget-text-argv
                            wget-text
                            download
+                           ;; ====== sift ======
+                           sift-command
+                           sift-files
+                           sift-argv
+                           sift
+                           sift-status
+                           sift-exit-meaning
+                           sift-format
+                           sift-check
+                           sift-lint
+                           sift-ci
+                           ;; ====== Veritas ======
+                           veritas-expression
+                           veritas-env
+                           veritas-test-argv
+                           veritas-shell-command
+                           veritas-test
                            ;; ====== Version ======
                            maak-version
                            maak-version-string

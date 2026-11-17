@@ -10,9 +10,75 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 
 *[Unreleased]*
 
-Nothing yet.
-
 *[Released]*
+
+** v1.0.0 (2026-11-17)
+
+The first release that promises something: the public surface is frozen and
+written down, and every place that names this project points at the repository
+that is alive.
+
+*** Added
+
+- [[file:docs/stability.org][What 1.0 freezes]]: the standard the version number is about -- the exported
+  bindings of the installed modules, the command line, the environment
+  variables, the Maak file's shape and the two versioned JSON descriptions --
+  the things explicitly left out of it, and how a deprecation is announced,
+  kept and removed.
+- ~packaging/opensuse/maak-rpmlintrc~, the suppressions the RPM build always
+  tried to copy and never had.
+- ~(maak sift)~, re-exported by ~(maak maak)~: ~sift-argv~ builds any of sift's
+  subcommands (the dialect, the style, the line length, the checkers, the
+  filters and the rest as keywords), ~sift~ runs one, and ~sift-status~
+  returns the exit status rather than flattening it -- 0 clean, 1 findings, 2 a
+  usage error or a file that cannot be parsed.  ~sift-exit-meaning~ names which
+  of the three a code was; ~sift-format~, ~sift-check~, ~sift-lint~ and
+  ~sift-ci~ are the gates, and each raises with a hint that says which of the
+  two a failure was.  ~sift-files~ finds the Lisp files under a directory,
+  sorted and pruned, with ~#:exclude~ for the fixtures a project leaves
+  unformatted, using the walk ~(maak watch)~ already had rather than a second
+  one.  The program is ~MAAK_SIFT~, then ~SIFT~, then ~sift~.
+- ~(maak veritas)~: ~veritas-env~ is the four ~VERITAS_*~ assignments the runner
+  reads, ~veritas-test-argv~ is the guile invocation as words,
+  ~veritas-shell-command~ is the same words with the expression quoted for a
+  manifest shell, and ~veritas-test~ runs the suite and fails the task when it
+  does not pass.
+- ~watch-relist~ in ~(maak watch)~: re-runs a listing now and on every change,
+  reporting a broken edit instead of ending the watch.
+- ~docs/sift.org~ and ~docs/veritas.org~.
+
+*** Changed
+
+- The homepage is ~https://github.com/jjba23/maak~ everywhere: ~maak
+  --version~, the help screen, the manual page, the installation page, the
+  README, the guide's community page, ~guix.scm~, ~default.nix~, the RPM spec
+  and its OBS ~_service~, the Debian control and copyright files, the Arch
+  recipe's ~url~, the Homebrew formula and the VS Code extension.  Codeberg
+  archived its copy of this repository on 2026-11-08, so a link there can no
+  longer take a patch or an issue, and OBS was still fetching its source from
+  it -- where a tag newer than that archive cannot exist.
+- The manual page names ~MAAK_SIFT~.
+
+*** Fixed
+
+- ~maak rpm-build~ stopped on ~cp packaging/opensuse/maak-rpmlintrc~, a file
+  the tree did not have.  The suppressions exist now, and rpmlint is given
+  them with ~-r~ rather than trusted to find them beside the RPM it checks.
+
+*** Verification
+
+- The Veritas suite is green -- no failing case -- run under ~guix shell -m
+  manifest.scm~.  The sift and Veritas specs assert the argv builders, the
+  three exit statuses, the walk that finds the files and the quoting a
+  manifest shell needs; a stand-in sift runs as a real process through the
+  launcher, which is what covers ~sift-status~ reading a status and passing
+  sift's own output on.
+- The version's copies agree with ~maak-version~ in the RPM spec, the Arch
+  recipe, the Homebrew formula, the manual page, the installation page and the
+  newest Debian changelog entry, which the suite compares.
+- The checksums of the release archive in the Arch recipe and the Homebrew
+  formula are refreshed from the published tag after the push, which is the
+  one step no task can take before the archive exists.
 
 ** v0.25.0 (2026-11-17)
 

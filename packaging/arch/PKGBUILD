@@ -5,11 +5,11 @@
 
 # Maintainer: Josep Bigorra <jjbigorra@gmail.com>
 pkgname=maak
-pkgver=0.25.0
+pkgver=1.0.0
 pkgrel=1
 pkgdesc="Command runner à la Make using Guile Scheme"
 arch=('any')
-url="https://codeberg.org/jjba23/maak"
+url="https://github.com/jjba23/maak"
 license=('MIT')
 
 depends=(
@@ -30,8 +30,8 @@ checkdepends=(
   'zip'
 )
 
-# The tag is published on GitHub, where the pipeline and the release live;
-# Codeberg carries the repository, so an archive of a new tag can lag there.
+# The tag is published on GitHub, which carries the repository, the pipeline
+# and the release.
 # `maak sync-version' writes $pkgver, and the checksum is updated afterwards
 # from the published archive, which is the one thing no release task can know.
 source=("$pkgname-$pkgver.tar.gz::https://github.com/jjba23/maak/archive/refs/tags/v$pkgver.tar.gz")

@@ -1,0 +1,19 @@
+#!/bin/sh
+# maak
+#
+# SPDX-License-Identifier: MIT
+# Copyright © Josep Bigorra <jjbigorra@gmail.com>
+
+# A stand-in for sift, for the launcher spec: it prints what it was asked and
+# answers with the status its subcommand stands for, so each of sift's three
+# answers can be asked for without sift installed.  sift's own names are not
+# used as the words here -- a subcommand this file does not know is a usage
+# error, which is exactly sift's answer 2.
+
+echo "fake-sift: $*"
+
+case "$1" in
+  clean) exit 0 ;;
+  check | ci | findings | lint) exit 1 ;;
+  *) exit 2 ;;
+esac

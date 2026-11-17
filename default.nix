@@ -140,7 +140,7 @@ stdenv.mkDerivation {
 
   meta = with lib; {
     description = "Command runner à la Make using Guile Scheme";
-    homepage = "https://codeberg.org/jjba23/maak";
+    homepage = "https://github.com/jjba23/maak";
     license = licenses.mit;
     platforms = platforms.linux ++ platforms.darwin;
     mainProgram = "maak";

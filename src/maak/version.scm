@@ -29,10 +29,10 @@
                          print-version))
 
 (define maak-version
-  "0.25.0")
+  "1.0.0")
 
 (define maak-homepage
-  "https://codeberg.org/jjba23/maak")
+  "https://github.com/jjba23/maak")
 
 (define maak-license
   "MIT")

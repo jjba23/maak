@@ -525,7 +525,68 @@ that a case can ask about it alongside the status of the run."
                                               (said? result "stderr"
                                                      "No Maak file found")))))))))
 
+;; ====== sift, through the launcher ======
+;;
+;; `sift-status' starts sift and reads its exit status, which means a fork.  A
+;; fork made inside the runner's own fibers waits forever (the child inherits
+;; their locks), which is why `sift.scm' asserts the decision -- the meaning of
+;; 0, 1 and 2 -- rather than the process.  The process is asserted here, one
+;; launcher run per case, against a stand-in sift that answers with the status
+;; its subcommand stands for.  What only this can show is that the program
+;; really runs, that its status is the one returned, and that what it printed
+;; still reaches the user.
+
+(define sift-fixture "test/maak/fixtures/sift.scm")
+
+(define sift-suite
+  (suite "sift's status through the launcher"
+         #:concurrent? #f
+         #:shuffle? #f
+
+         (test "a clean tree answers zero, and sift's output reaches the user"
+               (let ((result (launcher-run "-f" sift-fixture
+                                           "--no-banner" "--" "status-clean")))
+                 (assert-equal #:expect (list 0 #t #t)
+                               #:got (list (status-of result)
+                                           (said? result "stdout" "status=0")
+                                           (said? result "stdout" "fake-sift: clean")))))
+
+         (test "a tree with findings answers one, and the task still succeeds"
+               ;; The status is the answer rather than a failure: a task that
+               ;; asked what sift thought has been told, and it is the task's
+               ;; business what to do about it.
+               (let ((result (launcher-run "-f" sift-fixture
+                                           "--no-banner" "--" "status-findings")))
+                 (assert-equal #:expect (list 0 #t)
+                               #:got (list (status-of result)
+                                           (said? result "stdout" "status=1")))))
+
+         (test "a tree sift cannot read answers two"
+               (let ((result (launcher-run "-f" sift-fixture
+                                           "--no-banner" "--" "status-error")))
+                 (assert-equal #:expect (list 0 #t)
+                               #:got (list (status-of result)
+                                           (said? result "stdout" "status=2")))))
+
+         (test "a finding is named as a finding, not as a broken file"
+               (let ((result (launcher-run "-f" sift-fixture
+                                           "--no-banner" "--" "meaning")))
+                 (assert-equal #:expect (list 0 #t)
+                               #:got (list (status-of result)
+                                           (said? result "stdout" "meaning=findings")))))
+
+         (test "a gate fails the task on a finding, and says what a finding is"
+               (let ((result (launcher-run "-f" sift-fixture
+                                           "--no-banner" "--" "gate")))
+                 (assert-equal #:expect (list 1 #t #t)
+                               #:got (list (status-of result)
+                                           (said? result "stderr"
+                                                  "has something to report")
+                                           (said? result "stdout"
+                                                  "fake-sift: check")))))))
+
 (define (spec)
   (veritas-run #:concurrent? #f
                #:shuffle? #f
-               launcher-suite))
+               launcher-suite
+               sift-suite))

@@ -1,0 +1,13 @@
+# maak
+#
+# SPDX-License-Identifier: MIT
+# Copyright © Josep Bigorra <jjbigorra@gmail.com>
+
+# The suppressions `maak rpm-build' hands to rpmlint with -r, so the gate runs
+# with the project's own judgement rather than the distribution's defaults.
+# A filter is a decision, so each one says why it is here; the spec is expected
+# to be clean without one.
+
+# The suite is not a %check: it needs guile-veritas, which no distribution
+# carries yet, and the Arch recipe and CI run it from the checkout instead.
+addFilter("no-%check-section")

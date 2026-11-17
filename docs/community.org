@@ -10,10 +10,10 @@
 
 Join the ~maak~ community to ask questions, discuss development, share configurations and screenshots, report issues, or just hang out:
 
-- *Issues and development:* [[https://codeberg.org/jjba23/maak][the Codeberg repository]].
+- *Issues and development:* [[https://github.com/jjba23/maak][the GitHub repository]].
 - *Chat, support, discussion, announcements:* [[https://jointhefreeworld.zulipchat.com/#narrow/channel/632494-maak][the maak Zulip community]].
 
-If you are unsure where to start, Zulip is recommended. Codeberg issues are also a good place for ideas, bugs and improvements. The backlog and Kanban boards live at https://lucidplan.jointhefreeworld.org/tickets/maak.
+If you are unsure where to start, Zulip is recommended. GitHub issues are also a good place for ideas, bugs and improvements. The backlog and Kanban boards live at https://lucidplan.jointhefreeworld.org/tickets/maak.
 
 If you like this work, you can [[https://bmc.link/jjbigorra][buy me a cup of coffee ☕]] so I can keep going with a lot of motivation.
 
@@ -30,7 +30,7 @@ maak embodies the spirit of GNU: simplicity, freedom and curiosity. It is both a
 
 ** Reporting bugs and asking for features
 
-Open an issue on [[https://codeberg.org/jjba23/maak/issues][Codeberg]]. A useful report includes:
+Open an issue on [[https://github.com/jjba23/maak/issues][GitHub]]. A useful report includes:
 
 - what you ran (the exact command line, including flags),
 - what you expected and what happened,
@@ -44,7 +44,7 @@ Open an issue on [[https://codeberg.org/jjba23/maak/issues][Codeberg]]. A useful
 3. Run ~maak fmt~ to format Scheme sources the way the project does.
 4. Run the suite: ~guix shell -m manifest.scm -- ./scripts/maak test~. Everything must pass.
 5. If you changed behaviour, say so in the commit message *and* in the documentation (the page under =docs/=, the man page, or the docstring — whichever is closest to the change).
-6. Open a pull request on Codeberg, or mail a patch to <jjbigorra@gmail.com>.
+6. Open a pull request on GitHub, or mail a patch to <jjbigorra@gmail.com>.
 
 New tasks in this repository's own ~maak.scm~ always get a docstring, because that docstring is what ~maak --list~ shows to the next person.
 

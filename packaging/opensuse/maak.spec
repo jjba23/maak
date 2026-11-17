@@ -16,11 +16,11 @@
 #
 
 Name:           maak
-Version:        0.25.0
+Version:        1.0.0
 Release:        0
 Summary:        Command runner à la Make using Guile Scheme
 License:        MIT
-URL:            https://codeberg.org/jjba23/maak
+URL:            https://github.com/jjba23/maak
 Source0:        %{name}-%{version}.tar.gz
 BuildRequires:  bash-completion
 BuildRequires:  fish

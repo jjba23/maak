@@ -444,6 +444,10 @@ Args:
 (define (rpm-build)
   "Build RPM package for openSUSE and Fedora/RHEL"
   (let* ((latest-tag (git:git-describe-tag))
+         ;; rpmlint reads the suppressions it is given, wherever the build was
+         ;; started from; the file used to be copied beside the RPM and left
+         ;; for rpmlint to discover in its working directory.
+         (rpmlintrc "packaging/opensuse/maak-rpmlintrc")
          (latest-tag-num (cond ((string=? latest-tag "") "")
                                ((string-prefix? "v" latest-tag)
                                 (string-drop latest-tag 1))
@@ -469,11 +473,9 @@ Args:
            (latest-src-rpm
             (string-trim-both
              (capture (~ "ls -t ~a/maak-[0-9]*.rpm | head -n 1" srpms)))))
-      (cp "packaging/opensuse/maak-rpmlintrc" rpms
-          #:verbose? #t)
-      (run (list "rpmlint" latest-rpm)
+      (run (list "rpmlint" "-r" rpmlintrc latest-rpm)
            #:verbose? #t)
-      (run (list "rpmlint" latest-src-rpm)
+      (run (list "rpmlint" "-r" rpmlintrc latest-src-rpm)
            #:verbose? #t))))
 
 (define (hot-reload)

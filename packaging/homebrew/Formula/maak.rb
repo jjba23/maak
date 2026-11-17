@@ -14,8 +14,8 @@
 # Arch recipe's is.
 class Maak < Formula
   desc "Command runner à la Make using Guile Scheme"
-  homepage "https://codeberg.org/jjba23/maak"
-  url "https://github.com/jjba23/maak/archive/refs/tags/v0.25.0.tar.gz"
+  homepage "https://github.com/jjba23/maak"
+  url "https://github.com/jjba23/maak/archive/refs/tags/v1.0.0.tar.gz"
   sha256 "eef52cbcae1fed9d42a14b3a606b8408e0e4735c58db456b8157402904c37a60"
   license "MIT"
 

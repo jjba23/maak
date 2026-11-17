@@ -1,3 +1,24 @@
+maak (1.0.0-1) unstable; urgency=medium
+
+  * The public API is frozen and documented: docs/stability.org names the
+    exported bindings of the installed modules, the command line and its exit
+    status, the environment variables, the Maak file's shape and the two
+    versioned JSON descriptions that the version number is about, the parts
+    left out of that promise, and how a deprecation is announced, kept and
+    removed.
+  * The homepage is https://github.com/jjba23/maak everywhere: maak --version,
+    the help screen, the manual page, the installation page, the README, the
+    community page, the Guix and Nix packages, the RPM spec and its OBS
+    _service, this package's control and copyright files, the Arch recipe, the
+    Homebrew formula and the VS Code extension.  Codeberg archived its copy of
+    the repository on 2026-11-08, so it can no longer take a patch or an issue,
+    and OBS was still fetching its source from it.
+  * maak rpm-build no longer dies on a missing
+    packaging/opensuse/maak-rpmlintrc: the file exists, and rpmlint is given it
+    with -r instead of being trusted to find it beside the RPM.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Tue, 17 Nov 2026 18:00:00 +0100
+
 maak (0.25.0-1) unstable; urgency=medium
 
   * (maak python): uv argv builder, output queries and one-line wrappers for

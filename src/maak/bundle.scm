@@ -75,7 +75,7 @@
                         (maak-file "maak.scm")
                         (maak-package "(specification->package \"maak\")")
                         (packages '("bash" "coreutils"))
-                        (home-page "https://codeberg.org/jjba23/maak")
+                        (home-page "https://github.com/jjba23/maak")
                         (description #f))
   "Return the Guix package file that defines a bundle for NAME.
 
@@ -173,7 +173,7 @@ The package installs the Maak file under `share/NAME' and a launcher in
                  (maak-file "maak.scm")
                  (maak-package "(specification->package \"maak\")")
                  (packages '("bash" "coreutils"))
-                 (home-page "https://codeberg.org/jjba23/maak")
+                 (home-page "https://github.com/jjba23/maak")
                  (description #f)
                  (load? #f)
                  (verbose? #f))

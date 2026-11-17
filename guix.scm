@@ -78,7 +78,7 @@
                           ("scripts/maak-completion.zsh"
                            "/share/zsh/site-functions" "_maak"))))))))
     (inputs (list guile-3.0 bash-minimal coreutils util-linux))
-    (home-page "https://codeberg.org/jjba23/maak")
+    (home-page "https://github.com/jjba23/maak")
     (synopsis "Command runner à la Make using Guile Scheme")
     (description
      "Maak is a command runner and control plane for your

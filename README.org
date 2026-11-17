@@ -102,6 +102,7 @@ Start with the quick start, or open the whole [[file:docs/index.org][documentati
 | [[file:docs/maven-and-gradle.org][Maven, Gradle and the JVM]] | The Maven lifecycle and Gradle tasks as argv, wrapper detection, and the JVM reports. |
 | [[file:docs/emacs-lisp.org][Emacs Lisp packages]] | Byte-compiling, ERT and checkdoc in batch, and the packaging conventions. |
 | [[file:docs/guix-and-nix.org][Guix, Nix and reproducibility]] | The helpers that build the command line, and the ones that return values. |
+| [[file:docs/stability.org][What 1.0 freezes]] | The public API a version number is about, and how a deprecation travels. |
 | [[file:docs/why-maak.org][Why maak, and why Lisp]] | What Make cannot do, and the table of Make flags that did carry over. |
 | [[file:docs/editors.org][Editors, shells and the REPL]] | maak.el and the seven integrations, the shell completions, the REPL workflow. |
 
@@ -119,7 +120,7 @@ Using maak in your project? Send a link and it can be listed there.
 
 * Community and support
 
-- *Issues and development:* [[https://codeberg.org/jjba23/maak][the Codeberg repository]]; the backlog and Kanban boards live at https://lucidplan.jointhefreeworld.org/tickets/maak.
+- *Issues and development:* [[https://github.com/jjba23/maak][the GitHub repository]]; the backlog and Kanban boards live at https://lucidplan.jointhefreeworld.org/tickets/maak.
 - *Chat, support, discussion, announcements:* [[https://jointhefreeworld.zulipchat.com/#narrow/channel/632494-maak][the maak Zulip community]].
 
 Bug reports, patches, the AI policy and the code of conduct are in

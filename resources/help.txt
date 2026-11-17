@@ -9,7 +9,7 @@
   `------------'        and project automator.
 
 
-    See more at: https://codeberg.org/jjba23/maak
+    See more at: https://github.com/jjba23/maak
     License: MIT
 
 Usage: maak [OPTIONS] [TASKS] [TASK_ARGS]...

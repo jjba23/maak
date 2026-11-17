@@ -1,0 +1,129 @@
+#+title: Formatting and linting with sift
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+[[https://github.com/jjba23/sift][sift]] formats, lints and reads Scheme, Emacs Lisp and Common Lisp, and keeps
+its three jobs apart: ~format~ prints or writes, ~lint~ reports, ~check~ asks the
+formatting question without touching the tree, and ~ci~ asks both at once.
+~(maak sift)~ is that command line as procedures, with one thing added: it reads
+the exit status instead of treating it as a yes or a no.
+
+* The status is the answer
+:PROPERTIES:
+:CUSTOM_ID: status
+:END:
+
+sift returns three statuses, and they mean different things:
+
+| Status | Meaning                                                       |
+|--------+---------------------------------------------------------------|
+| ~0~    | nothing to report                                             |
+| ~1~    | findings, or a file ~format~ would change                     |
+| ~2~    | a usage error, an unreadable file, or a file that cannot parse |
+
+A wrapper that treated ~1~ as a crash would report a lint finding as a broken
+pipeline; one that ignored it would let a gate pass on a dirty tree.  So the
+three questions have three answers:
+
+- ~sift-status~ returns the code, ~0~, ~1~ or ~2~, and lets sift's output reach
+  the terminal as it is written.
+- ~sift-exit-meaning~ names which of the three a code was, so a task that only
+  wants to know whether the tree is clean asks for ~'clean~ rather than for
+  zero.
+- ~sift-format~, ~sift-check~, ~sift-lint~ and ~sift-ci~ are gates: they raise a
+  maak error, with a hint that says whether the tree had findings or the command
+  could not read it.
+
+* The command line, as argv
+:PROPERTIES:
+:CUSTOM_ID: argv
+:END:
+
+~sift-argv~ builds the words without running anything, so ~--dry-run~ prints
+them, ~--plan~ records them, and a test asserts them with no sift installed.
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak sift))
+
+(define (fmt)
+  "Rewrite the sources the way sift formats them."
+  (sift-format (sift-files "src") #:write? #t))
+
+(define (fmt-check)
+  "Fail when a source is not formatted."
+  (sift-format (sift-files "src") #:check? #t))
+
+(define (lint)
+  "Lint the tree, failing on a warning or an error."
+  (sift-lint (sift-files "src") #:severity "warning"))
+
+(define (ci)
+  "The pipeline's gate: formatting and linting in one pass."
+  (sift-ci (append (sift-files "src") (sift-files "tests"))
+           #:severity "warning"
+           #:output-format "github"))
+#+end_src
+
+| Procedure                 | What it runs                                          |
+|---------------------------+-------------------------------------------------------|
+| ~sift-argv~              | The words of any subcommand, without running them.     |
+| ~sift~                   | A subcommand with raw arguments, raising on non-zero.  |
+| ~sift-format~            | ~sift format~, writing with ~#:write?~ and printing otherwise. |
+| ~sift-check~             | ~sift check~, the formatting gate.                     |
+| ~sift-lint~              | ~sift lint~, with ~#:severity~ and ~#:output-format~.  |
+| ~sift-ci~                | ~sift ci~, both questions in one pass and one status.  |
+
+The options follow sift's own vocabulary: ~#:dialect~ (~scheme~, ~racket~,
+~elisp~, ~cl~), ~#:style~ (~community~ or ~dangling~), ~#:line-length~,
+~#:indent~, ~#:checkers~, ~#:exclude-checkers~, ~#:file-filters~, ~#:config~,
+~#:watch?~ and the rest.  Arguments the builder does not name travel through
+~#:arguments~, and the combinations sift refuses -- ~--write~ with ~--stdout~,
+~--sort~ without ~--write~, ~ci~ with ~--fix~ -- are refused before anything
+runs.
+
+Every other subcommand goes through ~sift~, which takes the words to add and
+raises on a non-zero status: ~(sift "fix" "src")~ applies the fixes the rules
+have, and ~(sift "explain" '() #:arguments '("SIFT012"))~ and
+~(sift "list-checkers")~ ask about sift itself.  Those are one line each rather
+than a procedure apiece, because a wrapper that only forwards its argument is
+one more name to read and no more sift.
+
+* Which files
+:PROPERTIES:
+:CUSTOM_ID: files
+:END:
+
+sift walks a directory operand itself, so ~sift-files~ is for the list a task
+means rather than a different walk: it returns the Lisp files under a directory,
+sorted, with ~node_modules~, ~.git~ and the like pruned, and with ~#:exclude~
+naming directories to prune at any depth -- which is the
+~find ... -not -path 'tests/fixtures/*'~ a project with deliberately unformatted
+fixtures spells out by hand.
+
+The walk is ~(maak watch)~'s -- ~walk-files~ in one place, with one list of
+directories that are never a source file -- so a watch and a lint cannot
+disagree about what the tree is.
+
+#+begin_src scheme
+(sift-check (append (sift-files "src")
+                    (sift-files "tests" #:exclude '("fixtures"))))
+#+end_src
+
+* Which sift runs
+:PROPERTIES:
+:CUSTOM_ID: program
+:END:
+
+~sift-command~ is a parameter: ~MAAK_SIFT~, then ~SIFT~, then ~sift~.  A value
+may be a path or carry a wrapper, so a project that develops sift itself runs
+the sift in its own checkout:
+
+#+begin_src scheme
+(parameterize ((sift-command "./bin/sift"))
+  (sift-ci (sift-files "src")))
+#+end_src

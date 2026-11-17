@@ -1,0 +1,97 @@
+#+title: What 1.0 freezes
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+maak 1.0.0 is the first release whose public surface is a promise rather than a
+snapshot. This page says what the version number is about, what it is not, and
+what happens when one of those things has to change. The maintainers' rulebook
+is [[file:../AGENTS.md][AGENTS.md]], and this page is the same rule written for someone using maak
+rather than changing it.
+
+* The public API
+:PROPERTIES:
+:CUSTOM_ID: public-api
+:END:
+
+Four things are covered. Everything else may change in any release.
+
+1. *The exported bindings of the installed modules.* Each module under
+   ~src/maak/~ is installed and importable, and the names in its ~#:export~
+   form are the API, together with the keyword arguments their docstrings name.
+   ~(maak maak)~ re-exports the everyday ones, so a Maak file can import a
+   single module and still reach ~run~, the file helpers, the parameters and
+   the jobs. A new export is MINOR; removing one, renaming one, or changing
+   what it takes or returns is MAJOR.
+2. *The command line.* Every option in [[file:cli.org][the command line]], the grammar that
+   turns a command line into a task and its arguments, and the exit status a
+   run ends with. A new flag is MINOR; removing or renaming one is MAJOR.
+3. *The environment variables* in [[file:configuration.org][Configuration]]: the ones that change the
+   banner, the dry run, the quiet run and the watch, and the tool variables a
+   helper honours (~MAAK_CARGO~, ~MAAK_UV~, ~MAAK_PYTHON~,
+   ~MAAK_PACKAGE_MANAGER~ and the rest).
+4. *The Maak file's shape, and the two machine-readable descriptions.* A Maak
+   file is a Guile module; a task is a procedure, its docstring is the
+   description, its lambda list is the argument grammar, an ~Args:~ section
+   carries the prose for each argument, and ~task-metadata!~ declares
+   ~#:depends~, ~#:hidden?~ and ~#:example~. The JSON that ~maak --list
+   --json~ and ~maak --plan --json~ print carries ~"version": 1~, and the
+   schema of [[file:task-files.org][JSON, TOML and YAML task files]] is under the same promise:
+   version 1 of each keeps its meaning, and a change that cannot be expressed
+   compatibly becomes version 2 rather than a different version 1.
+
+* What is not covered
+:PROPERTIES:
+:CUSTOM_ID: not-covered
+:END:
+
+- The *wording* of a message, the layout of the text ~--list~ and ~--help~
+  print, and the order the tasks appear in. A program that wants to read the
+  task list should read ~--list --json~, which is the description that is
+  promised, rather than the text, which is for a person.
+- A module's *private* helpers: everything it does not ~#:export~, including
+  the internals the generated API documentation happens to show.
+- *~contrib/~* is covered where a page documents it, such as ~maak-tasks~'s
+  ~--words~ and ~--executable~ that the editor integrations call, and is a
+  convenience everywhere else.
+- *This repository's own ~maak.scm~*: its tasks are this project's automation,
+  not the library's API, and they change whenever the repository's chores do.
+- *Performance*, the Guile versions beyond the 3.0 that
+  [[file:installation.org][installation]] requires, and the exact set of programs a helper needs at run
+  time: a task that calls ~(maak cargo)~ needs ~cargo~, and which ~cargo~ is
+  the machine's business.
+- *A distribution package.* The Arch recipe, the RPM spec, the Homebrew formula
+  and the Debian packaging are the packagers' files, versioned with the package
+  rather than with the library.
+
+* How a change is announced
+:PROPERTIES:
+:CUSTOM_ID: deprecation
+:END:
+
+- A fix is a PATCH release; a new export, flag, option or format field is
+  MINOR; anything that breaks one of the four items above is MAJOR.
+- A name that has to go is deprecated before it is removed. The release notes
+  of a MINOR release name it, name what replaces it, and name the version that
+  removes it, and the name keeps working until that version.
+- Removal happens in a MAJOR release, whose notes say what broke and what to
+  write instead.
+- 1.0.0 is MAJOR only in the sense that it is the first release to make this
+  promise: it removes no 0.x name and changes no 0.x behaviour. The step from
+  0.25.0 is the same API with a homepage that resolves.
+
+* What a version number means here
+:PROPERTIES:
+:CUSTOM_ID: versions
+:END:
+
+~maak --version~ prints the version. It is written by hand once, in
+~src/maak/version.scm~, and the packaging recipes, the manual page and
+[[file:installation.org][the installation page]] carry copies that the test suite compares with it, so a
+release cannot be published with a recipe that disagrees.
+
+A Maak file that runs on 1.0 runs on every 1.x: a 1.x release that broke any of
+the four items above would be a 2.0 instead.

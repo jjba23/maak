@@ -7,8 +7,8 @@ Build-Depends:
  guile-3.0-dev,
  guile-3.0
 Standards-Version: 4.6.2
-Homepage: https://codeberg.org/jjba23/maak
-Vcs-Git: https://codeberg.org/jjba23/maak.git
+Homepage: https://github.com/jjba23/maak
+Vcs-Git: https://github.com/jjba23/maak.git
 Rules-Requires-Root: no
 
 Package: maak

@@ -28,6 +28,7 @@ maak is configured three ways, in increasing order of precision: command-line fl
 | ~MAAK_PYTHON~     | The interpreter ~(maak python)~ runs; falls back to ~PYTHON~, then ~python3~. |
 | ~MAAK_PACKAGE_MANAGER~ | The frontend package manager: ~npm~, ~pnpm~, ~yarn~, or a wrapper such as ~"corepack pnpm"~. |
 | ~MAAK_MAVEN~      | The Maven program for ~(maak maven)~; falls back to ~MAVEN~, then ~mvn~. |
+| ~MAAK_SIFT~       | The sift program for ~(maak sift)~; falls back to ~SIFT~, then ~sift~. |
 | ~MAAK_GRADLE~     | The Gradle program for ~(maak gradle)~; falls back to ~GRADLE~, then ~gradle~. |
 | ~MAAK_EMACS~      | The Emacs program for ~(maak elisp)~; falls back to ~EMACS~, then ~emacs~. |
 | ~MAAK_ELEVATE~    | The program that answers ~#:sudo?~: ~doas~, ~sudo~, or one with options. |
