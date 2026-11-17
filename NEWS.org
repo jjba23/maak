@@ -14,6 +14,76 @@ Nothing yet.
 
 *[Released]*
 
+** v0.25.0 (2026-11-17)
+
+Python projects get uv and the pyproject they already have, and a frontend
+project gets npm, pnpm and yarn behind one set of procedures.
+
+*** Added
+
+- `(maak python)`, re-exported by `(maak maak)`: `uv-argv` builds a uv
+  invocation (the program-wide options before the subcommand, the ones the
+  project-reading commands take after it, the caller's words last), `uv` runs
+  it, `uv-output` returns what a command printed, and `uv-version` returns the
+  version uv reports.  `uv-init`, `uv-sync`, `uv-lock`, `uv-run`, `uv-add`,
+  `uv-remove`, `uv-tree`, `uv-export`, `uv-build`, `uv-publish`, `uv-venv`,
+  `uv-pip` and `uv-python` are one line each, and their arguments are uv's own.
+- `uvx-argv` and `uvx` for a tool in a temporary environment, and
+  `python-argv`, `python`, `python-module`, `python-output` and
+  `python-version` for the interpreter itself, with `-m` and `-I` named
+  options rather than words a caller has to remember.
+- The pyproject readers: `pyproject-file` names the file (a parameter),
+  `pyproject-data` returns the whole document as data, `python-project` the
+  `[project]` table, and `python-project-name`, `python-project-version`,
+  `python-requires-python`, `python-project-scripts` and
+  `python-build-backend` the five facts a task asks for.  A project that leaves
+  its version to the build backend is refused by name rather than guessed at.
+- The four checks a Python CI runs, through `uv run` so the locked version is
+  the one that runs: `python-test` (pytest), `python-lint` (ruff check),
+  `python-format` (ruff format) and `python-type-check` (mypy), plus
+  `python-check`, which runs the lint, the type check and the tests in that
+  order.  The words a caller gives replace the default path.
+- `(maak frontend)`: `package-manager` is a parameter holding the program the
+  checkout pins -- `MAAK_PACKAGE_MANAGER`, or the lock file in the directory
+  maak runs in, npm when there is none -- and `package-manager-kind` answers
+  which of the three it is, from the last word of the command, so
+  `"corepack pnpm"` is pnpm.  `detect-package-manager` reads the lock file from
+  a directory named.
+- `frontend-argv` builds the command line, with the flag that points a manager
+  at a directory spelled as that manager spells it (`--prefix`, `--dir`,
+  `--cwd`); `frontend` runs it and `frontend-output` returns what it printed.
+- The wrappers that spell out where the three managers disagree:
+  `frontend-install`, `frontend-ci` (`npm ci`, `pnpm install
+  --frozen-lockfile`, `yarn install --immutable`, and `--frozen-lockfile` on a
+  Yarn 1 checkout, told apart by `.yarnrc.yml`), `frontend-add` (with
+  `#:dev?`), `frontend-remove`, `frontend-run`, `frontend-exec` (including
+  npm's `--`) and `frontend-publish` (including Yarn 2's `yarn npm publish`).
+- The conventional scripts: `frontend-build`, `frontend-test`, `frontend-lint`,
+  `frontend-format` and `frontend-check`.
+- The package.json readers: `package-json-file`, `package-json`,
+  `package-name`, `package-version`, `package-scripts`,
+  `package-dependencies` and `package-dev-dependencies`.
+- `docs/python.org` and `docs/frontend.org`.
+
+*** Changed
+
+- `(maak formats)` reads two TOML constructs it used to refuse: an array or an
+  inline table that spans several lines, and an array of tables (`[[name]]`),
+  which appends one table per header.  A `pyproject.toml` from a project that
+  configures uv is read rather than refused.
+- The manual page names the tool variables it was missing: `MAAK_UV`,
+  `MAAK_UVX`, `MAAK_PYTHON` and `MAAK_PACKAGE_MANAGER`.
+
+*** Verification
+
+- The Veritas suite is green, with new `python` and `frontend` specs that
+  assert the argv builders, the pyproject and package.json readers, the dry-run
+  commands and the error messages, from manifests and stand-in programs the
+  specs write themselves.  The `formats` spec covers the two TOML constructs
+  the reader gained, including the refusal that keeps a table and an array of
+  tables apart.
+- `contrib/test/maak-tasks.sh` still passes all 43 checks.
+
 ** v0.24.0 (2026-11-16)
 
 Java and Kotlin projects get the Maven and Gradle lifecycle as argv, and an

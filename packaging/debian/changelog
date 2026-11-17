@@ -1,3 +1,26 @@
+maak (0.25.0-1) unstable; urgency=medium
+
+  * (maak python): uv argv builder, output queries and one-line wrappers for
+    init, sync, lock, run, add, remove, tree, export, build, publish, venv,
+    pip and python; uvx and the interpreter helpers with -m and -I named.
+  * (maak python): the pyproject readers answer the name, version, console
+    scripts, interpreter constraint and build backend, refusing a version the
+    build backend computes rather than guessing it, and python-test, -lint,
+    -format, -type-check and -check run the four CI checks through uv run.
+  * (maak frontend): package-manager detection from the lock file and a
+    parameter that may carry a wrapper, frontend-argv with each manager's
+    directory flag, and the wrappers that spell the frozen install, add,
+    remove, run, exec and publish differently -- npm, pnpm and Yarn 1 and 2.
+  * (maak frontend): the package.json readers answer the name, version,
+    scripts and dependencies without starting Node.
+  * (maak formats): an array or an inline table may span several lines, and an
+    array of tables appends one table per header, so a pyproject.toml that
+    configures uv is read rather than refused.
+  * docs/python.org and docs/frontend.org; the manual page names MAAK_UV,
+    MAAK_UVX, MAAK_PYTHON and MAAK_PACKAGE_MANAGER.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Tue, 17 Nov 2026 18:00:00 +0100
+
 maak (0.24.0-1) unstable; urgency=medium
 
   * (maak maven) and (maak gradle): argv builders for the Maven lifecycle and
