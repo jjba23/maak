@@ -148,9 +148,10 @@ is a maak error with its line.
   surrogate pairs, numbers, ~true~, ~false~ and ~null~.  A duplicate key and a
   trailing comma are errors.
 - *TOML* is read as tables, arrays, inline tables, basic and literal strings,
-  integers, floats and booleans.  Arrays of tables (~[[name]]~), multi-line
-  strings and dotted keys are refused; a date or a time comes back as the text
-  it was written as.
+  integers, floats and booleans.  An array or an inline table may span several
+  lines, and an array of tables (~[[name]]~) appends one table per header.
+  Multi-line strings and dotted keys are refused; a date or a time comes back as
+  the text it was written as.
 - *YAML* is read as block mappings and sequences, flow sequences and mappings,
   quoted and plain scalars, and comments.  Anchors, aliases, tags, directives,
   multi-line scalars and a second document are refused.

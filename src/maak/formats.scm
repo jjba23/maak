@@ -351,10 +351,11 @@ and a duplicate key is an error rather than a value that silently wins."
 
 ;; ====== TOML ======
 ;;
-;; The subset is the one a task file needs: comments, `[table]' headers, keys,
-;; basic and literal strings, integers, floats, booleans, single-line arrays and
-;; inline tables.  Array-of-tables (`[[name]]'), multi-line strings, dates and
-;; dotted keys are refused rather than approximated.
+;; The subset is the one a task file or a `pyproject.toml' needs: comments,
+;; `[table]' headers, `[[arrays of tables]]', dotted keys, keys, basic and
+;; literal strings, integers, floats, booleans, and arrays and inline tables
+;; that may span lines.  Multi-line strings are refused rather than
+;; approximated, and a date or a time comes back as the text it was written as.
 
 (define (toml-strip-comment line)
   "Return LINE without a trailing comment, respecting its strings."
@@ -373,16 +374,62 @@ and a duplicate key is an error rather than a value that silently wins."
            ((char=? char #\#) (substring line 0 i))
            (else (loop (+ i 1) #f)))))))
 
+(define (toml-line-depth text depth)
+  "Return the bracket DEPTH TEXT leaves, counting `[' and `{' out and in.
+
+A quote is entered and left as the line spells it, so a bracket inside a string
+is not counted; a string that does not close on its line leaves the depth alone
+and the value reader refuses the line, which is why the quote is not carried to
+the next line."
+  (let loop ((i 0) (depth depth) (quoting #f))
+    (if (>= i (string-length text))
+        depth
+        (let ((char (string-ref text i)))
+          (cond
+           ((eq? quoting #\")
+            (cond ((char=? char #\\) (loop (+ i 2) depth quoting))
+                  ((char=? char #\") (loop (+ i 1) depth #f))
+                  (else (loop (+ i 1) depth quoting))))
+           ((eq? quoting #\')
+            (if (char=? char #\') (loop (+ i 1) depth #f)
+                (loop (+ i 1) depth quoting)))
+           ((or (char=? char #\") (char=? char #\')) (loop (+ i 1) depth char))
+           ((memv char '(#\[ #\{)) (loop (+ i 1) (+ depth 1) #f))
+           ((memv char '(#\] #\})) (loop (+ i 1) (max 0 (- depth 1)) #f))
+           (else (loop (+ i 1) depth #f)))))))
+
 (define (toml-logical-lines text)
-  "Return TEXT's non-blank lines as `(LINE-NUMBER TEXT)' pairs."
-  (let loop ((lines (string-split text #\newline)) (number 1) (kept '()))
+  "Return TEXT's non-blank lines as `(LINE-NUMBER TEXT)' pairs.
+
+A line that opens a bracket and does not close it on the same line is joined to
+the lines that follow until it does, because TOML lets an array or an inline
+table span as many lines as it likes and the readers below want one line per
+value.  The number reported is the line the value started on."
+  (let loop ((lines (string-split text #\newline))
+             (number 1)
+             (kept '())
+             (pending #f)
+             (start #f)
+             (depth 0))
     (if (null? lines)
-        (reverse kept)
-        (let ((stripped (string-trim-both (toml-strip-comment (car lines)))))
-          (loop (cdr lines) (+ number 1)
-                (if (string=? stripped "")
-                    kept
-                    (cons (list number stripped) kept)))))))
+        (reverse (if pending
+                     (cons (list start (string-trim-both pending)) kept)
+                     kept))
+        (let* ((stripped (string-trim-both (toml-strip-comment (car lines))))
+               (depth (toml-line-depth stripped depth)))
+          (cond
+           ((and (not pending) (string=? stripped ""))
+            (loop (cdr lines) (+ number 1) kept #f #f 0))
+           (else
+            (let ((pending (if pending
+                               (string-append pending " " stripped)
+                               stripped))
+                  (start (or start number)))
+              (if (zero? depth)
+                  (loop (cdr lines) (+ number 1)
+                        (cons (list start (string-trim-both pending)) kept)
+                        #f #f 0)
+                  (loop (cdr lines) (+ number 1) kept pending start depth)))))))))
 
 (define (toml-key-parts key-text line)
   "Return KEY-TEXT as a list of key strings, splitting dotted keys."
@@ -421,6 +468,29 @@ and a duplicate key is an error rather than a value that silently wins."
     (fail-line line (format #f "~s is not a bare key" key)))
   key)
 
+(define (toml-lookup table key)
+  "Return the value KEY names in TABLE, or `missing'.
+
+TABLE is a mapping, or the list an array of tables holds, whose elements KEY
+indexes as a number."
+  (cond
+   ((exact-integer? key)
+    (if (< key (length table)) (list-ref table key) 'missing))
+   ((data-mapping? table) (mapping-get table key))
+   (else 'missing)))
+
+(define (toml-store table key value)
+  "Return TABLE with KEY set to VALUE, keeping the order of the other keys."
+  (cond
+   ((exact-integer? key)
+    (map (lambda (item index) (if (= index key) value item))
+         table (iota (length table))))
+   (else (mapping-set (if (data-mapping? table) table '()) key value))))
+
+(define (toml-at tree path)
+  "Return the value PATH names in TREE, or `missing' when it names none."
+  (fold (lambda (key table) (toml-lookup table key)) tree path))
+
 (define (toml-parent tree path line)
   "Return TREE with every key of PATH present as a mapping."
   (if (null? path)
@@ -437,27 +507,56 @@ and a duplicate key is an error rather than a value that silently wins."
                      key
                      (toml-parent child (cdr path) line)))))
 
+(define (toml-put tree path value)
+  "Return TREE with VALUE stored at PATH, replacing whatever table was there."
+  (if (null? path)
+      value
+      (let* ((key (car path))
+             (existing (toml-lookup tree key)))
+        (toml-store tree key
+                    (toml-put (if (eq? existing 'missing) '() existing)
+                              (cdr path) value)))))
+
+(define (toml-table-list parent name line)
+  "Return the list an array of tables named NAME appends to, in PARENT.
+
+A name that already holds a table rather than a list of them is refused here:
+TOML cannot have both, and a reader that picked one would lose the other."
+  (let ((existing (mapping-get parent name)))
+    (cond
+     ((or (eq? existing 'missing) (null? existing)) '())
+     ((data-mapping? existing)
+      (fail-line line
+                 (format #f "~a is a table, not an array of tables" name)))
+     (else existing))))
+
 (define (toml-set tree path value line)
   "Return TREE with VALUE at PATH, refusing to overwrite a table with a value."
   (if (null? path)
       value
-      (let* ((key (car path))
-             (existing (mapping-get tree key))
-             (leaf? (null? (cdr path))))
-        (cond
-         (leaf?
-          (if (or (eq? existing 'missing) (null? existing))
-              (mapping-set (if (data-mapping? tree) tree '()) key value)
-              (fail-line line "a key is defined twice")))
-         ((or (eq? existing 'missing)
-              (null? existing)
-              (data-mapping? existing))
-          (mapping-set (if (data-mapping? tree) tree '())
-                       key
-                       (toml-set (if (eq? existing 'missing) '() existing)
-                                 (cdr path) value line)))
-         (else
-          (fail-line line "a key is used as a table and as a value"))))))
+      (let ((key (car path))
+            (rest (cdr path)))
+        ;; A number among the keys is an element of an array of tables, which
+        ;; the header created and this call only descends into.
+        (if (exact-integer? key)
+            (toml-store tree key
+                        (toml-set (toml-lookup tree key) rest value line))
+            (let ((existing (mapping-get tree key)))
+              (cond
+               ((null? rest)
+                (if (or (eq? existing 'missing) (null? existing))
+                    (mapping-set (if (data-mapping? tree) tree '()) key value)
+                    (fail-line line "a key is defined twice")))
+               ((or (exact-integer? (car rest))
+                    (eq? existing 'missing)
+                    (null? existing)
+                    (data-mapping? existing))
+                (mapping-set (if (data-mapping? tree) tree '())
+                             key
+                             (toml-set (if (eq? existing 'missing) '() existing)
+                                       rest value line)))
+               (else
+                (fail-line line "a key is used as a table and as a value"))))))))
 
 (define (toml-hex-escape text index digits)
   "Return `(CHAR . NEXT)' for the hexadecimal escape at INDEX."
@@ -640,10 +739,31 @@ what is refused."
           (let* ((number (car (car lines)))
                  (line (cadr (car lines))))
             (cond
+             ((and (string-prefix? "[[" line)
+                   (string-suffix? "]]" line)
+                   (> (string-length line) 4))
+              (let ((parts (toml-key-parts
+                            (substring line 2 (- (string-length line) 2))
+                            number)))
+                (when (null? parts)
+                  (fail-line number "a table header names no table"))
+                (let* ((keys (map (lambda (key) (toml-ensure-key! number key))
+                                  parts))
+                       (name (car (last-pair keys)))
+                       (parent-keys (list-head keys (- (length keys) 1)))
+                       (tree (toml-parent tree parent-keys number))
+                       (tables (append (toml-table-list (toml-at tree parent-keys)
+                                                        name number)
+                                       (list '())))
+                       (tree (toml-put tree parent-keys
+                                       (mapping-set (toml-at tree parent-keys)
+                                                    name tables)))
+                       ;; The keys after this line belong to the table that was
+                       ;; just appended, which is the last one of the list.
+                       (path (append keys (list (- (length tables) 1)))))
+                  (loop (cdr lines) tree path))))
              ((string-prefix? "[[" line)
-              (fail-line number
-                         "arrays of tables are not read here"
-                         #:hint "Write one table per task, or use a list of tasks in JSON or YAML."))
+              (fail-line number "an array of tables header ends with `]]'"))
              ((and (string-prefix? "[" line)
                    (string-suffix? "]" line))
               (let ((parts (toml-key-parts (substring line 1 (- (string-length line) 1))

@@ -96,12 +96,29 @@
                (assert-equal
                 #:expect '(("env" ("A" . "1") ("B" . "2")))
                 #:got (toml-read-string "env = { A = \"1\", B = \"2\" }")))
+         (test "an array may span several lines"
+               (assert-equal
+                #:expect '(("dependencies" "requests>=2" "rich"))
+                #:got (toml-read-string
+                       "dependencies = [\n  \"requests>=2\",\n  \"rich\",\n]\n")))
+         (test "an array of tables appends one table per header"
+               (assert-equal
+                #:expect '(("tasks" (("name" . "build")) (("name" . "test"))))
+                #:got (toml-read-string
+                       "[[tasks]]\nname = \"build\"\n[[tasks]]\nname = \"test\"\n")))
+         (test "a table after an array of tables is a table of its own"
+               (assert-equal
+                #:expect '(("tool" ("uv" ("index" (("name" . "a"))))
+                                  ("ruff" ("line-length" . 100))))
+                #:got (toml-read-string
+                       "[[tool.uv.index]]\nname = \"a\"\n[tool.ruff]\nline-length = 100\n")))
          (test "a key defined twice is refused"
                (assert-error (lambda ()
                                (toml-read-string "a = 1\na = 2"))))
-         (test "an array of tables is refused rather than guessed"
+         (test "an array of tables and a table of the same name are refused"
                (assert-error (lambda ()
-                               (toml-read-string "[[tasks]]\nname = \"build\""))))))
+                               (toml-read-string
+                                "[tasks]\nname = \"build\"\n[[tasks]]\nname = \"test\"\n"))))))
 
 (define yaml-suite
   (suite "YAML"
