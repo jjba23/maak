@@ -35,7 +35,7 @@ checkdepends=(
 # `maak sync-version' writes $pkgver, and the checksum is updated afterwards
 # from the published archive, which is the one thing no release task can know.
 source=("$pkgname-$pkgver.tar.gz::https://github.com/jjba23/maak/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('eef52cbcae1fed9d42a14b3a606b8408e0e4735c58db456b8157402904c37a60')
+sha256sums=('39aefbdd5856817c52d107e53b037bcaa0c64f4f4b694e6d59299017c580d883')
 
 # Guile looks for byte-compiled modules under the site-ccache directory, which
 # differs between distributions (and between a Guile installed system-wide and
