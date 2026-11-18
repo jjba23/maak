@@ -44,8 +44,6 @@ Most build tools invent their own limited domain-specific language.  Maak embrac
 /This also means your code is flexible, robust and reliable (+declarative) for at least the next 50 years./
 #+end_quote
 
-- *What is it it.* A command runner and control plane. You write a file called ~maak.scm~ — a perfectly normal Guile module — and every function in it becomes a runnable task.
-- *Who is it for.* Lispers who want their automation to be as powerful as their editor, and everyone who is tired of Make's runes, shell-script glue, and YAML pipelines that cannot loop.
 - *Why it matters.* Tasks are real Scheme functions: composable, testable, declarative, dry-runnable, parallelisable, and reproducible.
 
 * Lisp all the way down
@@ -57,8 +55,7 @@ Most build tools invent their own limited domain-specific language.  Maak embrac
 - *Shell-free by default.* ~run~ takes a program and its arguments as separate strings, so a path with a space in it stays one argument.
 - *Errors that read like sentences.* ~task-error~ prints one line and a hint, exits non-zero, and keeps the backtrace behind ~--debug~.
 
-The full list — pipelines, background jobs, ~-j~, containers, niri, downloads,
-gettext — is in [[file:docs/features.org][Features]].
+See the full list pipelines, background jobs, ~-j~, guix, nix, containers, niri, downloads, gettext, maven, uv, python in [[file:docs/features.org][Features]].
 
 * Installation
 
