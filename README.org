@@ -57,29 +57,6 @@ Most build tools invent their own limited domain-specific language.  Maak embrac
 
 See the full list pipelines, background jobs, ~-j~, guix, nix, containers, niri, downloads, gettext, maven, uv, python in [[file:docs/features.org][Features]].
 
-* Installation
-
-Guix, Nix, Homebrew, the container image, the RPM and the Debian package are all
-in [[file:docs/installation.org][Installing maak]]. From a checkout, the launcher
-runs this tree's own sources:
-
-#+begin_src shell
-guix shell -m manifest.scm -- ./scripts/maak --list
-#+end_src
-
-* Editor support
-
-Emacs is the first-class citizen.  [[https://github.com/jjba23/maak.el][maak.el]]
-is maak's canonical front end: pick a task, prompt for its arguments, watch the
-output and jump to the definition, from inside Emacs, from the same =maak.scm=
-the command line runs.
-
-The other editors are also served.  Neovim, Vim, VS Code, Helix,
-IntelliJ, Zed and Sublime Text each have an integration in
-[[file:contrib/README.org][contrib/]] .
-
-[[file:docs/editors.org][Editors, shells and the REPL]] has the details, and every integration has a README of its own.
-
 * Documentation
 
 The guide is split by topic, so a page stays short enough to read on a phone.
@@ -107,6 +84,29 @@ The manual page is installed with the program (~man maak~, or ~maak man~ in a
 checkout), the technical Guile API documentation is published at
 https://jointhefreeworld.org/api-docs/maak/API.html, and every release is
 recorded in [[file:NEWS.org][NEWS.org]].
+
+* Installation
+
+Guix, Nix, Homebrew, the container image, the RPM and the Debian package are all
+in [[file:docs/installation.org][Installing maak]]. From a checkout, the launcher
+runs this tree's own sources:
+
+#+begin_src shell
+guix shell -m manifest.scm -- ./scripts/maak --list
+#+end_src
+
+* Editor support
+
+Emacs is the first-class citizen.  [[https://github.com/jjba23/maak.el][maak.el]]
+is maak's canonical front end: pick a task, prompt for its arguments, watch the
+output and jump to the definition, from inside Emacs, from the same =maak.scm=
+the command line runs.
+
+The other editors are also served.  Neovim, Vim, VS Code, Helix,
+IntelliJ, Zed and Sublime Text each have an integration in
+[[file:contrib/README.org][contrib/]] .
+
+[[file:docs/editors.org][Editors, shells and the REPL]] has the details, and every integration has a README of its own.
 
 * Who uses maak
 
