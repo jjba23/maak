@@ -57,6 +57,11 @@ Most build tools invent their own limited domain-specific language.  Maak embrac
 
 See the full list pipelines, background jobs, ~-j~, guix, nix, containers, niri, downloads, gettext, maven, uv, python in [[file:docs/features.org][Features]].
 
+* See it run
+
+#+attr_html: :width 800 :alt maak --plan deploy, in a terminal
+[[file:resources/maak-demo.gif]]
+
 * Documentation
 
 Start with the quick start, or open the whole [[file:docs/index.org][documentation index]].
