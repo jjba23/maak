@@ -59,7 +59,6 @@ See the full list pipelines, background jobs, ~-j~, guix, nix, containers, niri,
 
 * Documentation
 
-The guide is split by topic, so a page stays short enough to read on a phone.
 Start with the quick start, or open the whole [[file:docs/index.org][documentation index]].
 
 | Page | What it covers |
@@ -85,16 +84,6 @@ checkout), the technical Guile API documentation is published at
 https://jointhefreeworld.org/api-docs/maak/API.html, and every release is
 recorded in [[file:NEWS.org][NEWS.org]].
 
-* Installation
-
-Guix, Nix, Homebrew, the container image, the RPM and the Debian package are all
-in [[file:docs/installation.org][Installing maak]]. From a checkout, the launcher
-runs this tree's own sources:
-
-#+begin_src shell
-guix shell -m manifest.scm -- ./scripts/maak --list
-#+end_src
-
 * Editor support
 
 Emacs is the first-class citizen.  [[https://github.com/jjba23/maak.el][maak.el]]
@@ -108,12 +97,15 @@ IntelliJ, Zed and Sublime Text each have an integration in
 
 [[file:docs/editors.org][Editors, shells and the REPL]] has the details, and every integration has a README of its own.
 
-* Who uses maak
+* Installation
 
-maak runs the build, release and site automation of many projects, see a list in
-[[file:docs/who-uses-maak.org][Who uses maak]].
+Guix, Nix, Homebrew, the container image, the RPM and the Debian package are all
+in [[file:docs/installation.org][Installing maak]]. From a checkout, the launcher
+runs this tree's own sources:
 
-Using maak in your project? Send a link and it can be listed there.
+#+begin_src shell
+guix shell -m manifest.scm -- ./scripts/maak --list
+#+end_src
 
 * Community and support
 
@@ -138,3 +130,9 @@ In short: use it, study it, change it, share it — and keep the copyright notic
 -------
 
 Happy hacking! ✨
+* Who uses maak
+
+maak runs the build, release and site automation of many projects, see a list in
+[[file:docs/who-uses-maak.org][Who uses maak]].
+
+Using maak in your project? Send a link and it can be listed there.
