@@ -22,7 +22,7 @@ maak is Guix-first: the repository ships ~guix.scm~ (the package), ~manifest.scm
 Install the current checkout into your profile:
 
 #+begin_src shell
-guix install -f ./guix.scm
+guix package -f ./guix.scm
 #+end_src
 
 Enter an environment with maak available, pinned to the channels this project was tested with:
@@ -50,10 +50,10 @@ guix time-machine --channels=channels.scm -- \
 maak is also available *upstream in Guix* as ~maak~, in ~(gnu packages build-tools)~:
 
 #+begin_src shell
-guix install maak
+guix package -i maak
 #+end_src
 
-Upstream currently carries an older release than this checkout; ~guix install -f ./guix.scm~ builds the tree in front of you.
+Upstream currently carries an older release than this checkout; ~guix package -f ./guix.scm~ builds the tree in front of you.
 
 * On Nix
 
