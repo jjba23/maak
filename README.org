@@ -80,7 +80,7 @@ Start with the quick start, or open the whole [[file:docs/index.org][documentati
 | [[file:docs/maven-and-gradle.org][Maven, Gradle and the JVM]] | The Maven lifecycle and Gradle tasks as argv, wrapper detection, and the JVM reports. |
 | [[file:docs/emacs-lisp.org][Emacs Lisp packages]] | Byte-compiling, ERT and checkdoc in batch, and the packaging conventions. |
 | [[file:docs/guix-and-nix.org][Guix, Nix and reproducibility]] | The helpers that build the command line, and the ones that return values. |
-| [[file:docs/stability.org][What 1.0 freezes]] | The public API a version number is about, and how a deprecation travels. |
+| [[file:docs/stability.org][On Stability]] | What the versions mean, and the promises of stability |
 | [[file:docs/why-maak.org][Why maak, and why Lisp]] | What Make cannot do, and the table of Make flags that did carry over. |
 | [[file:docs/editors.org][Editors, shells and the REPL]] | maak.el and the seven integrations, the shell completions, the REPL workflow. |
 
