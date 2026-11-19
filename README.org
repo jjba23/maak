@@ -44,8 +44,6 @@ Most build tools invent their own limited domain-specific language.  Maak embrac
 /This also means your code is flexible, robust and reliable (+declarative) for at least the next 50 years./
 #+end_quote
 
-- *What is it it.* A command runner and control plane. You write a file called ~maak.scm~ — a perfectly normal Guile module — and every function in it becomes a runnable task.
-- *Who is it for.* Lispers who want their automation to be as powerful as their editor, and everyone who is tired of Make's runes, shell-script glue, and YAML pipelines that cannot loop.
 - *Why it matters.* Tasks are real Scheme functions: composable, testable, declarative, dry-runnable, parallelisable, and reproducible.
 
 * Lisp all the way down
@@ -57,35 +55,15 @@ Most build tools invent their own limited domain-specific language.  Maak embrac
 - *Shell-free by default.* ~run~ takes a program and its arguments as separate strings, so a path with a space in it stays one argument.
 - *Errors that read like sentences.* ~task-error~ prints one line and a hint, exits non-zero, and keeps the backtrace behind ~--debug~.
 
-The full list — pipelines, background jobs, ~-j~, containers, niri, downloads,
-gettext — is in [[file:docs/features.org][Features]].
+See the full list pipelines, background jobs, ~-j~, guix, nix, containers, niri, downloads, gettext, maven, uv, python in [[file:docs/features.org][Features]].
 
-* Installation
+* See it run
 
-Guix, Nix, Homebrew, the container image, the RPM and the Debian package are all
-in [[file:docs/installation.org][Installing maak]]. From a checkout, the launcher
-runs this tree's own sources:
-
-#+begin_src shell
-guix shell -m manifest.scm -- ./scripts/maak --list
-#+end_src
-
-* Editor support
-
-Emacs is the first-class citizen.  [[https://github.com/jjba23/maak.el][maak.el]]
-is maak's canonical front end: pick a task, prompt for its arguments, watch the
-output and jump to the definition, from inside Emacs, from the same =maak.scm=
-the command line runs.
-
-The other editors are also served.  Neovim, Vim, VS Code, Helix,
-IntelliJ, Zed and Sublime Text each have an integration in
-[[file:contrib/README.org][contrib/]] .
-
-[[file:docs/editors.org][Editors, shells and the REPL]] has the details, and every integration has a README of its own.
+#+attr_html: :width 800 :alt maak --plan deploy, in a terminal
+[[file:resources/maak-demo.gif]]
 
 * Documentation
 
-The guide is split by topic, so a page stays short enough to read on a phone.
 Start with the quick start, or open the whole [[file:docs/index.org][documentation index]].
 
 | Page | What it covers |
@@ -111,12 +89,28 @@ checkout), the technical Guile API documentation is published at
 https://jointhefreeworld.org/api-docs/maak/API.html, and every release is
 recorded in [[file:NEWS.org][NEWS.org]].
 
-* Who uses maak
+* Editor support
 
-maak runs the build, release and site automation of many projects, see a list in
-[[file:docs/who-uses-maak.org][Who uses maak]].
+Emacs is the first-class citizen.  [[https://github.com/jjba23/maak.el][maak.el]]
+is maak's canonical front end: pick a task, prompt for its arguments, watch the
+output and jump to the definition, from inside Emacs, from the same =maak.scm=
+the command line runs.
 
-Using maak in your project? Send a link and it can be listed there.
+The other editors are also served.  Neovim, Vim, VS Code, Helix,
+IntelliJ, Zed and Sublime Text each have an integration in
+[[file:contrib/README.org][contrib/]] .
+
+[[file:docs/editors.org][Editors, shells and the REPL]] has the details, and every integration has a README of its own.
+
+* Installation
+
+Guix, Nix, Homebrew, the container image, the RPM and the Debian package are all
+in [[file:docs/installation.org][Installing maak]]. From a checkout, the launcher
+runs this tree's own sources:
+
+#+begin_src shell
+guix shell -m manifest.scm -- ./scripts/maak --list
+#+end_src
 
 * Community and support
 
@@ -141,3 +135,9 @@ In short: use it, study it, change it, share it — and keep the copyright notic
 -------
 
 Happy hacking! ✨
+* Who uses maak
+
+maak runs the build, release and site automation of many projects, see a list in
+[[file:docs/who-uses-maak.org][Who uses maak]].
+
+Using maak in your project? Send a link and it can be listed there.
