@@ -22,6 +22,7 @@ lives in a repository of its own; the rest live here.
 | [[file:zed/README.org][Zed]]            | A generated =.zed/tasks.json=, kept current by =maak-zed= as you work. |
 | [[file:sublime/README.org][Sublime Text]]   | Quick panels, and the run in a Sublime build panel.                  |
 | [[file:helix/README.org][Helix]]          | =maak-picker= for =:sh=: fzf, the argument prompts, and a terminal.    |
+| [[file:ai/README.org][AI assistant]]   | A skill file: the Maak file's rules, vocabulary and verification loop. |
 
 * What they all do
 

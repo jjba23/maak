@@ -1,0 +1,106 @@
+#+title: Maak files and AI assistants
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+A Maak file is a Guile program, so an assistant reads it the way it reads any
+other module: the task list is a set of =define=s, the documentation is a
+docstring, and the argument grammar is a lambda list.  No private format stands
+between the model and the build, and nothing has to be recovered from output
+that the file does not already say.
+
+Two questions are left over, and both are answered by a command rather than by a
+prompt: which words the installed maak provides, and whether what was just
+written behaves.  This page is mostly that list of commands, the few rules a
+Maak file is reviewed against, and the traps that catch a first draft.
+
+* Ask maak instead of guessing
+
+| Question | Command | What comes back |
+|----------+---------+----------------|
+| What tasks does this file define? | =maak --list= | One entry per task: the docstring under the name, and =needs:= where the task declares a dependency. |
+| The same, for a program | =maak --list --json= | One versioned object: the file, the root it sits in, and each task's docstring, line, dependencies, example and arguments. |
+| What would a task execute? | =maak --plan TASK= | Every command as argv, with the directory and environment it would be given, and nothing run. |
+| The same, for a program | =maak --plan --json= | The same plan as =version: 1= JSON: =kind=, =argv=, =cwd=, =env=, =elevation=, =devNull=, =async=. |
+| What does a task call? | =maak explain TASK= | The composition in both directions, the load path, the escalation, and which environment file won. |
+| What does a half-written file say? | =maak-tasks --preview TASK= | The static reader in [[file:../contrib/README.org][contrib/]]: it reads the file without loading it, so it answers while the file still does not compile. |
+
+The text forms are the ones a person reads; =--json= is the one a program reads,
+with nothing else on standard output.  Both describe what maak itself found, so
+an assistant that prints one is quoting the runner rather than paraphrasing it.
+
+* The rules a Maak file is reviewed against
+
+They fit on one page in [[file:tasks.org][Tasks]], and none of them is new syntax:
+a task is a top-level procedure, its docstring is its documentation, =#:export=
+hides the helpers, arguments arrive as strings, and =task-metadata!= is the whole
+vocabulary for ordering, hiding and examples.
+
+[[file:../contrib/ai/maak-skill.md][=contrib/ai/maak-skill.md=]] is those rules
+as one file to hand to a model: the module header, the rules, the vocabulary it
+may call, the Guile forms a task actually uses, and the loop that checks the
+work before it is called done.
+
+* A block for a project's =AGENTS.md=
+
+Most assistants keep a project instructions file — =AGENTS.md=, =CLAUDE.md=,
+=.cursor/rules=.  These lines are enough to send a first draft in the right
+direction, and the skill file is what to name when the assistant needs the
+vocabulary as well:
+
+#+begin_src markdown
+## Automation is a Maak file
+
+`maak.scm` is a Guile module and every procedure in it is a task: `maak --list`
+is the task list, `maak TASK` runs one.
+
+- A command is argv, one string per argument, never a shell string:
+  `(run (list "git" "commit" "-m" message))`.  `$` is only for a pipe, a glob,
+  a redirection or a `VAR=value` prefix.
+- The docstring is the documentation: one line saying what the task does, then an
+  `Args:` section naming each argument on a line of its own.
+- Arguments arrive as strings, so convert them where they enter the task.
+- A failure is `(task-error "what went wrong" #:hint "what to do")`, not
+  `(error ...)`; `--debug` brings the backtrace back.
+- `task-metadata!` declares `#:depends` (ordering only), `#:hidden?` and
+  `#:example`.  Never name a task after a procedure maak or Guile provides.
+- Verify with `maak --list` (the file loads and the task is there), then
+  `maak -n TASK` (the commands it would run) and `maak --plan TASK` (the argv,
+  directory and environment it would use).
+#+end_src
+
+* Traps a first draft falls into
+
+- *A shell string where argv belongs.*  ~(run "make test")~ is not a command
+  line: ~run~ takes a list, and a path with a space in it stays one argument
+  only because the list is not re-split.
+- *Invented options.*  There is no =--fmt=, no =--output= and no =--check=; the
+  options are the ones in =maak --help= and in [[file:cli.org][The command line]].
+- *A dependency written as a cache.*  =#:depends= orders a run and never skips
+  one: a task named on the command line runs whether or not its dependency
+  changed, because maak has no notion of up to date.
+- *A dependency with a different argument list.*  A declared dependency is run
+  with the arguments the task was given, so a task that takes a host cannot
+  depend on one that takes none; have the task call the other as a function, or
+  give both the same arguments.
+- *A guard that a dry run cannot satisfy.*  Under =--plan= and =-n= no command
+  runs, so a task that refuses because a file is missing fails the dry run even
+  when =#:depends= would have built it first.  Keep the check for a real run and
+  expect the dry run of that task to stop there.
+- *A task named after a helper.*  =list= shadows Guile's, and a task called =run=
+  cannot call =run=.  See [[file:tasks.org][Tasks]] for the naming advice.
+
+* Limits worth knowing before trusting an answer
+
+- =--list --json= and =--plan --json= are versioned descriptions, and
+  [[file:stability.org][What 1.0 freezes]] says what that promises a consumer.
+- =--plan= records one task at a time, so it is not a plan for a =-j= run.
+- The static reader (=maak-tasks=) and a load (=maak --list=) agree on a file
+  whose tasks are all written out; a task a macro or a used module defines is
+  only visible to the load.
+- Nothing here checks that a task's commands are *correct*; it checks that the
+  file says what it means.  That is the most an assistant should claim to have
+  verified, and the suite is what proves the rest.

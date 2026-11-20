@@ -1,0 +1,46 @@
+#+title: maak and AI assistants
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[../../docs/index.org][Documentation index]]
+
+An assistant reads a Maak file the way it reads any other Guile module, so what
+it needs is not a second format but a short, accurate description of the one
+that exists.  [[file:maak-skill.md][=maak-skill.md=]] is that description: the
+module header, the rules a Maak file is reviewed against, the vocabulary a task
+may call, the Guile forms it actually uses, and the loop that checks the work.
+
+It is plain Markdown with no front matter, so it can be pasted into a system
+prompt, dropped in beside a project's =AGENTS.md=, or named in one.
+
+* Using it
+
+- *Whole file.* Add =maak-skill.md= to the context, or copy it into the rules
+  directory of whatever assistant you use (=.cursor/rules=, =CLAUDE.md=,
+  =AGENTS.md=).
+- *The short version.* [[../../docs/ai.org][Maak files and AI assistants]] has a
+  block of six rules to paste into a project's own instructions, which is enough
+  for an assistant that only needs to edit an existing task.
+- *Ask maak instead.* =maak --list=, =maak --list --json=, =maak --plan TASK=
+  and =maak explain TASK= answer from the file and the runner, so an assistant
+  that prints one is quoting maak rather than recalling it.  A file that is
+  still half-written is read by [[file:../bin/maak-tasks][=maak-tasks=]], which
+  parses without loading.
+
+* What it is not
+
+- Not a format and not a protocol: the interface to a program is the command
+  line it already has, and the descriptions are the =--list --json= and
+  =--plan --json= objects beside it.
+- Not a promise about a model's output.  The file says what a correct Maak file
+  looks like; =maak --list= and a dry run are what show whether one is.
+
+* Keeping it in step
+
+The skill file names options, helpers and conventions, so it changes in the same
+commit as they do.  A helper that gains a keyword, an option that changes
+meaning, a rule that stops being true: the file is one of the places that has to
+say so, next to [[../../docs/cli.org][The command line]] and
+[[../../docs/builtins.org][the built-in toolkit]].

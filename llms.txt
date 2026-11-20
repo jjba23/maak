@@ -1,0 +1,42 @@
+# maak
+
+> maak is a command runner whose task file is a Guile Scheme module: every
+> procedure in `maak.scm` is a task, its docstring is its documentation, and a
+> command is an argv list rather than a shell string. There is no DSL — the build
+> is the program. MIT licensed, POSIX and Guile, no Windows.
+
+A task is read as code, so a description of a project's automation is never
+guessed from output. The two objects to read instead are `maak --list --json`
+(the tasks of the current file: docstring, line, dependencies, example,
+arguments) and `maak --plan --json TASK` (what a task would execute: `kind`,
+`argv`, `cwd`, `env`, `elevation`, `devNull`, `async`), both versioned.
+
+## Start here
+
+- [Quick start](https://raw.githubusercontent.com/jjba23/maak/trunk/docs/quick-start.org): your first Maak file, eight steps from a module to a dry run.
+- [Tasks](https://raw.githubusercontent.com/jjba23/maak/trunk/docs/tasks.org): how a procedure becomes a task, what `#:export` hides, how arguments arrive, how `--list` lays docstrings out.
+- [The command line](https://raw.githubusercontent.com/jjba23/maak/trunk/docs/cli.org): every option, the grammar of tasks and arguments, environment files, load paths.
+- [The built-in toolkit](https://raw.githubusercontent.com/jjba23/maak/trunk/docs/builtins.org): `run`, pipelines, background jobs, file helpers, `task-error`, string helpers, gettext.
+- [Plans, watches and explanations](https://raw.githubusercontent.com/jjba23/maak/trunk/docs/inspect.org): the typed plan behind `--plan`, its two JSON shapes, and what `explain` reports.
+- [Configuration](https://raw.githubusercontent.com/jjba23/maak/trunk/docs/configuration.org): the `MAAK_*` environment variables and the Scheme parameters behind dry-run and quiet.
+
+## For an assistant
+
+- [Maak files and AI assistants](https://raw.githubusercontent.com/jjba23/maak/trunk/docs/ai.org): what to ask maak instead of guessing, the rules a Maak file is reviewed against, the traps a first draft falls into, and a block to paste into a project's `AGENTS.md`.
+- [The skill file](https://raw.githubusercontent.com/jjba23/maak/trunk/contrib/ai/maak-skill.md): one Markdown file to add to a context — module header, rules, vocabulary, Guile forms, verification loop.
+- [Why maak, and why Lisp](https://raw.githubusercontent.com/jjba23/maak/trunk/docs/why-maak.org): what Make cannot express, and the table of Make flags that carried over.
+- [What 1.0 freezes](https://raw.githubusercontent.com/jjba23/maak/trunk/docs/stability.org): which of those shapes are promises to a consumer, and how a deprecation travels.
+- [Task files in JSON, TOML and YAML](https://raw.githubusercontent.com/jjba23/maak/trunk/docs/task-files.org): a task list without the language, and what a data file cannot do.
+
+## The rest of the guide
+
+- [Guide index](https://raw.githubusercontent.com/jjba23/maak/trunk/docs/index.org): one page per topic — Guix and Nix, containers, Rust, Python, frontend, Maven and Gradle, Emacs Lisp, git and archives, downloads, editors.
+- [This repository's own automation](https://raw.githubusercontent.com/jjba23/maak/trunk/docs/project.org): the tasks of the checkout that writes maak.
+- [Hacking on maak](https://raw.githubusercontent.com/jjba23/maak/trunk/docs/development.org): the Veritas suite, the API documentation, the man page.
+
+## Optional
+
+- [README](https://raw.githubusercontent.com/jjba23/maak/trunk/README.org): the project in a page.
+- [Release notes](https://raw.githubusercontent.com/jjba23/maak/trunk/NEWS.org): one section per release tag.
+- [Repository](https://github.com/jjba23/maak)
+- [Guile API documentation](https://jointhefreeworld.org/api-docs/maak/API.html): every exported procedure, its arguments and its docstring.

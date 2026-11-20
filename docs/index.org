@@ -37,6 +37,7 @@ continues.
 | [[file:downloads.org][Downloads with curl and wget]] | Fetching, reading and mirroring through one set of procedures. |
 | [[file:why-maak.org][Why maak, and why Lisp]] | What Make cannot do, what Scheme changes, and the table of Make flags that did carry over. |
 | [[file:editors.org][Editors, shells and the REPL]] | maak.el as the canonical front end, integrations for seven other editors, completions for Bash, Zsh and fish, and the REPL workflow. |
+| [[file:ai.org][Maak files and AI assistants]] | What an assistant should ask maak instead of guessing, the rules a Maak file is reviewed against, and the skill file to hand a model. |
 | [[file:who-uses-maak.org][Who uses maak]] | The forty-one projects that run their automation on maak, grouped, with a line about each. |
 | [[file:project.org][This repository's own automation]] | The tasks this checkout defines, and how a release is cut. |
 | [[file:development.org][Hacking on maak]] | The suite and the traps a spec can fall into, the API documentation, the man page. |

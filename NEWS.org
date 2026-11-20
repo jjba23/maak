@@ -10,6 +10,27 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 
 *[Unreleased]*
 
+** Added
+
+- [[file:docs/ai.org][Maak files and AI assistants]]: what to ask maak instead of
+  guessing (`--list --json`, `--plan --json`, `explain`, and the static reader
+  for a file that does not compile yet), the few rules a Maak file is reviewed
+  against, the traps a first draft falls into, and a block to paste into a
+  project's `AGENTS.md`, `CLAUDE.md` or rules directory.  The limits an answer
+  should not cross are on the same page: `#:depends` orders a run and never skips
+  one, a declared dependency is run with the arguments the task was given, and a
+  task that guards on a file an earlier task builds cannot pass a dry run.
+- `contrib/ai/maak-skill.md`, a skill file for an assistant: the module header,
+  the ten rules, the vocabulary a task may call grouped by area, the Guile forms
+  a Maak file actually uses, and the loop that checks the work — `maak --list`,
+  then `maak -n`, then `maak --plan`, then the real run.  Plain Markdown with no
+  front matter, so it can be pasted into a context or added to a project's
+  instructions; `contrib/ai/README.org` says how, and says it changes in the same
+  commit as the options and helpers it names.
+- `llms.txt`, a map of the guide for a tool: the two versioned JSON objects to
+  read instead of guessing, then the page that answers each question, as raw
+  URLs.
+
 *[Released]*
 
 ** v1.0.0 (2026-11-17)

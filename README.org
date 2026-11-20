@@ -116,6 +116,7 @@ Start with the quick start, or open the whole [[file:docs/index.org][documentati
 | [[file:docs/stability.org][On Stability]] | What the versions mean, and the promises of stability |
 | [[file:docs/why-maak.org][Why maak, and why Lisp]] | What Make cannot do, and the table of Make flags that did carry over. |
 | [[file:docs/editors.org][Editors, shells and the REPL]] | maak.el and the seven integrations, the shell completions, the REPL workflow. |
+| [[file:docs/ai.org][Maak files and AI assistants]] | What to ask maak instead of guessing, the rules a Maak file is reviewed against, and a block for a project's agents file. |
 
 The manual page is installed with the program (~man maak~, or ~maak man~ in a
 checkout), the technical Guile API documentation is published at
@@ -134,6 +135,11 @@ IntelliJ, Zed and Sublime Text each have an integration in
 [[file:contrib/README.org][contrib/]] .
 
 [[file:docs/editors.org][Editors, shells and the REPL]] has the details, and every integration has a README of its own.
+
+An assistant is served the same way: [[file:contrib/ai/README.org][contrib/ai]] ships a
+skill file — the Maak file's rules, its vocabulary and the loop that checks the
+work, as one context file — and [[file:docs/ai.org][Maak files and AI assistants]]
+says what to ask maak instead of guessing.
 
 * Installation
 
