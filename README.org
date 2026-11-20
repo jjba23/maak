@@ -24,11 +24,20 @@ keep in your head: the build is the program.
 ;; A task is a λ: (define (build) ...) is (define build (lambda () ...)).
 (define (build)
   "Compile every page in ./pages into ./build."
-  (mkdir-p "build")
-  (for-each (lambda (page)
-              (run (list "pandoc" (~ "pages/~a.md" page)
-                         "-o" (~ "build/~a.html" page))))
-            '("index" "about")))
+  (let ((out "build"))
+    (mkdir-p out)
+    (for-each (lambda (page)
+                (run (list "pandoc" (~ "pages/~a.md" page)
+                           "-o" (~ "~a/~a.html" out page))))
+              '("index" "about"))
+    (when (file-exists? "static/style.css")
+      (cp "static/style.css" (~ "~a/style.css" out)))))
+
+;; Two programs, one pipe, and a failure that names the stage that failed.
+(define (check)
+  "Lint every tracked page."
+  (run-pipeline (list (list "git" "ls-files" "pages")
+                      (list "xargs" "markdownlint"))))
 
 ;; Its arguments arrive as the strings typed on the command line.
 (define (deploy host)
@@ -40,13 +49,14 @@ keep in your head: the build is the program.
 
 ;; Procedures are values, so tasks compose like any other function.
 (define (ci host)
-  "Build and ship in one go."
+  "Check, build and ship in one go."
+  (check)
   (build)
   (deploy host))
 #+end_src
 
-A loop of three commands, and =--plan= shows each one as the argv it is — no
-shell to re-parse, no quote to guess at:
+The loop and the conditional expand into four commands, and =--plan= shows each
+one as the argv it is — no shell to re-parse, no quote to guess at:
 
 #+begin_src shell
 $ maak --plan build
@@ -56,6 +66,8 @@ maak plan
   [2] build  pandoc pages/index.md -o build/index.html
               cwd: /home/me/site
   [3] build  pandoc pages/about.md -o build/about.html
+              cwd: /home/me/site
+  [4] build  cp -r -v static/style.css build/style.css
               cwd: /home/me/site
 #+end_src
 
