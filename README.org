@@ -21,21 +21,42 @@ keep in your head: the build is the program.
   #:declarative? #t
   #:use-module (maak maak))
 
-;; A task is a λ: (define (deploy) ...) is (define deploy (lambda () ...)).
-(define (deploy)
-  "Ship the build to the server."
-  (run (list "rsync" "-av" "build/" "server:/srv/www")))
+;; A task is a λ: (define (build) ...) is (define build (lambda () ...)).
+(define (build)
+  "Compile every page in ./pages into ./build."
+  (mkdir-p "build")
+  (for-each (lambda (page)
+              (run (list "pandoc" (~ "pages/~a.md" page)
+                         "-o" (~ "build/~a.html" page))))
+            '("index" "about")))
+
+;; Its arguments arrive as the strings typed on the command line.
+(define (deploy host)
+  "Ship ./build to HOST, replacing what is there."
+  (unless (file-exists? "build/index.html")
+    (task-error "nothing to deploy"
+                #:hint "Run `maak build' first."))
+  (run (list "rsync" "-av" "--delete" "build/" (~ "~a:/srv/www/" host))))
 
 ;; Procedures are values, so tasks compose like any other function.
-(define (ci)
-  "Everything CI does, in order."
-  (fmt)
-  (test)
-  (deploy))
+(define (ci host)
+  "Build and ship in one go."
+  (build)
+  (deploy host))
 #+end_src
 
+A loop of three commands, and =--plan= shows each one as the argv it is — no
+shell to re-parse, no quote to guess at:
+
 #+begin_src shell
-$ maak ci
+$ maak --plan build
+maak plan
+  [1] build  mkdir -pv build
+              cwd: /home/me/site
+  [2] build  pandoc pages/index.md -o build/index.html
+              cwd: /home/me/site
+  [3] build  pandoc pages/about.md -o build/about.html
+              cwd: /home/me/site
 #+end_src
 
 #+begin_quote
