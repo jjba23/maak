@@ -12,6 +12,23 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 
 *[Released]*
 
+** v1.1.2 (2026-11-21)
+
+The documentation build works again: `frontend-add`'s `@example` is gone,
+because Texinfo read `@testing-library/react` in it as the command `@testing`
+and `maak docs` stopped with `Unknown command testing`.
+
+*** Fixed
+
+- `(maak frontend)`'s `frontend-add` no longer carries the `@example` that
+  v1.1.1 restored.  A docstring is Texinfo, so an `@` in it starts a command:
+  the example named `@testing-library/react` and documenta answered
+  `parser-error: Unknown command testing`, which is what `maak docs` -- and
+  therefore the CI job that runs it -- was failing on.  The invocation the
+  example showed is still described in the prose beside it, and it can come
+  back escaped as `@@testing-library` when a docstring example is what a
+  release wants.
+
 ** v1.1.1 (2026-11-21)
 
 A formatting release: `(maak frontend)` is laid out the way a `sift` pass over
