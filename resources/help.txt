@@ -96,7 +96,29 @@ Options:
         happened, and the run fails at the end with the tasks that failed.
 
     -l, --list
-        List all available tasks in the currently loaded Maak file.
+        List all available tasks in the currently loaded Maak file: a heading
+        naming the file and how many tasks it holds, then one entry a task,
+        with its name in bold, its docstring aligned in one column, and what
+        it needs to have finished first under that.
+
+    --list=STYLE
+        Lay the listing out another way.  The styles are:
+
+            table    the aligned listing above (the default)
+            long     the table, with each task's example under it
+            plain    the 'name: docstring' blocks the listing used to print
+            names    one task name per line, and nothing else
+            json     the versioned JSON description an editor reads, which is
+                     what --list --json prints
+
+    --list-width N
+        Fold a listing's docstrings to fit N columns, which is what keeps a
+        long task description inside an 80-column terminal:
+
+            maak --list --list-width 100
+
+        Without it a docstring is printed as it was written, which keeps the
+        layout a task wrote -- a code sample, an 'Args:' table -- intact.
 
     --json
         With --list, print the listing as JSON instead: one object naming the

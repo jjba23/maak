@@ -579,7 +579,8 @@
                            maak-homepage
                            maak-license
                            print-version)
-  #:export (resolve-maak-tasks list-tasks run-tasks run-tasks-parallel
+  #:export (resolve-maak-tasks list-tasks tasks-table
+                              run-tasks run-tasks-parallel
                               run-task
                               format-task-doc available-task-names
                               unknown-task-error
@@ -825,30 +826,186 @@ that needs nothing prints nothing extra."
               (map indented (cdr lines)))))
      needed)))
 
-(define* (list-tasks #:key (as-is? #f))
+;; ====== The listing a person reads ======
+;;
+;; The table aligns every documentation line on one column rather than on each
+;; task's own name, which is what makes a long list readable: the documentation
+;; of `docs' and of `push-docker-latest' starts in the same place.  A name longer
+;; than the column keeps a line of its own and its documentation moves under it,
+;; so the column is a setting rather than a consequence of the longest name in
+;; the file.
+;;
+;; The documentation itself is printed as it was written -- a docstring that
+;; wraps is a docstring that wraps -- unless a width was asked for, in which case
+;; each line is folded into the columns that are left over.  Folding by default
+;; would reflow code samples and `Args:' tables that were laid out on purpose.
+
+;; The widest a name may be before its documentation moves under it, and the
+;; column the documentation is indented to: two spaces of lead, the name, two
+;; spaces of separation.
+(define %listing-name-width 24)
+(define %listing-lead 2)
+(define %listing-separation 2)
+
+;; The narrowest a folded documentation line may be, so a width too small for
+;; the widest name in the file still prints something readable.
+(define %listing-minimum-doc-width 20)
+
+(define (listing-entry task)
+  "Return TASK as (NAME DOC NEEDS EXAMPLE), or #f when it is not to be listed."
+  (let ((proc (variable-ref (cdr task))))
+    (and (not (task-hidden? proc))
+         (list (symbol->string (car task))
+               (let ((doc (procedure-documentation proc)))
+                 (if (string? doc) (dedent-string doc) ""))
+               (map symbol->string (task-depends proc))
+               (task-example proc)))))
+
+(define (listing-entries tasks)
+  "Return the entries of TASKS that a listing shows, in the order given."
+  (filter-map listing-entry tasks))
+
+(define (fold-line line width)
+  "Return LINE as the lines it takes to fit WIDTH columns, or as itself.
+
+Words are moved to the next line rather than split, so a URL or a long
+identifier that does not fit still reads as one word, on a line of its own."
+  (if (or (not width) (< (string-length line) width))
+      (list line)
+      (let loop ((words (string-tokenize line)) (current "") (lines '()))
+        (cond
+          ((null? words) (reverse (if (string=? current "") lines
+                                      (cons current lines))))
+          ((string=? current "") (loop (cdr words) (car words) lines))
+          ((<= (+ 1 (string-length current) (string-length (car words))) width)
+           (loop (cdr words) (string-append current " " (car words)) lines))
+          (else (loop words "" (cons current lines)))))))
+
+(define (listing-doc-lines doc doc-width)
+  "Return DOC as the lines a listing prints, folded to DOC-WIDTH when given."
+  (if (string=? doc "")
+      '()
+      (append-map (lambda (line)
+                    (if (blank-line? line) (list "") (fold-line line doc-width)))
+                  (string-split doc #\newline))))
+
+(define* (format-task-entry entry #:key (name-width 0) (width #f) (long? #f))
+  "Return ENTRY, a task's (NAME DOC NEEDS EXAMPLE), as the lines of a table row.
+
+The name is emphasised and padded to NAME-WIDTH, and the documentation starts
+after it; a name wider than the column keeps its own line.  WIDTH, when given,
+is the widest line the entry may produce, which is what folds the documentation.
+NEEDS and, with LONG?, EXAMPLE follow the documentation in the same column."
+  (match entry
+    ((name doc needs example)
+     (let* ((margin (+ %listing-lead name-width %listing-separation))
+            (doc-column (make-string margin #\space))
+            (doc-width (and width (max %listing-minimum-doc-width
+                                       (- width margin))))
+            (doc-lines (listing-doc-lines doc doc-width))
+            (fits? (<= (string-length name) name-width))
+            (label (if fits?
+                       (string-append (bold-output name)
+                                      (make-string (- name-width
+                                                      (string-length name))
+                                                   #\space)
+                                      (make-string %listing-separation #\space))
+                       (bold-output name)))
+            (indented (map (lambda (line)
+                             (if (string=? line "")
+                                 ""
+                                 (string-append doc-column line)))
+                           doc-lines))
+            (trailing (append
+                       (if (null? needs)
+                           '()
+                           (list (string-append doc-column "needs: "
+                                                (string-join needs ", "))))
+                       (if (and long? (not (string=? example "")))
+                           (list (string-append doc-column "example: " example))
+                           '())))
+            (head (cond
+                    ((null? doc-lines)
+                     (list (string-append (make-string %listing-lead #\space)
+                                          label)))
+                    (fits?
+                     (cons (string-append (make-string %listing-lead #\space)
+                                          label (car doc-lines))
+                           (cdr indented)))
+                    (else
+                     (cons (string-append (make-string %listing-lead #\space)
+                                          label)
+                           indented)))))
+       (append head trailing)))))
+
+(define* (tasks-table tasks #:key (width #f) (long? #f) (file #f))
+  "Return TASKS as the aligned listing `maak --list' prints.
+
+TASKS is the `(NAME . VARIABLE)' alist `resolve-maak-tasks' returns, so the
+listing is read from the loaded file: its docstrings, what each task declares
+and whether it asked to be left out.  WIDTH is the widest line the table may
+produce, and FILE, when given, is named in the heading."
+  (let* ((entries (listing-entries tasks))
+         (names (map first entries))
+         (name-width (if (null? names)
+                         0
+                         (min %listing-name-width
+                              (apply max (map string-length names)))))
+         (rows (append-map (lambda (entry)
+                             (cons ""
+                                   (format-task-entry entry
+                                                      #:name-width name-width
+                                                      #:width width
+                                                      #:long? long?)))
+                           entries))
+         (heading (if file
+                      (format #f "maak ~a — ~a task~a in ~a~%"
+                              maak-version
+                              (length entries)
+                              (if (= 1 (length entries)) "" "s")
+                              file)
+                      "")))
+    (string-append heading
+                   (if (null? rows)
+                       ""
+                       (string-join (map string-trim-right rows) "\n"))
+                   "\n")))
+
+(define* (list-tasks #:key (as-is? #f) (style 'table) (width #f) (file #f))
   "List documentation for every maak task in the loaded file.
 
-Tasks are sorted by name unless AS-IS? is #t.  Each docstring is laid out so
-its lines align under the task name rather than wrapping back to the left
-margin; see `format-task-doc'.  A task that needs others to have finished first
-says so under its documentation, and a task that asked to be left out of the
-listings with `task-metadata!' is left out."
+Tasks are sorted by name unless AS-IS? is #t.
+
+STYLE is how the listing is laid out: `table' aligns every documentation line
+on one column and is what `maak --list' prints, `names' prints one task name per
+line for a script or a picker, `long' is the table with each task's example
+under it, and `plain' is the `name: documentation' block the listing printed
+before the table, kept for a reader that has the shape in a script already.
+WIDTH, when given, is the widest line the listing may produce, which is what
+folds a long docstring.  FILE, when given, is named in the heading.
+
+A task that needs others to have finished first says so under its documentation,
+and a task that asked to be left out of the listings with `task-metadata!' is
+left out of all of them."
   (let* ((raw-tasks (resolve-maak-tasks))
          (tasks (if as-is? raw-tasks (sort raw-tasks task-name<?))))
-    (log-separator)
-    (for-each (lambda (task)
-                (let ((proc (variable-ref (cdr task))))
-                  (unless (task-hidden? proc)
-                    (newline)
-                    (log-message
-                     (string-join
-                      (format-task-doc (symbol->string (car task))
-                                       (procedure-documentation proc)
-                                       #:needs (map symbol->string
-                                                    (task-depends proc)))
-                      "\n")))))
-              tasks)
-    (newline)
+    (display
+     (case style
+       ((names)
+        (string-join (map first (listing-entries tasks)) "\n"))
+       ((plain)
+        (call-with-output-string
+          (lambda (port)
+            (for-each (match-lambda
+                        ((name doc needs _example)
+                         (newline port)
+                         (display (string-join
+                                   (format-task-doc name doc #:needs needs)
+                                   "\n")
+                                  port)))
+                      (listing-entries tasks)))))
+       ((long) (tasks-table tasks #:width width #:file file #:long? #t))
+       (else (tasks-table tasks #:width width #:file file))))
     (newline)))
 
 (define (unknown-task-error task)

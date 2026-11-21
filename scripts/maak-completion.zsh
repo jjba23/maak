@@ -15,6 +15,8 @@ _maak() {
         '(-i --ignore-errors)'{-i,--ignore-errors}'[Keep going after a failure, and still succeed]'
         '(-k --keep-going)'{-k,--keep-going}'[Keep going after a failure]'
         '(-l --list)'{-l,--list}'[List available tasks in the Maak file]'
+        '--list=[Lay the listing out this way]:layout:(table plain long names json)'
+        '--list-width=[Fold a listing to this many columns]:columns:'
         '--json[Print the listing or plan as JSON, with --list or --plan]'
         '--plan[Print the typed plan a run would execute, without running it]'
         '--watch[Re-run the named tasks whenever the tree changes]'

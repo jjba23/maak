@@ -168,35 +168,30 @@ A dependency that names no task of the file, and a cycle, are errors before anyt
 
 * How ~--list~ lays out docstrings
 
-The docstring of a task is its documentation. ~maak --list~ prints it in a way that stays readable no matter how long it is:
+The docstring of a task is its documentation. ~maak --list~ prints it in the column the widest name in the file leaves, so the documentation of every task starts in the same place:
 
-- one line prints inline after the name:
+#+begin_src
+maak 1.1.0 — 3 tasks in /p/maak.scm
 
-  #+begin_src
-  build: Compile the project.
-  #+end_src
+  build              Compile the project.
+                     The result lands in ./target.
 
-- two lines start inline and align the continuation under the documentation:
+  release            Bump the version, tag the tree, upload the
+                     artefacts and then push the tag.
 
-  #+begin_src
-  build: Compile the project.
-         The result lands in ./target.
-  #+end_src
+  deploy             Ship the build.
+                     needs: build
+#+end_src
 
-- three or more lines become a block, with the name on its own line and every line of documentation indented to the same column:
+The name is emphasised and padded, the first line of the docstring starts after it, and every line after that -- a continuation, a paragraph break, the ~needs:~ line a declared dependency adds -- lines up in the same column. A name wider than that column keeps a line of its own and its documentation moves under it, so one unusually long task name never misaligns the rest of the file. Common source indentation is removed first, with ~dedent-string~, so a docstring written inside an indented procedure still reads flush left.
 
-  #+begin_src
-  release:
-           Bump the version, tag the tree,
-           upload the artefacts and then
-           push the tag.
-  #+end_src
+A docstring is printed as it was written, because a task that laid out a code sample or an ~Args:~ table meant to lay it out. ~--list-width N~ folds it into N columns instead, for a terminal that would otherwise wrap the listing itself.
 
-Common source indentation is removed first, so a docstring written inside an indented procedure still reads flush left.
+~--list~ has four other layouts, each a word after the equals sign: ~--list=long~ (the table with each task's example under it), ~--list=plain~ (the ~name: documentation~ blocks the table replaced), ~--list=names~ (one name per line and nothing else) and ~--list=json~ (the versioned description an editor reads). Which one is right depends on the reader, and a project's Maak file does not have to care: the docstring is the same in all five.
 
 A task that needs others to have finished first says so under its documentation, and a task that asked to be left out with ~#:hidden?~ is left out of the listing altogether:
 
 #+begin_src
-push-docker-latest: Push the latest locally generated Docker image to Dockerhub.
-                    needs: package-docker
+  push-docker-latest  Push the latest locally generated Docker image to Dockerhub.
+                      needs: package-docker
 #+end_src

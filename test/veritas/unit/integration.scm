@@ -184,7 +184,8 @@ that a case can ask about it alongside the status of the run."
                (let ((result (launcher-run "--no-banner" "--list")))
                  (assert-equal #:expect (list 0 #t)
                                #:got (list (status-of result)
-                                           (said? result "stdout" "container:")))))
+                                           (said? result "stdout"
+                                                  "Guix container, with no network")))))
 
          (test "the help text is read from the resources the launcher ships beside itself"
                (let ((result (launcher-run "--help")))
@@ -242,7 +243,7 @@ that a case can ask about it alongside the status of the run."
                                            "--no-banner" "--list")))
                  (assert-equal #:expect (list 0 #t #t)
                                #:got (list (status-of result)
-                                           (said? result "stdout" "build:")
+                                           (said? result "stdout" "Build it.")
                                            (said? result "stdout"
                                                   "needs: build")))))
 

@@ -12,6 +12,23 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 
 ** Added
 
+- `--list` is a table now, and it has layouts.  The default listing aligns every
+  docstring on one column -- a heading naming the file and how many tasks it
+  holds, then one entry a task with its name emphasised, its documentation in
+  that column, and what it needs to have finished first underneath -- so a
+  listing of forty tasks reads down one edge instead of restarting at every
+  name.  `--list=STYLE` picks another shape: `long` adds the example a task
+  declares, `plain` is the `name: documentation` blocks the table replaced,
+  `names` is one task name per line for a script or a picker, and `json` is the
+  description `--list --json` prints.  `--list-width N` folds a docstring into N
+  columns; without it a docstring is printed as it was written, so a code sample
+  or an `Args:` table a task laid out stays laid out.
+- `tasks-table` in `(maak maak)`: the aligned listing as one string, for a task
+  that prints its own menu.  `list-tasks` grew `#:style`, `#:width` and
+  `#:file` to render it.
+- `color?` in `(maak dsl)`, a parameter that turns ANSI styling off for a whole
+  run.  `NO_COLOR`, set to anything but the empty string, is what it reads by
+  default, so `maak --list` and a dry run reach a file or a CI log plain.
 - [[file:docs/ai.org][Maak files and AI assistants]]: what to ask maak instead of
   guessing (`--list --json`, `--plan --json`, `explain`, and the static reader
   for a file that does not compile yet), the few rules a Maak file is reviewed
@@ -30,6 +47,20 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 - `llms.txt`, a map of the guide for a tool: the two versioned JSON objects to
   read instead of guessing, then the page that answers each question, as raw
   URLs.
+
+** Changed
+
+- `--list` prints the listing and nothing else: the greeting banner and the
+  `Loading tasks from:` line are gone, because the listing carries its own
+  heading, and the environment-file lines an environment file used to announce
+  are silenced for a listing the way they already were for `--plan`.
+- `--list=json` and `--list=names` are the same requests as `--list --json` and
+  `maak-tasks --names`, spelled as one word.
+
+** Fixed
+
+- A listing no longer announces the environment file it read before printing
+  itself, which used to land between the heading and the first task.
 
 *[Released]*
 

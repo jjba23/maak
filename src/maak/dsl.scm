@@ -33,6 +33,7 @@
                         quiet?
                         dry-run?
                         banner?
+                        color?
                         ;; ====== Plans ======
                         make-plan-step
                         plan-step?
@@ -281,6 +282,16 @@ those are filled in here so the user never sees a bare `~S'."
 ;; run it starts itself, and on again afterwards.
 (define banner?
   (make-parameter #t))
+
+;; Whether styling is emitted at all.  `NO_COLOR' -- https://no-color.org -- is
+;; the switch a terminal, a CI job or a supervisor sets once, and a set, non-empty
+;; value turns the escapes off for the whole run.  It is a parameter for the same
+;; reason `banner?' is: a task that prints into a file or a log can turn it off
+;; around the output it controls.
+(define color?
+  (make-parameter
+   (let ((no-color (getenv "NO_COLOR")))
+     (not (and no-color (not (string=? no-color "")))))))
 
 ;; ====== Plans ======
 ;;
@@ -2125,4 +2136,7 @@ rather than at `/'.
      #:async? async?))
 
 (define (bold-output x)
-  (format #f "\x1b[1m~a\x1b[0m" x))
+  "Return X emphasised for a terminal, or X unchanged when styling is off.
+
+See `color?': `NO_COLOR' turns the escapes off for a whole run."
+  (if (color?) (format #f "\x1b[1m~a\x1b[0m" x) x))

@@ -116,11 +116,31 @@ for word in "$@"; do
   fi
 done
 
+# `--list=STYLE' is one word that asks for two things: the listing and its
+# layout.  `getopt' takes an optional argument as the word after the option, so
+# it could not tell `--list=long' from `--list' followed by a task called
+# `long'; the layout is therefore taken out here, before `getopt' sees the line,
+# and handed to Guile in the spelling it understands.  Everything else is left
+# exactly as it was written.
+listing_style=""
+options_without_style=()
+for word in "${option_side[@]}"; do
+  case "${word}" in
+  --list=*)
+    listing_style="${word#--list=}"
+    options_without_style+=("--list")
+    ;;
+  *) options_without_style+=("${word}") ;;
+  esac
+done
+option_side=("${options_without_style[@]}")
+
 # Only the words before that first separator are options and task words; the
 # ones after it are the arguments, and are never shown to `getopt' -- a task
 # argument that looks like an option is an argument.
-parsed_options=$(getopt -n "maak" -o C:e:ij:klf:hL:nqvt: --longoptions list,json,plan,watch,explain,file:,help,dry-run,quiet,load-path:,env-file:,no-env-file,banner,no-banner,version,debug,directory:,keep-going,ignore-errors,jobs:,no-print-directory,tasks: -- "${option_side[@]}")
+parsed_options=$(getopt -n "maak" -o C:e:ij:klf:hL:nqvt: --longoptions list,list-width:,json,plan,watch,explain,file:,help,dry-run,quiet,load-path:,env-file:,no-env-file,banner,no-banner,version,debug,directory:,keep-going,ignore-errors,jobs:,no-print-directory,tasks: -- "${option_side[@]}")
 eval set -- "$parsed_options"
+
 
 # The Maak file is resolved once every -C has been honoured, so it is kept as
 # it was given until then.
@@ -189,6 +209,14 @@ while [ "$#" -gt 0 ]; do
   -l | --list)
     guile_cmd_args+=("--list")
     shift
+    ;;
+  --list-width)
+    if [ -z "${2:-}" ]; then
+      log_error "The --list-width option needs a number of columns."
+      exit 1
+    fi
+    guile_cmd_args+=("--list-width" "${2}")
+    shift 2
     ;;
   --json)
     guile_cmd_args+=("--json")
@@ -414,6 +442,13 @@ if [ "${#task_names[@]}" -gt 0 ]; then
 fi
 if [ "${#task_arguments[@]}" -gt 0 ]; then
   guile_cmd_args+=("--" "${task_arguments[@]}")
+fi
+
+# The layout `--list=STYLE' asked for, if any.  It is handed over last, because
+# `getopt-long' keeps the final value of a single-valued option: a `--list' the
+# line also carries is the table, and the layout named here wins.
+if [ -n "${listing_style}" ]; then
+  guile_cmd_args+=("--list=${listing_style}")
 fi
 
 # Run Guile application

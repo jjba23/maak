@@ -56,6 +56,10 @@
 ;; that reached one as an argument fails rather than passes quietly, and a task
 ;; that takes any number of them and prints what it was given.
 (define several-fixture "test/maak/fixtures/several.scm")
+;; The fixture whose tasks declare what they need first and one that asks to be
+;; left out of the listings, which is what the `long' layout and the hidden-task
+;; rule are asserted against.
+(define order-fixture "test/maak/fixtures/order.scm")
 
 (define (options-for . args)
   "Return the parsed command line ARGS, as `main' would see it."
@@ -250,9 +254,9 @@ unaffected."
                (assert-equal #:expect 0
                              #:got (status-of (listing-run)))
                (assert-contains #:expect (stdout-of (listing-run))
-                                #:got "ok: Print a line and succeed.")
+                                #:got "Print a line and succeed.")
                (assert-contains #:expect (stdout-of (listing-run))
-                                #:got "boom: Fail the way a task is supposed to fail."))
+                                #:got "Fail the way a task is supposed to fail."))
          ;; A Maak file defines the module `(maak)', and `load' adds to a module
          ;; that already exists: a run that loaded another file first would
          ;; otherwise describe both.  The two runs are sequenced inside one
@@ -459,11 +463,120 @@ task it reaches takes none."
                                             "--" "beta")))
                 #:got "`beta' names a task of this Maak file"))))
 
+;; ====== The shapes a listing takes ======
+;;
+;; `--list' takes an optional layout and a width.  The layout decides what a
+;; reader is shown -- the aligned table, one name per line, the plain blocks the
+;; listing had before the table, the table with each task's example, or the
+;; versioned JSON an editor reads -- and the width decides whether a long
+;; docstring is folded or printed as it was written.  Each run below goes
+;; through `main' on the fixture Maak file, so the option grammar and the layout
+;; are exercised together.
+
+(define (styled-listing-run word . args)
+  "List the fixture Maak file's tasks, with WORD as the listing option."
+  (apply run-cli (append (list "--file" fixture-file
+                               "--no-banner"
+                               word)
+                         args)))
+
+(define (names-listing-run)
+  "List the fixture's task names, one per line."
+  (styled-listing-run "--list=names"))
+
+(define (long-listing-run)
+  "List the fixture's tasks as the table, with what each declares under it."
+  (run-cli-fixture order-fixture "--list=long"))
+
+(define (json-listing-run)
+  "List the fixture's tasks as the versioned JSON an editor reads."
+  (styled-listing-run "--list=json"))
+
+(define (plain-listing-run)
+  "List the fixture's tasks as the blocks the table replaced."
+  (styled-listing-run "--list=plain"))
+
+(define (unknown-style-run)
+  "Ask for a layout maak does not have."
+  (styled-listing-run "--list=fancy"))
+
+(define (bad-width-run)
+  "Ask for a width a listing cannot be folded into."
+  (styled-listing-run "--list" "--list-width" "7"))
+
+(define listing-style-suite
+  (suite "The shapes a listing takes"
+         #:concurrent? #f
+         #:shuffle? #f
+         (test "a layout may be named with the flag that asks for the listing"
+               (assert-equal #:expect 0
+                             #:got (status-of (names-listing-run))))
+         (test "the names layout prints one task name per line and nothing else"
+               (assert-equal #:expect "boom\nok\nreport-default\nreport-env\n"
+                             #:got (stdout-of (names-listing-run))))
+         (test "the default layout names the file and how many tasks it holds"
+               (assert-contains #:expect (stdout-of (listing-run))
+                                #:got "4 tasks in"))
+         (test "the default layout starts both docstrings in the same column"
+               ;; The fixture's names are of different lengths, so one column for
+               ;; both is what proves the alignment comes from the listing rather
+               ;; than from each name.
+               (let ((lines (string-split (plain (stdout-of (listing-run)))
+                                          #\newline)))
+                 (assert-equal
+                  #:expect #t
+                  #:got (= (string-contains
+                            (find (lambda (line)
+                                    (string-contains line "Fail the way"))
+                                  lines)
+                            "Fail the way")
+                           (string-contains
+                            (find (lambda (line)
+                                    (string-contains line "Print a line"))
+                                  lines)
+                            "Print a line")))))
+         (test "the plain layout keeps the name and the colon it always had"
+               (assert-contains #:expect (stdout-of (plain-listing-run))
+                                #:got "ok: Print a line and succeed."))
+         (test "the long layout says what a task needs first"
+               (assert-contains #:expect (stdout-of (long-listing-run))
+                                #:got "needs: prepare"))
+         (test "a listing leaves out the task that asked to be left out"
+               (assert-false (string-contains (stdout-of (long-listing-run))
+                                              "tidy")))
+         (test "the json layout is the listing an editor reads"
+               (assert-contains #:expect (stdout-of (json-listing-run))
+                                #:got "{\"version\":1,"))
+         (test "a width folds a docstring that is longer than it"
+               ;; The heading names the file and is not folded, so the assertion
+               ;; is about the entries: the lines that begin in the listing's
+               ;; margin or in the column its documentation starts in.
+               (assert-true
+                (every (lambda (line) (<= (string-length line) 40))
+                       (filter (lambda (line) (string-prefix? " " line))
+                               (string-split
+                                (plain
+                                 (stdout-of
+                                  (styled-listing-run "--list"
+                                                      "--list-width" "40")))
+                                #\newline)))))
+         (test "an unknown layout is refused, naming the listing as the problem"
+               (assert-equal #:expect (list 1 #t)
+                             #:got (list (status-of (unknown-style-run))
+                                         (and (string-contains
+                                               (plain (stderr-of (unknown-style-run)))
+                                               "unknown listing style: fancy")
+                                              #t))))
+         (test "a width too narrow to fold into is refused"
+               (assert-contains #:expect (plain (stderr-of (bad-width-run)))
+                                #:got "invalid listing width: 7"))))
+
 (define (spec)
   (veritas-run #:concurrent? #f
                #:shuffle? #f
                switch-suite
                banner-suite
+               listing-style-suite
                failure-suite
                env-file-suite
                runs-suite

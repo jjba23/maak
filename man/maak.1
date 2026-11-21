@@ -219,9 +219,40 @@ fails with the list of tasks that did not succeed.  Without this flag the first
 failure ends the run, which is what a pipeline of tasks usually wants.
 .TP
 .BR \-l ", " \-\-list
-List every task in the loaded Maak file, with its documentation.  A task that
-declared what it needs first under its documentation, and a task that asked to
-be left out of the listings is left out altogether.
+List every task in the loaded Maak file, with its documentation, laid out to be
+read: a heading naming the file and how many tasks it holds, then one entry a
+task, with the name emphasised, the docstring aligned in one column, and what
+the task needs to have finished first under it.  Every documentation line starts
+in the same column whatever the task is called; a name wider than that column
+keeps a line of its own.  Nothing else is printed around a listing \-\- no
+banner and no log lines \-\- so its output is the listing and only the listing.
+A task that asked to be left out of the listings is left out altogether.
+.TP
+.BI "\-\-list=" STYLE
+Lay the listing out another way.
+.I table
+is the aligned listing above and the default;
+.I long
+is the same table with each task's example invocation under it;
+.I plain
+is the
+.IR name: " documentation"
+blocks the listing printed before the table;
+.I names
+is one task name per line and nothing else, which is what a shell loop or a
+picker reads; and
+.I json
+is the versioned description
+.B \-\-list \-\-json
+prints.  The layout is attached with an equals sign, so a word after
+.B \-\-list
+is still a task name.
+.TP
+.BI "\-\-list\-width " N
+Fold a listing's docstrings to fit N columns, which is what keeps a long task
+description inside an 80\-column terminal.  Without it a docstring is printed as
+it was written, so a code sample or an "Args:" table a task laid out stays as it
+was laid out.  N must be 40 or more.
 .TP
 .B \-\-json
 With
@@ -330,6 +361,12 @@ is not given.  A name that is already in the environment is left alone.
 When set to a non\-empty value, skip the greeting banner.
 .B \-\-banner
 overrides it.
+.TP
+.B NO_COLOR
+When set to a non\-empty value, print no ANSI styling at all: a listing's task
+names and a dry run's command lines arrive plain, which is what a file, a log
+or a CI job wants.  It is the convention described at
+https://no\-color.org, honoured for the whole run.
 .TP
 .B MAAK_DEBUG
 When set to a non\-empty value, print the Guile backtrace on an error instead

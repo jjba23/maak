@@ -47,6 +47,7 @@
   #:export (main maak-option-spec maak-default-file resolve-maak-file
                  resolve-banner? resolve-env-files truthy-string?
                  resolve-print-directory?
+                 listing-styles resolve-listing-style resolve-list-width
                  describe-tasks
                  report-maak-error report-generic-error))
 
@@ -63,9 +64,19 @@
     (resources (single-char #\r)
                (value #t)
                (required? #f))
+    ;; `--list' lays the tasks out for a person.  Its value, which may be left
+    ;; out, names the layout: `--list=table' is the aligned table that is the
+    ;; default, `names' one name per line, `long' the table with each task's
+    ;; example, `plain' the shape the listing had before the table, and `json'
+    ;; the description an editor reads, which is `--list --json' spelled once.
     (list (single-char #\l)
-          (value #f)
+          (value optional)
           (required? #f))
+    ;; The column the listing folds a long docstring to.  A terminal cannot be
+    ;; asked for its width portably, so the width is given rather than guessed,
+    ;; and a listing that is not given one is printed as it was written.
+    (list-width (value #t)
+                (required? #f))
     ;; `--json' is the listing for a machine rather than for a person: the same
     ;; tasks, printed as the description an editor can act on.  It has no
     ;; meaning without `--list', which is why it is a flag beside it rather than
@@ -262,6 +273,38 @@ modules that live beside it.  Directories that do not exist are skipped."
                   (add-load-path! dir)))
               (reverse resolved))
     resolved))
+
+;; ====== The shapes a listing takes ======
+
+;; The layouts `--list' offers, in the order the help screen names them.
+(define listing-styles '(table plain long names json))
+
+(define (resolve-listing-style options)
+  "Return the layout `--list' asks for, as a symbol.
+
+`--list' on its own is the aligned table; `--list=STYLE' names one of
+`listing-styles'.  A layout maak does not know is refused here rather than
+printed as something the reader did not ask for."
+  (let ((value (option-ref options 'list #f)))
+    (cond
+      ((not (string? value)) 'table)
+      ((memq (string->symbol value) listing-styles) (string->symbol value))
+      (else
+       (raise-maak-error
+        (format #f "unknown listing style: ~a" value)
+        #:hint (format #f "`--list' takes one of ~a; `--list' alone prints the table."
+                        (string-join (map symbol->string listing-styles) ", ")))))))
+
+(define (resolve-list-width options)
+  "Return the width `--list-width' gives, or #f when nothing is folded."
+  (let ((given (option-ref options 'list-width #f)))
+    (and given
+         (let ((width (string->number given)))
+           (unless (and (exact-integer? width) (>= width 40))
+             (raise-maak-error
+              (format #f "invalid listing width: ~a" given)
+              #:hint "`--list-width N' takes a whole number of columns, 40 or more."))
+           width))))
 
 ;; ====== Options ======
 
@@ -566,12 +609,16 @@ fixed is exactly when it should keep going."
 
 (define (run-maak options)
   "Carry out the action OPTIONS select: help, version, listing, plan, or tasks."
-  (let ((resources (option-ref options
-                               'resources #f))
+  (let* ((resources (option-ref options
+                                'resources #f))
         (should-list (option-ref options
                                  'list #f))
-        (should-json (option-ref options
-                                 'json #f))
+        ;; `--list=json' is `--list --json' spelled once, so the layout decides
+        ;; whether the description is printed as JSON.
+        (listing-style (resolve-listing-style options))
+        (should-json (or (option-ref options
+                                     'json #f)
+                         (eq? 'json listing-style)))
         (should-plan (option-ref options
                                  'plan #f))
         (should-watch (option-ref options
@@ -675,12 +722,14 @@ fixed is exactly when it should keep going."
                         ;; A listing or a plan a machine reads carries no
                         ;; greeting and no log lines: it is the whole of what a
                         ;; reader gets, and a banner in front of it would choke
-                        ;; the reader.  Explain is a report for a person, and
-                        ;; still reads better without a run's chatter.
+                        ;; the reader.  A listing for a person carries a heading
+                        ;; of its own, so it wants the same silence around it.
+                        ;; Explain is a report for a person, and still reads
+                        ;; better without a run's chatter.
                         (quiet? (or should-quiet should-json should-plan
-                                    should-explain))
+                                    should-explain should-list))
                         (banner? (and (not should-json) (not should-plan)
-                                      (not should-explain)
+                                      (not should-explain) (not should-list)
                                       (resolve-banner? options))))
            ;; The environment is read before the maak file is loaded, so a task
            ;; file can already consult the variables it names.  A watch re-reads
@@ -710,7 +759,10 @@ fixed is exactly when it should keep going."
                   (begin
                     (display (tasks-json (describe-tasks file) file))
                     (newline))
-                  (list-tasks #:as-is? #f))
+                  (list-tasks #:as-is? #f
+                              #:style listing-style
+                              #:width (resolve-list-width options)
+                              #:file file))
               0)
              (should-plan
               (let* ((out (current-output-port))

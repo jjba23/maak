@@ -13,9 +13,24 @@ _maak() {
   }
 
   local opts="-C --directory -e --env-file -f --file -h --help -i --ignore-errors
-    -k --keep-going -l --list --json --plan --watch --explain -L --load-path
-    -n --dry-run -q --quiet -t --tasks -v --version --banner --no-banner
-    --no-env-file --no-print-directory --debug"
+    -k --keep-going -l --list --list-width --json --plan --watch --explain
+    -L --load-path -n --dry-run -q --quiet -t --tasks -v --version --banner
+    --no-banner --no-env-file --no-print-directory --debug"
+
+  # The layouts `--list=STYLE' takes.
+  local styles="table plain long names json"
+
+  # A layout is being named after the `=' of `--list='.
+  if [[ "$cur" == --list=* ]]; then
+    mapfile -t COMPREPLY < <(compgen -P "--list=" -W "$styles" \
+      -- "${cur#--list=}")
+    return 0
+  fi
+
+  # The column a listing is folded to is a number, not a path.
+  if [[ "$prev" == "--list-width" ]]; then
+    return 0
+  fi
 
   # Complete options if the current token starts with a hyphen
   if [[ "$cur" == -* ]]; then
