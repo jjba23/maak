@@ -1,3 +1,30 @@
+maak (1.1.0-1) unstable; urgency=medium
+
+  * --list is a table now: a heading naming the file and how many tasks it
+    holds, then one entry a task with its name emphasised, its docstring
+    aligned on one column, and what it needs first underneath.  A name wider
+    than the column keeps a line of its own, so one long task name no longer
+    misaligns the file.
+  * --list=STYLE picks another layout: long adds the example a task declares,
+    plain keeps the name: documentation blocks the table replaced, names is one
+    task name per line, and json is what --list --json prints.
+  * --list-width N folds a docstring into N columns; without it a docstring is
+    printed as it was written, so a code sample or an Args: table a task laid
+    out stays laid out.
+  * --list prints the listing and nothing else: no banner, no Loading tasks
+    from line, and no environment-file lines between the heading and the first
+    task.
+  * NO_COLOR, set to a non-empty value, turns ANSI styling off for a whole run
+    through a new color? parameter in (maak dsl).
+  * tasks-table in (maak maak) renders the aligned listing; list-tasks takes
+    #:style, #:width and #:file.
+  * maak test runs scripts/maak-test, which is bash and guile and never loads
+    this checkout's library before the suite does; it chooses the environment
+    (the manifest under Guix, the flake under Nix, or the guile on PATH),
+    says which one, and takes MAAK_TEST_ENV=guix|nix|plain.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Sat, 21 Nov 2026 12:00:00 +0100
+
 maak (1.0.0-1) unstable; urgency=medium
 
   * The public API is frozen and documented: docs/stability.org names the

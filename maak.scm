@@ -97,7 +97,8 @@ copies, and this task rewrites them from that file.
 
 A release is then the whole ritual in one command: the copies are made to agree,
 everything tracked that changed is committed as `chore: Release vX.Y.Z', and
-that commit is tagged `vX.Y.Z'.  The commit is `git commit -am', so it takes
+that commit is tagged `vX.Y.Z' with an annotated tag.  The commit is `git
+commit -am', so it takes
 every tracked change in the tree rather than only the ones this task made;
 commit anything unrelated first if it should not ride along.  A version whose
 tag already exists is refused rather than committed again or retagged, and a
@@ -211,9 +212,15 @@ as it was."
       message))
 
   (define (tag-release version)
-    "Tag the current commit as the release VERSION, and return the tag."
+    "Tag the current commit as the release VERSION, and return the tag.
+
+The tag is annotated, which is what makes it a release rather than a
+bookmark: it carries the name and the version, `git push --follow-tags'
+sends it without an extra flag, and `git describe' answers with it.  The
+same shape the earlier releases were cut with."
     (let ((tag (~ "v~a" version)))
-      (unless (git:git (list "tag" tag)
+      (unless (git:git (list "tag" "--annotate" tag
+                             "--message" (~ "~a ~a" project-name version))
                        #:directory repo #:allow-failure? #t)
         (task-error "sync-version: `git tag ~a' failed; the release was committed, but not tagged"
                     #:args (list tag)))

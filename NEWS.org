@@ -10,7 +10,15 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 
 *[Unreleased]*
 
-** Added
+*[Released]*
+
+** v1.1.0 (2026-11-21)
+
+The task list is a table now: every docstring starts in the same column, and
+the shape of the listing is a choice rather than a constant.  And `maak test`
+no longer needs a working maak to test maak.
+
+*** Added
 
 - `--list` is a table now, and it has layouts.  The default listing aligns every
   docstring on one column -- a heading naming the file and how many tasks it
@@ -48,7 +56,7 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
   read instead of guessing, then the page that answers each question, as raw
   URLs.
 
-** Changed
+*** Changed
 
 - `--list` prints the listing and nothing else: the greeting banner and the
   `Loading tasks from:` line are gone, because the listing carries its own
@@ -65,12 +73,10 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
   says which one it chose, and takes `MAAK_TEST_ENV=guix|nix|plain` when it must
   not choose for itself.
 
-** Fixed
+*** Fixed
 
 - A listing no longer announces the environment file it read before printing
   itself, which used to land between the heading and the first task.
-
-*[Released]*
 
 ** v1.0.0 (2026-11-17)
 
