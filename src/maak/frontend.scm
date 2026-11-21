@@ -279,11 +279,7 @@ fails instead.  The words are the manager's own -- `npm ci',
 PACKAGES is one name or a list of them.  DEV? asks for a development dependency,
 which npm and pnpm spell `--save-dev' and yarn spells `--dev'.  ARGUMENTS are
 the manager's own words, appended last.
-
-@example
-(frontend-add \"react\")
-(frontend-add '(\"vitest\" \"@testing-library/react\") #:dev? #t)
-@end example"
+"
   (let ((kind (package-manager-kind)))
     (frontend (append (add-words kind)
                       (string-list packages "frontend-add")
