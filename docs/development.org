@@ -86,6 +86,6 @@ environment variable is also written into the manual page.
 
 The technical Guile API documentation is generated from the sources with ~maak docs~ and published here:
 
-https://jointhefreeworld.org/api-docs/maak/API.html
+https://jointhefreeworld.org/api-docs/maak/index.html
 
 The manual page lives in ~man/maak.1~, is installed with the program, and is previewed by ~maak man~. ~maak --help~ and ~resources/help.txt~ carry the same option reference.

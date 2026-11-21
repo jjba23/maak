@@ -39,4 +39,4 @@ arguments) and `maak --plan --json TASK` (what a task would execute: `kind`,
 - [README](https://raw.githubusercontent.com/jjba23/maak/trunk/README.org): the project in a page.
 - [Release notes](https://raw.githubusercontent.com/jjba23/maak/trunk/NEWS.org): one section per release tag.
 - [Repository](https://github.com/jjba23/maak)
-- [Guile API documentation](https://jointhefreeworld.org/api-docs/maak/API.html): every exported procedure, its arguments and its docstring.
+- [Guile API documentation](https://jointhefreeworld.org/api-docs/maak/index.html): every exported procedure, its arguments and its docstring.

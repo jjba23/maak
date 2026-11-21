@@ -132,7 +132,7 @@ Start with the quick start, or open the whole [[file:docs/index.org][documentati
 
 The manual page is installed with the program (~man maak~, or ~maak man~ in a
 checkout), the technical Guile API documentation is published at
-https://jointhefreeworld.org/api-docs/maak/API.html, and every release is
+https://jointhefreeworld.org/api-docs/maak/index.html, and every release is
 recorded in [[file:NEWS.org][NEWS.org]].
 
 * Editor support
