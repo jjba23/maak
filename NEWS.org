@@ -12,6 +12,20 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 
 *[Released]*
 
+** v1.1.1 (2026-11-21)
+
+A formatting release: `(maak frontend)` is laid out the way a `sift` pass over
+the tree expects, so the module stops being the one file that changes whenever
+the tree is formatted.  No command line the helpers build changed, and the spec
+that asserts them is byte for byte the same.
+
+*** Changed
+
+- `(maak frontend)` writes its `cond` and `case` clauses with the brackets
+  `sift format` produces, which is a whitespace and bracket change and nothing
+  else.  `frontend-add`'s docstring keeps the `@example` that shows `#:dev?`,
+  which the pass had dropped.
+
 ** v1.1.0 (2026-11-21)
 
 The task list is a table now: every docstring starts in the same column, and

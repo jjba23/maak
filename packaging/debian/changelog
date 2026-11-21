@@ -1,3 +1,14 @@
+maak (1.1.1-1) unstable; urgency=medium
+
+  * (maak frontend) writes its cond and case clauses with the brackets sift
+    format produces, so a formatting pass over the tree stops rewriting that
+    module and nothing else.  It is a whitespace and bracket change: the specs
+    that assert the argv the helpers build are unchanged and pass.
+  * frontend-add's docstring keeps the @example block that names #:dev?, which
+    the pass had dropped.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Sat, 21 Nov 2026 15:00:00 +0100
+
 maak (1.1.0-1) unstable; urgency=medium
 
   * --list is a table now: a heading naming the file and how many tasks it
