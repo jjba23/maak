@@ -27,9 +27,23 @@ guix shell -m manifest.scm -- ./scripts/maak test
 guix shell -m manifest.scm -- ./scripts/maak man
 #+end_src
 
+The suite has a second entry point of its own, ~scripts/maak-test~, and it is the one to reach for when the thing you are changing is the command line itself:
+
+#+begin_src shell
+./scripts/maak-test
+#+end_src
+
 * Tests
 
-The tests live under ~test/veritas/unit~ and are written with [[https://codeberg.org/jjba23/veritas][Veritas]]. ~maak test~ runs them; the same run by hand is:
+The tests live under ~test/veritas/unit~ and are written with [[https://codeberg.org/jjba23/veritas][Veritas]]. ~maak test~ runs them, by way of ~scripts/maak-test~, which is bash and guile and never loads this checkout's library before the suite does. The direction is deliberate: the thing that runs the tests must not be the thing under test, so a change that breaks `(maak main)` — a parenthesis, a lambda list, a module that will not compile — still gets a suite run and a report instead of a command line that will not start.
+
+The script also picks the environment, in this order, and says which one it chose:
+
+1. ~guix shell -m manifest.scm~, which pins the interpreter, Veritas and the tools the integration specs run;
+2. ~nix develop~, the project's flake, for a machine without Guix;
+3. the ~guile~ already on ~PATH~, when it can load ~(veritas runner)~.
+
+~MAAK_TEST_ENV=guix|nix|plain~ picks one outright, which is what a container or a CI job wants when it must not fall back to whatever is installed or whatever the machine is not. The same run by hand, in the manifest's environment, is:
 
 #+begin_src shell
 VERITAS_TEST_MODULE=veritas VERITAS_TEST_TOP_DIR=test \
@@ -38,7 +52,7 @@ VERITAS_TEST_MODULE=veritas VERITAS_TEST_TOP_DIR=test \
   guile -L ./src -L ./test -c '((@ (veritas runner) run-tests))'
 #+end_src
 
-That has to be *this* checkout's maak, not the one an installed ~maak~ was built with. The Maak file beside it may ask for modules a released library does not have, and the mismatch shows up as ~no code for module (maak ...)~, which reads like a missing file rather than as a version problem. The launcher under ~scripts~ falls back to the sources beside it, so the checkout's own maak is one command away, inside the environment ~manifest.scm~ declares.
+That has to be *this* checkout's maak, not the one an installed ~maak~ was built with. The Maak file beside it may ask for modules a released library does not have, and the mismatch shows up as ~no code for module (maak ...)~, which reads like a missing file rather than as a version problem. The launcher under ~scripts~ falls back to the sources beside it, so the checkout's own maak is one command away.
 
 Two kinds of spec sit in that directory, and the difference is what each one can see. Most of them call ~main~ in process with the output ports captured, which is how a test asserts on what a user reads while keeping a run cheap. What that cannot show is anything that belongs to the process rather than to the call: the exit status an operating system sees, which of the two streams a line went to, and the argument grammar of ~scripts/maak~ itself, which is what turns a command line into the Guile invocation ~main~ is handed. Those are what ~test/veritas/unit/integration.scm~ is for, running the launcher as a real subprocess. A suite run is the two together; nothing else starts the launcher, and nothing else reads the library the way a caller does.
 

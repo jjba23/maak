@@ -522,10 +522,14 @@ maak is the one that runs."
 
 ;; ====== Maak tests ======
 ;;
-;; The suite runs once, in the environment the manifest declares.  The Veritas
-;; variables go through `#:env' rather than as a `VAR=value' prefix: everything
-;; after `guix shell --' is executed directly, so `env' sets them for the guile
-;; that runs the tests.
+;; Two tasks run the suite, and neither of them builds the invocation itself.
+;; `test` runs `./scripts/maak-test`, which chooses the environment and starts
+;; guile without loading this checkout's library first; `container` runs the
+;; same words inside a Guix container, which is a shell rather than a process,
+;; so there the expression has to be quoted for it.  The Veritas variables go
+;; through `#:env' rather than as a `VAR=value' prefix: everything after
+;; `guix shell --' is executed directly, so `env' sets them for the guile that
+;; runs the tests.
 (define veritas-env
   '("VERITAS_TEST_MODULE=veritas"
     "VERITAS_TEST_TOP_DIR=test"
@@ -547,10 +551,14 @@ maak is the one that runs."
 (define (test)
   "Run the project's unit test suite with Veritas.
 
-The specs live under test/veritas/unit and are located by the Veritas runner,
-which needs both the library sources and the test tree on the load path."
-  (manifest-shell test-command
-                  #:env veritas-env))
+The suite is started by ./scripts/maak-test rather than from here, and the
+direction is the point: that script is bash and guile, it never loads this
+checkout's library before the suite does, so a change that breaks (maak main)
+still gets a test run and a report instead of a command line that will not
+start.  It also chooses the environment -- the manifest under Guix, this
+project's flake under Nix, or the guile already on PATH -- and says which one
+it chose.  MAAK_TEST_ENV=guix|nix|plain picks one outright."
+  (run (list "./scripts/maak-test") #:verbose? #t))
 
 (define (container)
   "Run the same unit test suite inside a Guix container, with no network."

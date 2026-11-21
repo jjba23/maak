@@ -56,6 +56,14 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
   are silenced for a listing the way they already were for `--plan`.
 - `--list=json` and `--list=names` are the same requests as `--list --json` and
   `maak-tasks --names`, spelled as one word.
+- `maak test` runs `scripts/maak-test`, which is bash and guile and never loads
+  this checkout's library before the suite does.  The direction is the point:
+  the thing that runs the tests must not be the thing under test, so a change
+  that breaks `(maak main)` now gets a suite run and a report instead of a
+  command line that will not start.  It also picks the environment -- the
+  manifest under Guix, the flake under Nix, or the guile already on `PATH` --
+  says which one it chose, and takes `MAAK_TEST_ENV=guix|nix|plain` when it must
+  not choose for itself.
 
 ** Fixed
 

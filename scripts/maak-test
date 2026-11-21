@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+
+# SPDX-License-Identifier: MIT
+# Copyright © Josep Bigorra <jjbigorra@gmail.com>
+
+# Commentary:
+#
+# The suite, started without maak.
+#
+# `maak test' runs this script, and this script runs the suite.  The direction
+# matters: the file is bash and guile only, so it never loads `(maak main)' or
+# any other module of this checkout before the suite does.  A change that breaks
+# the library -- a parenthesis, a lambda list, a module that fails to compile --
+# therefore still gets a test run and a report, instead of the command line
+# failing to start and leaving nothing but an error to read.  That is the whole
+# bootstrap story of testing maak with maak: the thing that runs the tests must
+# not be the thing under test.
+#
+# The environment is chosen here, in this order, so a fresh clone needs one
+# command and no instructions:
+#
+#   guix   `guix shell -m manifest.scm', which pins the interpreter, Veritas and
+#          the tools the integration specs run (git, tar, zip).
+#   nix    `nix develop', which the flake declares, for a machine without Guix.
+#   plain  the guile already on PATH, when it can load (veritas runner).
+#
+# `MAAK_TEST_ENV=guix|nix|plain' picks one outright, which is what a container
+# or a CI job wants when it must not fall back to whatever is installed.
+#
+# The runner is told where the specs are through the environment rather than
+# through its arguments, because every word after `--' in a `guix shell' is
+# executed directly: an assignment in front of the command would be looked up as
+# a program name.
+
+set -euo pipefail
+
+script_dir=$(dirname "$(readlink -f "$0")")
+root=$(readlink -f "${script_dir}/..")
+
+# The spec tree, and the two load paths the runner needs: this checkout's
+# library first, so what is under test is the sources beside this script rather
+# than the maak an earlier install left on the load path.
+test_vars=(
+  "VERITAS_TEST_MODULE=veritas"
+  "VERITAS_TEST_TOP_DIR=test"
+  "VERITAS_TEST_TYPE=unit"
+  "VERITAS_RUN_BENCHMARKS=false"
+)
+guile_argv=(
+  "guile" "-L" "./src" "-L" "./test"
+  "-c" "(exit ((@ (veritas runner) run-tests)))"
+)
+
+have() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+selected_env() {
+  if [ -n "${MAAK_TEST_ENV:-}" ]; then
+    echo "${MAAK_TEST_ENV}"
+  elif have guix && [ -f "${root}/manifest.scm" ]; then
+    echo guix
+  elif have nix && [ -f "${root}/flake.nix" ]; then
+    echo nix
+  else
+    echo plain
+  fi
+}
+
+# The suite reads paths relative to the project root, which is where the runner
+# has to start: `test/veritas/unit' and the fixtures under `test/maak'.
+cd "${root}"
+
+environment=$(selected_env)
+
+case "${environment}" in
+guix)
+  echo "maak-test: running the suite in this project's Guix manifest" >&2
+  exec guix shell -m "${root}/manifest.scm" -- env "${test_vars[@]}" "${guile_argv[@]}"
+  ;;
+nix)
+  echo "maak-test: running the suite in this project's Nix flake" >&2
+  exec nix develop "${root}" --command env "${test_vars[@]}" "${guile_argv[@]}"
+  ;;
+plain)
+  # A plain run is only worth starting when the runner is there to load; saying
+  # so is more use than guile's complaint about a missing module halfway through
+  # "scanning directories for unit tests".
+  if ! guile -c '(use-modules (veritas runner))' >/dev/null 2>&1; then
+    echo "maak-test: no (veritas runner) for $(command -v guile || echo guile) to load." >&2
+    echo "  hint: run the suite in Guix (guix shell -m manifest.scm -- ./scripts/maak-test)," >&2
+    echo "        set up this project's flake with nix develop, or install guile-veritas." >&2
+    exit 1
+  fi
+  echo "maak-test: running the suite with the guile already on PATH" >&2
+  exec env "${test_vars[@]}" "${guile_argv[@]}"
+  ;;
+*)
+  echo "maak-test: MAAK_TEST_ENV names an environment this script does not know: ${environment}" >&2
+  echo "  hint: name guix, nix or plain, or leave it unset and let the script choose." >&2
+  exit 1
+  ;;
+esac
