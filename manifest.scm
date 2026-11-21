@@ -58,7 +58,7 @@ concurrently by default.")
                           ;; the jointhefreeworld channel pinned in
                           ;; channels.scm carries.
                           (specification->package "guile-dokgen")
-                          texinfo
+                          (specification->package "texinfo")
                           guile-ares-rs
                           guile-veritas
                           coreutils
