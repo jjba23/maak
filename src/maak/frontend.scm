@@ -72,18 +72,18 @@
   "Return the first non-empty value among environment NAMES, or FALLBACK."
   (let loop ((names names))
     (if (null? names)
-        fallback
-        (let ((value (getenv (car names))))
-          (if (and value (not (string=? value "")))
-              value
-              (loop (cdr names)))))))
+      fallback
+      (let ((value (getenv (car names))))
+        (if (and value (not (string=? value "")))
+          value
+          (loop (cdr names)))))))
 
 (define (lockfile-manager directory)
   "Return the program a lock file in DIRECTORY names, or #f when it names one."
-  (cond ((file-exists? (in-vicinity directory "package-lock.json")) "npm")
-        ((file-exists? (in-vicinity directory "pnpm-lock.yaml")) "pnpm")
-        ((file-exists? (in-vicinity directory "yarn.lock")) "yarn")
-        (else #f)))
+  (cond [(file-exists? (in-vicinity directory "package-lock.json")) "npm"]
+        [(file-exists? (in-vicinity directory "pnpm-lock.yaml")) "pnpm"]
+        [(file-exists? (in-vicinity directory "yarn.lock")) "yarn"]
+        [else #f]))
 
 (define* (detect-package-manager #:key (directory "."))
   "Return the package manager DIRECTORY pins, named as its program is.
@@ -104,7 +104,7 @@ function can be tested without changing where the process runs."
 (define (program-words command)
   "Return COMMAND as the words of a program invocation, or raise."
   (let ((words (and (string? command)
-                    (string-tokenize (string-trim-both command)))))
+                 (string-tokenize (string-trim-both command)))))
     (unless (pair? words)
       (raise-maak-error
        (format #f "package-manager must name a program, got ~s" command)
@@ -140,43 +140,43 @@ running a Yarn that reads it."
 (define (ci-words kind directory)
   "Return the words that install KIND's dependencies exactly from the lock file."
   (case kind
-    ((npm) (list "ci"))
-    ((pnpm) (list "install" "--frozen-lockfile"))
-    (else (if (yarn-berry? directory)
-              (list "install" "--immutable")
-              (list "install" "--frozen-lockfile")))))
+    [(npm) (list "ci")]
+    [(pnpm) (list "install" "--frozen-lockfile")]
+    [else (if (yarn-berry? directory)
+            (list "install" "--immutable")
+            (list "install" "--frozen-lockfile"))]))
 
 (define (add-words kind)
   "Return the words that add a dependency with KIND."
   (case kind
-    ((npm) (list "install"))
-    (else (list "add"))))
+    [(npm) (list "install")]
+    [else (list "add")]))
 
 (define (remove-words kind)
   "Return the words that remove a dependency with KIND."
   (case kind
-    ((npm) (list "uninstall"))
-    ((pnpm) (list "remove"))
-    (else (list "remove"))))
+    [(npm) (list "uninstall")]
+    [(pnpm) (list "remove")]
+    [else (list "remove")]))
 
 (define (exec-words kind)
   "Return the words that run a binary from `node_modules' with KIND."
   (case kind
-    ((npm) (list "exec" "--"))
-    (else (list "exec"))))
+    [(npm) (list "exec" "--")]
+    [else (list "exec")]))
 
 (define (publish-words kind directory)
   "Return the words that publish the package with KIND."
   (case kind
-    ((yarn) (if (yarn-berry? directory) (list "npm" "publish") (list "publish")))
-    (else (list "publish"))))
+    [(yarn) (if (yarn-berry? directory) (list "npm" "publish") (list "publish"))]
+    [else (list "publish")]))
 
 (define (directory-words kind directory)
   "Return the words that point KIND at DIRECTORY, the way KIND spells them."
   (case kind
-    ((npm) (list "--prefix" directory))
-    ((pnpm) (list "--dir" directory))
-    (else (list "--cwd" directory))))
+    [(npm) (list "--prefix" directory)]
+    [(pnpm) (list "--dir" directory)]
+    [else (list "--cwd" directory)]))
 
 ;; ====== The command line ======
 
@@ -240,16 +240,16 @@ the command, or comes back as #f when the caller asked for the exit status."
          (status (close-pipe port))
          (code (status:exit-val status)))
     (cond
-     ((and code (zero? code)) output)
-     (allow-failure? #f)
-     ((not code)
-      (raise-maak-error
-       (format #f "the package manager was terminated by a signal: ~a" line)
-       #:hint "Run the command above by hand to read its own message."))
-     (else
-      (raise-maak-error
-       (format #f "the package manager failed (exit code ~a): ~a" code line)
-       #:hint "Run the command above to read its own message.")))))
+      [(and code (zero? code)) output]
+      [allow-failure? #f]
+      [(not code)
+       (raise-maak-error
+        (format #f "the package manager was terminated by a signal: ~a" line)
+        #:hint "Run the command above by hand to read its own message.")]
+      [else
+        (raise-maak-error
+         (format #f "the package manager failed (exit code ~a): ~a" code line)
+         #:hint "Run the command above to read its own message.")])))
 
 ;; ====== The commands ======
 ;;
@@ -288,7 +288,7 @@ the manager's own words, appended last.
     (frontend (append (add-words kind)
                       (string-list packages "frontend-add")
                       (if dev? (list (if (eq? kind 'yarn) "--dev" "--save-dev"))
-                          '()))
+                        '()))
               #:arguments arguments)))
 
 (define* (frontend-remove packages #:key (arguments '()))
