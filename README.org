@@ -90,6 +90,18 @@ Most build tools invent their own limited domain-specific language.  Maak embrac
 
 See the full list pipelines, background jobs, ~-j~, guix, nix, containers, niri, downloads, gettext, maven, uv, python in [[file:docs/features.org][Features]].
 
+** How a function becomes a task
+
+A Maak file is read, not run, when maak answers a question about it: a top-level
+~define~, ~define*~ or a name bound to a ~lambda~ is a task, the ~#:export~ list
+decides which of them are visible, the docstring is the documentation and the
+lambda list is the argument grammar. That is what lets a listing, a plan and the
+call graph be answered for a file somebody is halfway through writing, on a
+machine that does not have its libraries.
+
+#+attr_html: :width 720 :alt Taking a maak.scm file from data to a task description and the views built on it
+[[file:resources/diagrams/task-description.svg]]
+
 * See it run
 
 #+attr_html: :width 800 :alt maak --plan deploy, in a terminal

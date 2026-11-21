@@ -20,7 +20,11 @@
 # command and no instructions:
 #
 #   guix   `guix shell -m manifest.scm', which pins the interpreter, Veritas and
-#          the tools the integration specs run (git, tar, zip).
+#          the tools the integration specs run (git, tar, zip).  A checkout
+#          with a channels.scm is entered through `guix time-machine' instead:
+#          the manifest names guile-dokgen, which the jointhefreeworld channel
+#          pinned there carries, and a plain `guix shell' would answer from the
+#          channels the user has pulled, where that package is unknown.
 #   nix    `nix develop', which the flake declares, for a machine without Guix.
 #   plain  the guile already on PATH, when it can load (veritas runner).
 #
@@ -76,6 +80,13 @@ environment=$(selected_env)
 case "${environment}" in
 guix)
   echo "maak-test: running the suite in this project's Guix manifest" >&2
+  # The pinned shell when there is a pin to enter: see the note above on
+  # guile-dokgen, which Guix itself does not carry.
+  if [ -f "${root}/channels.scm" ]; then
+    exec guix time-machine --channels="${root}/channels.scm" \
+      -- shell -m "${root}/manifest.scm" \
+      -- env "${test_vars[@]}" "${guile_argv[@]}"
+  fi
   exec guix shell -m "${root}/manifest.scm" -- env "${test_vars[@]}" "${guile_argv[@]}"
   ;;
 nix)

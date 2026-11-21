@@ -9,6 +9,10 @@
   #:use-module (ice-9 textual-ports)
   #:use-module (ice-9 regex)
   #:use-module (srfi srfi-1)
+  ;; `scandir' finds the mermaid sources `maak diagrams' renders, and the
+  ;; `string-' procedures name and match each one.
+  #:use-module ((ice-9 ftw) #:select (scandir))
+  #:use-module ((srfi srfi-13) #:select (string-drop-right string-suffix?))
   #:use-module (maak maak)
   #:use-module ((ice-9 rdelim) #:select (read-line))
   ;; The git and container helpers are imported under prefixes because the
@@ -339,19 +343,54 @@ A bare push does not send tags that are not annotated; `maak git-push --
     (format #t "~a + ~a = ~a" x y
             (+ x y))))
 
+;; The manifest names guile-dokgen, which the jointhefreeworld channel pinned in
+;; channels.scm carries; Guix itself has no such package.  A plain `guix shell -m
+;; manifest.scm' answers from wherever the user's Guix was pulled from, and there
+;; the package is unknown, so the manifest would not load at all.  The tasks
+;; below that need that shell enter it the way channels.scm describes it -- `guix
+;; time-machine' -- so a task means the same thing on a machine that has never
+;; pulled the channel.
+
 (define (repl)
   "Development REPL."
-  (manifest-shell (list "guile" "-L" "./src"
-                        "-c" "'((@ (ares server) run-nrepl-server))'")))
+  (time-machine-manifest-shell
+   (list "guile" "-L" "./src"
+         "-c" "'((@ (ares server) run-nrepl-server))'")))
 
 (define (docs)
-  "Generate technical API documentation for Maak."
+  "Generate technical API documentation for Maak, and render it as HTML.
+
+Dokgen reads the modules rather than their text, so every exported procedure
+that has a docstring is in the reference.  Beside the Texinfo it writes the
+stylesheet and the script the page is read with, and a directory of diagrams
+for the docstrings that carry one; Texinfo copies neither, so both are put
+beside the page that points at them."
   (delete-file-recursively "doc")
-  (manifest-shell (list "documenta" "api" "./src/maak"))
-  (manifest-shell (list "texi2any" "-v" "--html"
-                        (~ "--css-ref=~a" api-docs-css-url)
-                        "-o" "index_html" "./doc/api/index.texi"))
-  (mv "./index_html" "./doc/api-dist"))
+  (time-machine-manifest-shell
+   (list "dokgen" "api"
+         "--destination" "doc/api"
+         (~ "./src/~a" project-name))
+   #:verbose? #t)
+  (mkdir-p "doc/api-dist")
+  (time-machine-manifest-shell
+   (list "texi2any" "-v" "--html" "--no-split"
+         (~ "--css-ref=~a" api-docs-css-url)
+         "-I" "doc/api"
+         "-c" (shell-quote
+               (string-append
+                "EXTRA_HEAD="
+                "<link rel=\"stylesheet\" href=\"dokgen.css\">"
+                "<script src=\"dokgen.js\" defer></script>"))
+         "-o" "doc/api-dist/index.html"
+         "./doc/api/index.texi")
+   #:verbose? #t)
+  (for-each (lambda (asset)
+              (when (file-exists? (~ "doc/api/~a" asset))
+                (cp (~ "doc/api/~a" asset) "doc/api-dist"
+                    #:force? #t #:verbose? #t)))
+            '("dokgen.css" "dokgen.js"))
+  (when (file-exists? "doc/api/diagrams")
+    (cp "doc/api/diagrams" "doc/api-dist" #:force? #t #:verbose? #t)))
 
 (define (deploy)
   "Generate documentation for the project and publish to web directory."
@@ -360,6 +399,28 @@ A bare push does not send tags that are not annotated; `maak git-push --
   (mv "doc/api-dist"
       (~ "~a/api-docs/maak" deploy-dir))
   (delete-file-recursively "doc"))
+
+;; ====== The README's diagrams ======
+;;
+;; A diagram is committed twice: the mermaid source under resources/diagrams and
+;; the SVG rendered beside it, so reading the README needs no renderer.  The
+;; rendering is a task of its own because the renderer is a JavaScript tool the
+;; development shell does not carry; it is found on $PATH, which is where
+;; `npm install --global @mermaid-js/mermaid-cli' puts it.
+
+(define (diagrams)
+  "Render every mermaid source under resources/diagrams to the SVG beside it."
+  (for-each
+   (lambda (name)
+     (let* ((source (in-vicinity "resources/diagrams" name))
+            (image (string-append (string-drop-right source 4) ".svg")))
+       (run (list "mmdc" "-i" source "-o" image
+                  "--backgroundColor" "transparent")
+            #:verbose? #t)))
+   (scandir "resources/diagrams"
+            (lambda (name)
+              (and (not (member name '("." "..")))
+                   (string-suffix? ".mmd" name))))))
 
 (define (package-docker)
   "Build a Docker image for Maak."

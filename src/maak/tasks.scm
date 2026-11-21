@@ -25,6 +25,21 @@
 ;; `contrib/test/maak-tasks.sh' runs both readers over the same file and
 ;; requires the same bytes.
 ;;
+;; ```mermaid
+;; flowchart LR
+;;   file["maak.scm"] --> forms["read-forms<br/>the file as data, never evaluated"]
+;;   forms --> defs["a top-level define, define*,<br/>or a name bound to a lambda"]
+;;   defs --> exports{"does the module<br/>declare #:export?"}
+;;   exports -- "yes, and the name is in it" --> task
+;;   exports -- "yes, and the name is not" --> helper["a helper, not a task"]
+;;   exports -- "no" --> task
+;;   forms --> metadata["metadata-plist<br/>the task-metadata! calls"]
+;;   metadata --> task["static-tasks<br/>name, docstring, lambda list,<br/>dependencies, hidden flag"]
+;;   task --> listing["maak: the task listing"]
+;;   task --> plan["maak --dry-run: the plan"]
+;;   task --> callgraph["static-call-graph<br/>which task calls which"]
+;; ```
+;;
 ;;; Code:
 
 (define-module (maak tasks)
