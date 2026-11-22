@@ -9,6 +9,8 @@
 #+attr_html: :width 160 :alt maak logo
 [[file:logo.svg]]
 
+- 📖 *API reference:* [[https://jointhefreeworld.org/api-docs/maak/index.html][Maak API reference]]
+
 * Every task is a λ
 
 maak is a command runner, and its task list is a Lisp file. You write =maak.scm=
