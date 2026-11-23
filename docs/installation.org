@@ -129,14 +129,14 @@ rpmbuild -ba ~/rpmbuild/SPECS/maak.spec
 You should end up with:
 
 #+begin_src shell
-~/rpmbuild/RPMS/x86_64/maak-1.2.3-0.x86_64.rpm
-~/rpmbuild/SRPMS/maak-1.2.3-0.src.rpm
+~/rpmbuild/RPMS/x86_64/maak-1.3.0-0.x86_64.rpm
+~/rpmbuild/SRPMS/maak-1.3.0-0.src.rpm
 #+end_src
 
 Install and run it:
 
 #+begin_src shell
-sudo zypper install ~/rpmbuild/RPMS/x86_64/maak-1.2.3-0.x86_64.rpm
+sudo zypper install ~/rpmbuild/RPMS/x86_64/maak-1.3.0-0.x86_64.rpm
 maak --help
 #+end_src
 
@@ -169,6 +169,28 @@ checksum, builds it and installs the result. The recipe is in this repository
 rather than in the AUR, so a change to it is a change to a pull request here,
 and the checksum is refreshed from the published archive after each release.
 
+* Void Linux
+
+~packaging/voidlinux/template~ is an xbps-src template, built the way any other
+Void package is: put it in a checkout of
+[[https://github.com/void-linux/void-packages][void-packages]] and let xbps-src
+fetch the release archive, byte-compile the modules, and install the launcher,
+the completions, the manual page and the guide.
+
+#+begin_src shell
+mkdir -p ~/void-packages/srcpkgs/maak
+cp packaging/voidlinux/template ~/void-packages/srcpkgs/maak/template
+cd ~/void-packages
+./xbps-src pkg maak
+sudo xbps-install --repository="$PWD/hostdir/binpkgs" maak
+#+end_src
+
+The template depends on ~guile~, ~bash~, ~coreutils~ and ~util-linux~; it
+installs the library where Guile looks for it (~/usr/share/guile/site/3.0~) and
+its compiled form into ~/usr/lib/guile/3.0/site-ccache~, and puts each
+completion under the name its shell loads it by. Like the Arch recipe, the
+checksum is refreshed from the published archive after each release.
+
 * Check the installation
 
 #+begin_src shell
@@ -176,7 +198,7 @@ maak --version
 #+end_src
 
 #+begin_src
-maak 1.2.3
+maak 1.3.0
 License: MIT
 Homepage: https://github.com/jjba23/maak
 #+end_src

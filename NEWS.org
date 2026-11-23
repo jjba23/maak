@@ -12,6 +12,30 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 
 *[Released]*
 
+** v1.3.0 (2026-11-23)
+
+maak is packaged for Void Linux.  Nothing in the library or the command line
+changed.
+
+*** Added
+
+- `packaging/voidlinux/template` is an xbps-src template: it fetches the
+  release archive from the tag, byte-compiles every module, and installs the
+  launcher, the library under `/usr/share/guile/site/3.0`, its compiled form
+  under `/usr/lib/guile/3.0/site-ccache`, the three completions under the names
+  each shell loads them by, the manual page, the licence and the guide.  It
+  depends on `guile`, `bash`, `coreutils` and `util-linux`, the same set the
+  other recipes name.
+- `maak sync-version` writes the version into the template, and the version
+  spec compares it with `maak-version` the way it compares the RPM spec, the
+  Arch recipe and the Homebrew formula.
+
+*** Changed
+
+- The installation page has a Void Linux section, and the README, the releasing
+  section of the guide, the stability page and the packaging notes name the
+  template wherever they named the other recipes.
+
 ** v1.2.3 (2026-11-23)
 
 The suite runs the completions in a bash that can complete, and passes in a

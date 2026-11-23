@@ -1,0 +1,77 @@
+# Template file for 'maak'
+#
+# SPDX-License-Identifier: MIT
+# Copyright © Josep Bigorra <jjbigorra@gmail.com>
+#
+# A Maak file is Guile Scheme and the launcher is bash, so the runtime needs
+# both, plus the userland the launcher calls: `getopt' from util-linux and the
+# coreutils programs `dirname', `readlink' and `date'.
+pkgname=maak
+version=1.3.0
+revision=1
+depends="bash coreutils guile util-linux"
+# `guild' byte-compiles the modules at build time, and it ships with Guile.
+hostmakedepends="guile"
+short_desc="Command runner à la Make using Guile Scheme"
+maintainer="Josep Bigorra <jjbigorra@gmail.com>"
+license="MIT"
+homepage="https://github.com/jjba23/maak"
+changelog="https://raw.githubusercontent.com/jjba23/maak/trunk/NEWS.org"
+archs="x86_64* i686* aarch64* armv7l*"
+
+# The tag is published on GitHub, which carries the repository, the pipeline and
+# the release.  `maak sync-version' writes $version; the checksum is refreshed
+# afterwards from the published archive, which is the one thing no release task
+# can know.
+distfiles="${homepage}/archive/refs/tags/v${version}.tar.gz"
+checksum=28107a8d3581f150b5430169528e771be02d305ea7e38a55b4db2c706c2e4ca1
+# GitHub drops the tag's leading `v' from the directory it packs, which is what
+# this name is; saying so keeps a future `v' handling change from moving the
+# sources out from under the recipe.
+wrksrc="${pkgname}-${version}"
+
+# Guile looks for modules in its site directory and for their compiled form in
+# its site-ccache directory; with the `/usr' prefix this distribution installs
+# under, those are the two paths below.  They are Guile's own defaults rather
+# than a guess about this distribution: a compiled file that lands elsewhere
+# only costs the first run a compile, which is what an uninstalled checkout does
+# anyway.
+site_dir="usr/share/guile/site/3.0"
+ccache_dir="usr/lib/guile/3.0/site-ccache"
+
+do_build() {
+	local scm_file rel_path go_file
+
+	for scm_file in $(find src/maak -name '*.scm'); do
+		rel_path=${scm_file#src/}
+		go_file="ccache/${rel_path%.scm}.go"
+		mkdir -p "$(dirname "$go_file")"
+		guild compile -L src -o "$go_file" "$scm_file"
+	done
+}
+
+do_install() {
+	# The launcher resolves its modules and its resources relative to its own
+	# prefix, so the layout below is the one it expects: the library under
+	# share/guile/site, the help screen under share/resources.
+	vinstall scripts/maak 755 usr/bin
+	vmkdir "$site_dir"
+	vcopy src/maak "$site_dir"
+	vmkdir "$ccache_dir"
+	vcopy ccache/maak "$ccache_dir"
+	vinstall resources/help.txt 644 usr/share/resources
+
+	# The names are the ones each shell loads a completion by.
+	vinstall scripts/maak-completion.bash 644 \
+		usr/share/bash-completion/completions maak
+	vinstall scripts/maak-completion.fish 644 \
+		usr/share/fish/vendor_completions.d maak.fish
+	vinstall scripts/maak-completion.zsh 644 usr/share/zsh/site-functions _maak
+
+	vinstall man/maak.1 644 usr/share/man/man1
+
+	vlicense LICENSE
+	vinstall README.org 644 usr/share/doc/maak
+	vinstall NEWS.org 644 usr/share/doc/maak
+	vcopy docs usr/share/doc/maak
+}

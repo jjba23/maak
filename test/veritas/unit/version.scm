@@ -76,6 +76,12 @@ field rather than a number that happens to look like one."
                                     "packaging/arch/PKGBUILD"
                                     "pkgver=([0-9]+\\.[0-9]+\\.[0-9]+)")))
 
+         (test "the Void Linux template carries the released version"
+               (assert-equal #:expect maak-version
+                             #:got (version-in
+                                    "packaging/voidlinux/template"
+                                    "version=([0-9]+\\.[0-9]+\\.[0-9]+)")))
+
          (test "the Homebrew formula carries the released version"
                (assert-equal #:expect maak-version
                              #:got (version-in

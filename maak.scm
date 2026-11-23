@@ -80,6 +80,8 @@
      . "Version:[ \t]+([0-9]+\\.[0-9]+\\.[0-9]+)")
     ("packaging/arch/PKGBUILD"
      . "pkgver=([0-9]+\\.[0-9]+\\.[0-9]+)")
+    ("packaging/voidlinux/template"
+     . "version=([0-9]+\\.[0-9]+\\.[0-9]+)")
     ("packaging/homebrew/Formula/maak.rb"
      . "refs/tags/v([0-9]+\\.[0-9]+\\.[0-9]+)\\.tar\\.gz")
     ("man/maak.1"

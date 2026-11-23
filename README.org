@@ -157,8 +157,8 @@ says what to ask maak instead of guessing.
 
 * Installation
 
-Guix, Nix, Homebrew, the container image, the RPM and the Debian package are all
-in [[file:docs/installation.org][Installing maak]]. From a checkout, the launcher
+Guix, Nix, Homebrew, the container image, the RPM, the Debian package and the
+Void Linux template are all in [[file:docs/installation.org][Installing maak]]. From a checkout, the launcher
 runs this tree's own sources:
 
 #+begin_src shell

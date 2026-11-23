@@ -1,3 +1,15 @@
+maak (1.3.0-1) unstable; urgency=medium
+
+  * maak is packaged for Void Linux: packaging/voidlinux/template is an
+    xbps-src template that fetches the release archive, byte-compiles the
+    modules and installs the launcher, the library under
+    /usr/share/guile/site/3.0, its compiled form, the three completions under
+    the names each shell loads them by, the manual page, the licence and the
+    guide.  maak sync-version writes its version and the version spec compares
+    it with maak-version.  No library code or command line changed.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Mon, 23 Nov 2026 16:00:00 +0100
+
 maak (1.2.3-1) unstable; urgency=medium
 
   * Test and manifest only; no library code, command line or generated script

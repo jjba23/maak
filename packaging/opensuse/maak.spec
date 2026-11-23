@@ -16,7 +16,7 @@
 #
 
 Name:           maak
-Version:        1.2.3
+Version:        1.3.0
 Release:        0
 Summary:        Command runner à la Make using Guile Scheme
 License:        MIT

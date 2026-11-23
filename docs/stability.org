@@ -63,9 +63,9 @@ Four things are covered. Everything else may change in any release.
   [[file:installation.org][installation]] requires, and the exact set of programs a helper needs at run
   time: a task that calls ~(maak cargo)~ needs ~cargo~, and which ~cargo~ is
   the machine's business.
-- *A distribution package.* The Arch recipe, the RPM spec, the Homebrew formula
-  and the Debian packaging are the packagers' files, versioned with the package
-  rather than with the library.
+- *A distribution package.* The Arch recipe, the RPM spec, the Void Linux
+  template, the Homebrew formula and the Debian packaging are the packagers'
+  files, versioned with the package rather than with the library.
 
 * How a change is announced
 :PROPERTIES:
