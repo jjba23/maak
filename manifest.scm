@@ -16,6 +16,7 @@
              (gnu packages pkg-config)
              (guix build-system guile)
              (gnu packages base)
+             (gnu packages bash)
              (gnu packages linux)
              (gnu packages compression)
              (gnu packages texinfo)
@@ -63,6 +64,13 @@ concurrently by default.")
                           guile-veritas
                           coreutils
                           util-linux
+                          ;; The completion specs drive a real bash, and a bash
+                          ;; built without readline -- `bash-minimal', which is
+                          ;; what Guile's own package graph carries -- has no
+                          ;; programmable completion at all: no `complete', no
+                          ;; `compgen'.  The full package is what a user
+                          ;; completes with, so it is what the suite tests.
+                          bash
                           ;; The archive tests build and unpack real tar and zip
                           ;; files, and the git tests need git itself.
                           tar
