@@ -1,0 +1,202 @@
+#+title: Zig and zig build
+#+author: Josep Bigorra, FuncProgLinux
+#+email: jjbigorra@gmail.com, softwarelibre@urutau-ltd.org
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+Zig already knows how to build a Zig project: ~build.zig~ declares the steps,
+the cache and the dependency graph, and maak adds no second build engine beside
+it.  What ~(maak zig)~ adds is the task layer around that build -- the steps and
+their options as an argv list, the direct compiler commands a build step may not
+cover, and the program as a parameter -- so the automation around the build is a
+Maak file and the build graph stays in ~build.zig~.
+
+* The helpers
+
+| Helper                                             | What it does                                                     |
+|----------------------------------------------------+------------------------------------------------------------------|
+| ~zig-command~                                       | The parameter for the program, honoured from ~MAAK_ZIG~, then ~ZIG~. |
+| ~zig-argv~                                          | The words of a zig subcommand, built without running it.         |
+| ~zig~                                               | Run a subcommand with arguments, through ~run~.                  |
+| ~zig-output~                                        | Run an argv and return its standard output.                      |
+| ~zig-build-argv~                                    | The words of a ~zig build~ invocation, built without running it. |
+| ~zig-build~                                         | Run ~zig build~ with the steps and arguments given.              |
+| ~zig-build-install~, ~zig-build-test~, ~zig-build-run~, ~zig-build-steps~ | The steps a ~build.zig~ usually declares, and the list it offers. |
+| ~zig-build-clean~, ~zig-build-uninstall~                     | Remove the local prefix; explain why Zig's own uninstall is unavailable. |
+| ~zig-build-exe~, ~zig-build-lib~, ~zig-build-obj~   | Compile a source file directly, without a build script.          |
+| ~zig-test~                                          | Run the tests in one source file.                                |
+| ~zig-fmt~, ~zig-fetch~                              | Format sources, and copy a package into Zig's cache.             |
+| ~zig-version~                                       | Return the version line the installed zig prints, trimmed.       |
+
+All of them are re-exported by ~(maak maak)~, so a normal Maak file needs only
+its usual import.
+
+* A project's tasks
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak maak))
+
+(define (build)
+  "Build every step with the release optimizations."
+  (zig-build "-Doptimize=ReleaseSafe"))
+
+(define (test)
+  "Run the tests the build script declares."
+  (zig-build-test))
+
+(define (run)
+  "Run the application."
+  (zig-build-run))
+
+(define (fmt)
+  "Format the sources."
+  (zig-fmt "src" "build.zig"))
+
+(define (ci)
+  "What CI runs, in order."
+  (fmt)
+  (test)
+  (build))
+#+end_src
+
+A wrapper passes its words straight to Zig, so ~-Doptimize=ReleaseSafe~,
+~--summary~ and ~--fetch=all~ are the flags Zig documents.  A word that belongs
+to the program rather than to the build goes after ~--~, as it does on the
+command line:
+
+#+begin_src scheme
+(define (run-here)
+  "Run the application with its own arguments."
+  (zig-build-run "--" "--help"))
+#+end_src
+
+* The structured command line
+
+When an option is a value rather than a word -- an optimization mode, a target,
+a prefix, a project option -- build the argv and hand it to ~run~.
+~zig-build-argv~ is pure, so the command line can be asserted in a test without
+Zig installed:
+
+#+begin_src scheme
+(define (release)
+  "Build the tests for an ARM target into build/out."
+  (run (zig-build-argv '("test")
+                       #:optimize "ReleaseSafe"
+                       #:target "aarch64-linux-gnu"
+                       #:prefix "build/out"
+                       #:summary "all"
+                       #:options '(("foo" . "bar")))))
+
+;; => zig build test -Doptimize=ReleaseSafe -Dtarget=aarch64-linux-gnu
+;;            -Dfoo=bar --prefix build/out --summary all
+#+end_src
+
+The first argument is one step name or a list of them; an empty list builds
+Zig's default install step.  The steps come first, then the build options, then
+~#:arguments~ as they are, so an option this builder does not name still
+reaches the build.
+
+~#:optimize~ takes ~Debug~, ~ReleaseSafe~, ~ReleaseFast~ or ~ReleaseSmall~.
+~#:target~ and ~#:cpu~ become ~-Dtarget~ and ~-Dcpu~.  ~#:options~ carries the
+project options ~build.zig~ declares, as ~"name=value"~ strings or
+~(name . value)~ pairs, so an option the build script invented needs no new
+keyword here.  ~#:summary~ takes ~all~, ~new~, ~failures~, ~line~ or ~none~,
+and ~#:color~ takes ~auto~, ~off~ or ~on~.
+
+The install and cache paths are named options too: ~#:prefix~,
+~#:prefix-lib-dir~, ~#:prefix-exe-dir~, ~#:prefix-include-dir~,
+~#:build-file~, ~#:cache-dir~, ~#:global-cache-dir~ and ~#:zig-lib-dir~.
+~#:search-prefixes~ and ~#:systems~ take a list and repeat their flag, and
+~#:fetch~ is ~#t~ or one of Zig's two modes, ~"needed"~ and ~"all"~.
+~#:jobs~ is a positive count, and ~#:verbose?~ adds ~--verbose~.
+
+The named options are the ones Zig 0.16.0 documents, the version these helpers
+are tested against.  If a newer Zig spells a flag differently, pass it through
+~#:arguments~.  The ~zig~ executable itself is selected by ~zig-command~,
+initialized from ~MAAK_ZIG~, then ~ZIG~, then ~zig~; set ~MAAK_ZIG~ for a whole
+run, or ~(parameterize ((zig-command ...)) ...)~ for one call.
+
+* Build steps and direct commands
+
+The two ways to run a test have different scopes, and the names say which is
+which:
+
+- ~zig-build-test~ is the ~test~ step of the project's ~build.zig~, which is the
+  idiomatic way to run every test the project declares.
+- ~zig-test~ is Zig's direct command, ~zig test FILE~, which builds and runs the
+  tests in one source file.
+
+The same split holds for ~zig-build-exe~, ~zig-build-lib~ and ~zig-build-obj~:
+they are the direct compiler commands, useful for a single file, a generated
+source or a reduced bug report, not a replacement for the project's build
+script.  ~zig-build-steps~ prints what the build script offers, which is where
+a task that wraps a step it did not write starts.
+
+* Cleaning and uninstalling
+
+Zig's own ~uninstall~ step is not implemented.  In 0.16.0 it panics with a link
+to [[https://github.com/ziglang/zig/issues/14943][issue 14943]], and the issue is
+still open, so ~zig-build-uninstall~ does not run the step: it raises a maak
+error that names the missing implementation instead of aborting Zig's build
+runner.
+
+What a task wants in practice is the local output directory removed.
+~zig-build-clean~ does that, and only that:
+
+#+begin_src scheme
+(define (clean)
+  "Remove the default zig-out directory."
+  (zig-build-clean))
+
+(define (clean-release)
+  "Remove the output of a release build."
+  (zig-build-clean #:prefix "build/out"))
+#+end_src
+
+The prefix is relative to the project and may not leave it.  An absolute path,
+a path containing ~..~, or the project root itself is a maak error.  That is
+deliberate: ~zig-out~ is maak's to remove, while ~/usr/local~ and
+~$HOME/.local~ belong to the package manager that installed into them.
+
+* Pinning a program
+
+~zig-command~ is a parameter.  A value may carry a wrapper, split the way an
+unquoted shell word is split, so a task can pin a compiler cache for one
+command without changing what the rest of the run uses:
+
+#+begin_src scheme
+(parameterize ((zig-command "sccache zig"))
+  (zig-build-test))
+#+end_src
+
+A bare ~ZIG~ in the environment is honoured, and ~MAAK_ZIG~ wins over it.  See
+[[file:configuration.org][Configuration]].
+
+* What is not here
+
+- *No second build engine.*  ~build.zig~ decides what is up to date; maak runs
+  the command the task names and reports its exit status.  There is no
+  ~zig-build~ that decides not to run, and no cache beside Zig's.
+- *No build script writer.*  ~build.zig~ and ~build.zig.zon~ are the project's;
+  a task that changes one is a task that edits a file, or ~zig init~ as a
+  command.
+- *No ZON reader.*  The package manifest is Zig's own format, and a task that
+  needs a field reads the file itself rather than asking maak to guess at a
+  second parser.
+- *No package manager.*  ~zig-fetch~ runs the command; the global cache and the
+  package hashes stay Zig's business.
+- *No uninstall for an external prefix.*  Zig has not implemented its own
+  uninstall step, and maak will not guess which files under a shared prefix are
+  the project's.  ~zig-build-clean~ removes a local prefix; a system prefix is
+  removed by the package manager that installed it.
+
+* Watching and inspecting a Zig build
+
+The modes documented on [[file:inspect.org][Plans, watches and explanations]] apply
+unchanged: ~maak --plan build~ records the zig command it would run without
+running it, ~maak --watch test~ re-runs the tests when the tree changes, and
+~maak explain test~ prints the task graph, the load path and the environment the
+task will read.
