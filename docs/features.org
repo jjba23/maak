@@ -35,5 +35,5 @@
 - *Translation tooling* — the whole GNU gettext workflow (~i18n-extract~, ~i18n-merge~, ~i18n-compile~, ~i18n-refresh~) packaged so you do not rewrite it per project.
 - *Errors that read like sentences* — ~task-error~ prints one line and a hint, exits non-zero, and keeps the backtrace behind ~--debug~.
 - *Self-documenting tasks* — a docstring becomes the entry in ~maak --list~, laid out so long descriptions stay readable.
-- *Shell completions* — Bash, Zsh and Fish, reading your Maak file so TAB knows your tasks.
+- *Shell completions* — Bash, Zsh and Fish, offering the tasks of the Maak file and the first line of each task's docstring.
 - *A REPL workflow* — tasks are ordinary definitions, so you can develop them live from Emacs (AREI/Ares), your terminal, or whatever speaks nREPL.

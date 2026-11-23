@@ -240,7 +240,10 @@ is the
 blocks the listing printed before the table;
 .I names
 is one task name per line and nothing else, which is what a shell loop or a
-picker reads; and
+picker reads;
+.I completion
+is a task name, a tab and the first line of the task's documentation, which is
+what a shell puts in its completion menu; and
 .I json
 is the versioned description
 .B \-\-list \-\-json
@@ -327,6 +330,39 @@ the library's rather than the Maak file's, so no Maak file is read: the answer
 is the same in a directory that holds none, which is how a script asks which
 .B maak
 is installed before it decides to run anything.
+.TP
+.BI "\-\-completion " SHELL
+Print the completion script for
+.IR SHELL ,
+one of
+.BR bash ,
+.B zsh
+or
+.BR fish ,
+and exit.  The script is generated from the options this
+.B maak
+has, so it cannot offer a flag that was removed or miss one that was added, and
+it reads no Maak file, so it answers in a directory that holds none:
+
+.RS
+.EX
+mkdir \-p ~/.local/share/bash\-completion/completions
+maak \-\-completion bash > ~/.local/share/bash\-completion/completions/maak
+.EE
+.RE
+
+The script asks
+.B maak
+which tasks the project has, so a task a macro defines, one a module the Maak
+file uses brings in, and one a task file in JSON, TOML or YAML describes are
+all offered.  The
+.B \-\-file
+and
+.B \-\-directory
+already typed on the line are handed over, which is what makes
+.B maak \-C sub
+offer the tasks of
+.IR sub .
 .TP
 .B \-\-debug
 Let an error reach Guile's own top level handler so the full backtrace is

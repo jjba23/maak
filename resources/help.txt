@@ -104,12 +104,14 @@ Options:
     --list=STYLE
         Lay the listing out another way.  The styles are:
 
-            table    the aligned listing above (the default)
-            long     the table, with each task's example under it
-            plain    the 'name: docstring' blocks the listing used to print
-            names    one task name per line, and nothing else
-            json     the versioned JSON description an editor reads, which is
-                     what --list --json prints
+            table       the aligned listing above (the default)
+            long        the table, with each task's example under it
+            plain       the 'name: docstring' blocks the listing used to print
+            names       one task name per line, and nothing else
+            completion  a task name, a tab, and the first line of the task's
+                        documentation, which is what a shell reads for its menu
+            json        the versioned JSON description an editor reads, which is
+                        what --list --json prints
 
     --list-width N
         Fold a listing's docstrings to fit N columns, which is what keeps a
@@ -169,6 +171,22 @@ Options:
     -v, --version
         Display the Maak version and exit.  This reads no Maak file either, so
         `maak --version' answers in any directory.
+
+    --completion SHELL
+        Print the completion script for SHELL, one of bash, zsh or fish, and
+        exit.  The script is generated from the options maak has, so it is
+        never out of date with this build, and it reads no Maak file: in a
+        directory that holds none, `maak --completion bash > /tmp/maak.bash'
+        still answers.  Redirect it to where your shell looks for completions:
+
+            mkdir -p ~/.local/share/bash-completion/completions
+            maak --completion bash > ~/.local/share/bash-completion/completions/maak
+            maak --completion zsh  > ~/.local/share/zsh/site-functions/_maak
+            maak --completion fish > ~/.config/fish/completions/maak.fish
+
+        In a directory with a Maak file, TAB then offers that file's tasks,
+        with the first line of each task's docstring beside it, and the tasks
+        of `-f/--file' and `-C/--directory' when the line names them.
 
     --debug
         Show the Guile backtrace on an error.  The same as setting the

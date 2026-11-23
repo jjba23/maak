@@ -25,6 +25,7 @@
 |       | ~--json~               | None     | With ~--list~ or ~--plan~, print that as JSON, for an editor or another program. |
 |       | ~--plan~               | None     | Print the typed plan a run would execute, without running it.                  |
 |       | ~--watch~              | None     | Re-run the named tasks whenever the tree changes.                              |
+|       | ~--completion~         | ~SHELL~  | Print the completion script for ~SHELL~ (~bash~, ~zsh~ or ~fish~), for [[file:editors.org][the shell completions]]. |
 | ~-t~  | ~--tasks~              | ~LIST~   | Run the tasks in ~LIST~ (comma separated), leaving every other word as an argument. |
 | ~-L~  | ~--load-path~          | ~DIR~    | Add ~DIR~ to Guile's load path (repeatable; ~:~-separated allowed).              |
 | ~-n~  | ~--dry-run~            | None     | Print shell commands instead of executing them.                                |
@@ -122,7 +123,7 @@ maak 1.1.0 — 4 tasks in /home/joe/project/maak.scm
 
 Every documentation line starts in the same column, whatever the task is called, which is what makes a long listing scannable; a name wider than that column keeps a line of its own and its documentation moves under it, so one unusually long task name never pushes the rest of the file out of alignment.
 
-~--list=STYLE~ asks for another layout. ~table~ is the one above, ~long~ is the same with the example invocation a task declares under it, ~plain~ is the ~name: documentation~ blocks the listing printed before the table, ~names~ is one task name per line and nothing else, and ~json~ is the same description ~--list --json~ prints. ~--list-width N~ folds a docstring into N columns, which is what keeps a listing inside an 80-column terminal:
+~--list=STYLE~ asks for another layout. ~table~ is the one above, ~long~ is the same with the example invocation a task declares under it, ~plain~ is the ~name: documentation~ blocks the listing printed before the table, ~names~ is one task name per line and nothing else, ~completion~ is a task name, a tab and the first line of the task's docstring, which is what the shell completions read (see [[file:editors.org][Editors, shells and the REPL]]), and ~json~ is the same description ~--list --json~ prints. ~--list-width N~ folds a docstring into N columns, which is what keeps a listing inside an 80-column terminal:
 
 #+begin_src shell
 # One name per line, for a shell loop or a picker

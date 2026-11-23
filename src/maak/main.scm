@@ -35,6 +35,7 @@
   #:use-module (maak tasks)
   #:use-module (maak declarative)
   #:use-module (maak version)
+  #:use-module (maak completion)
   #:use-module (maak plan)
   #:use-module (maak watch)
   #:use-module (maak explain)
@@ -139,6 +140,11 @@
               (required? #f))
     (no-env-file (value #f)
                  (required? #f))
+    ;; `--completion SHELL' prints the completion script for one shell and
+    ;; exits.  It reads no Maak file, so it answers in any directory, and it is
+    ;; the one description `scripts/maak-completion.*' is generated from.
+    (completion (value #t)
+                (required? #f))
     (banner (value #f)
             (required? #f))
     (no-banner (value #f)
@@ -226,10 +232,18 @@ somewhere else is the kind of thing that is worth knowing without asking.  The
 report is what make's `-w' prints, and `--no-print-directory' is the switch of
 make's that turns it off -- useful when the output of a run is read by
 something other than a person.  `--quiet' asks for the same silence, among
-other things, and so does not bring the lines back."
+other things, and so does not bring the lines back.
+
+A listing, a plan and an explain are reports rather than runs: their output is a
+document that something else may be reading, and a directory line in the middle
+of one is noise at best.  A listing says which file it read in its heading, so
+nothing is lost by keeping quiet."
   (cond
     ((option-ref options 'no-print-directory #f) #f)
     ((option-ref options 'quiet #f) #f)
+    ((option-ref options 'list #f) #f)
+    ((option-ref options 'plan #f) #f)
+    ((option-ref options 'explain #f) #f)
     (else #t)))
 
 (define (resolve-env-files options file)
@@ -277,7 +291,9 @@ modules that live beside it.  Directories that do not exist are skipped."
 ;; ====== The shapes a listing takes ======
 
 ;; The layouts `--list' offers, in the order the help screen names them.
-(define listing-styles '(table plain long names json))
+;; `completion' is the one a shell reads: a task a line, the name, a tab, and
+;; the first line of the task's docstring beside it.
+(define listing-styles '(table plain long names json completion))
 
 (define (resolve-listing-style options)
   "Return the layout `--list' asks for, as a symbol.
@@ -627,6 +643,8 @@ fixed is exactly when it should keep going."
                                     'explain #f))
         (should-version (option-ref options
                                     'version #f))
+        (should-completion (option-ref options
+                                       'completion #f))
         (should-help (option-ref options
                                  'help #f))
         (should-dry-run (option-ref options
@@ -639,6 +657,12 @@ fixed is exactly when it should keep going."
        0)
       (should-version
        (print-version)
+       0)
+      (should-completion
+       ;; The script is generated rather than read from a file beside the
+       ;; library, so an installed maak answers with the completions of the
+       ;; command line it actually has.
+       (display (completion-script (string->symbol should-completion)))
        0)
       ((and should-json (not (or should-list should-plan)))
        (raise-maak-error

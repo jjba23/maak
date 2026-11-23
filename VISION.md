@@ -69,8 +69,9 @@ would be a rewrite, not a port.
    by maak itself, versioned, with a schema. `maak --list --json` is that
    description, and `contrib/bin/maak-tasks` borrows its reader rather than
    growing a second parse; what is still per-consumer is the rendering — the Zed
-   task file, the fzf columns — and the completion scripts, which read the file
-   themselves.
+   task file, the fzf columns — and the completion scripts, which are rendered
+   per shell from one description of the options and ask `maak --list=completion`
+   for the tasks.
 
 2. **Tasks carry structure, not just a docstring.** A task can declare what it
    needs and what it produces as data — so `-j` can order rather than merely
@@ -98,10 +99,6 @@ would be a rewrite, not a port.
   missing is the rest of the ordering story: a `--plan` that shows the graph
   before anything runs, and a rule for what a failed dependency means to the tasks
   after it.
-- **A completion generator.** `scripts/maak-completion.bash`, `.zsh` and `.fish`
-  are maintained by hand and read the Maak file themselves. The hard part is
-  emitting all three from one description without making the scripts slower than
-  the static text they replace.
 - **A hermetic mode for CI.** A scrub of the ambient environment and a pinned
   `PATH`, so a task that leaks a dependency on the developer's machine fails
   where it should — without contradicting `.env` loading or the parameterised
@@ -133,14 +130,11 @@ would be a rewrite, not a port.
    `test/veritas/unit/guide.scm` already resolves every `file:` link and every
    `CUSTOM_ID`; the same technique applied to "every exported helper appears in
    `docs/builtins.org`" retires a whole class of silent rot.
-2. **Extract the completion scripts from one description.** Three files, one
-   source of truth, and a shell-level test that compares generated output to the
-   checked-in text.
-3. **Startup benchmarks under `statprof`.** AGENTS.md asks for a measurement
+2. **Startup benchmarks under `statprof`.** AGENTS.md asks for a measurement
    before a speedup; nobody has published one, and module resolution is the
    obvious place to look — the static reader now borrows the library, which is
    worth a number before anyone optimises it.
-4. **One more migration page, and one more spec.** `docs/why-maak.org` has the
+3. **One more migration page, and one more spec.** `docs/why-maak.org` has the
    Make table; a page for `just` and Task users is where most newcomers actually
    come from, and a Veritas spec exercising engine detection against a fake
    container binary would harden `container.scm` cheaply.

@@ -28,32 +28,24 @@ this repository), which is how the author drives tasks straight from Emacs.
 
 * Shell completions
 
-maak ships completions for Bash, Zsh and Fish. In a directory with a Maak file, type ~maak~, a space, then TAB, and the task names appear. The completion scripts read the current Maak file and extract task names from it.
+maak ships completions for Bash, Zsh and Fish. In a directory with a Maak file, type ~maak~, a space, then TAB, and the task names appear, each with the first line of its docstring beside it.
 
-The scripts live in ~scripts/~ and, in most situations, are installed for you. If you installed by hand, load them yourself — these variables are handy if you run Guix:
+What a completion offers comes from two places, and neither is a second reader of the Maak file:
 
-#+begin_export html
-<details>
-  <summary>See a Bash example of manual completion load</summary>
-#+end_export
+- the options are written once, in =src/maak/completion.scm=, and rendered for each shell;
+- the tasks are asked of maak itself, as ~maak --list=completion~, so a task a macro defines, one a module the Maak file uses brings in, one a task file in JSON, TOML or YAML describes, and the ones a ~--file~ or ~--directory~ already on the line names are all offered -- they are the tasks that run would have.
+
+The scripts are generated, never edited: =scripts/maak-completion.bash=, =.zsh= and =.fish= are copies of what ~maak --completion SHELL~ prints, ~maak completions~ rewrites them, and ~maak test~ fails when a copy and the generator disagree.  That is what keeps a flag added to the command line from being invisible to the shell that offers it.
+
+Most installations put the scripts where each shell looks, so there is nothing to do.  By hand, ask maak for the script and write it where your shell reads completions:
 
 #+begin_src shell
-#!/usr/bin/env bash
-maak_bin_install_dir=$(which maak)
-maak_install_dir=$(realpath "${maak_bin_install_dir}")
-maak_bin=$(dirname "${maak_install_dir}")
-maak_store=$(dirname "${maak_bin}")
-maak_completions="${maak_store}/share/bash-completion/completions/maak"
+mkdir -p ~/.local/share/bash-completion/completions
+maak --completion bash > ~/.local/share/bash-completion/completions/maak
 
-# Load Maak auto-completions
-if [[ -f "${maak_completions}" ]]; then
-  source "${maak_completions}" || true
-fi
+maak --completion zsh  > ~/.local/share/zsh/site-functions/_maak
+maak --completion fish > ~/.config/fish/completions/maak.fish
 #+end_src
-
-#+begin_export html
-</details>
-#+end_export
 
 * Editor integrations
 

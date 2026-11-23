@@ -12,6 +12,47 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 
 *[Released]*
 
+** v1.2.0 (unreleased)
+
+The shell completions are generated from one description of the interface and
+ask maak which tasks the project has, instead of parsing `maak.scm` themselves.
+
+*** Added
+
+- `maak --completion SHELL` prints the completion script for `bash`, `zsh` or
+  `fish` and exits.  It reads no Maak file, so it answers in any directory, and
+  it is generated from the options this build has.
+- `--list=completion` lays a listing out for a shell: one task a line, the name,
+  a tab, and the first line of the task's docstring.
+- `maak completions` regenerates `scripts/maak-completion.bash`, `.zsh` and
+  `.fish`, which are now copies of what the generator prints rather than three
+  hand-kept files.
+
+*** Changed
+
+- A completion offers the tasks `maak --list` would list, because it asks maak
+  rather than matching regular expressions against the file: a task a macro
+  defines, one a module the Maak file uses brings in, one a task file in JSON,
+  TOML or YAML describes, and the ones a `--file` or `--directory` already on
+  the command line names are all offered.  A task that asked to be left out of
+  the listings is left out here too.
+- Every option of `maak --help` completes, in all three shells, with a
+  description, and each option completes the value it takes: a file for
+  `-f/--file` and `-e/--env-file`, a directory for `-C/--directory` and
+  `-L/--load-path`, one of the layouts for `--list=`, a shell for `--completion`
+  and nothing for `-j/--jobs` and `--list-width`.  A spec fails the suite when
+  the table and `maak-option-spec` disagree.
+- `-C/--directory` no longer prints the directory it entered in front of a
+  listing, a plan or an explain: those are reports a program may be reading, and
+  a listing names the file it read in its heading.  A run still reports the
+  directory it changed to.
+
+*** Fixed
+
+- `maak -C DIR` no longer leaves the directory it entered on standard output
+  when the shell exports `CDPATH`, which put a path in front of a `--list=json`
+  document.
+
 ** v1.1.5 (2026-11-21)
 
 The API reference is rendered with Texinfo 7.3, so dokgen's stylesheet applies

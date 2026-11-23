@@ -724,6 +724,26 @@ written, rather than a task that runs in the wrong order later."
   (let ((meta (task-meta task)))
     (if (and meta (task-meta-example meta)) (task-meta-example meta) "")))
 
+;; ====== The listing a shell reads ======
+;;
+;; `--list=completion' prints one task a line: the name, a tab, and the first
+;; line of the task's documentation.  That is what a completion menu has room
+;; for -- zsh and fish show one line beside a candidate -- and it is why the
+;; layout exists rather than the completion scripts parsing `--list' themselves.
+
+(define (task-summary doc)
+  "Return DOC as the one line a completion menu shows for a task.
+
+The first line that is not blank is the summary: a docstring leads with what the
+task does, and a menu shows that and nothing more.  Runs of whitespace become one
+space, so a summary written inside an indented definition still reads as a line,
+and a task with no docstring has no summary."
+  (if (string=? doc "")
+      ""
+      (let ((line (find (lambda (candidate) (not (blank-line? candidate)))
+                        (string-split doc #\newline))))
+        (if line (string-join (string-tokenize line) " ") ""))))
+
 ;; ====== The order a run puts the tasks in ======
 ;;
 ;; A dependency orders a run and nothing else.  Nothing here asks whether a task
@@ -978,9 +998,11 @@ Tasks are sorted by name unless AS-IS? is #t.
 
 STYLE is how the listing is laid out: `table' aligns every documentation line
 on one column and is what `maak --list' prints, `names' prints one task name per
-line for a script or a picker, `long' is the table with each task's example
-under it, and `plain' is the `name: documentation' block the listing printed
-before the table, kept for a reader that has the shape in a script already.
+line for a script or a picker, `completion' prints a name, a tab and the first
+line of the task's documentation for a shell to put in its menu, `long' is the
+table with each task's example under it, and `plain' is the `name: documentation'
+block the listing printed before the table, kept for a reader that has the shape
+in a script already.
 WIDTH, when given, is the widest line the listing may produce, which is what
 folds a long docstring.  FILE, when given, is named in the heading.
 
@@ -993,6 +1015,13 @@ left out of all of them."
      (case style
        ((names)
         (string-join (map first (listing-entries tasks)) "\n"))
+       ((completion)
+        (string-join
+         (map (match-lambda
+                ((name doc _needs _example)
+                 (string-append name "\t" (task-summary doc))))
+              (listing-entries tasks))
+         "\n"))
        ((plain)
         (call-with-output-string
           (lambda (port)

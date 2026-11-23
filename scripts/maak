@@ -138,7 +138,7 @@ option_side=("${options_without_style[@]}")
 # Only the words before that first separator are options and task words; the
 # ones after it are the arguments, and are never shown to `getopt' -- a task
 # argument that looks like an option is an argument.
-parsed_options=$(getopt -n "maak" -o C:e:ij:klf:hL:nqvt: --longoptions list,list-width:,json,plan,watch,explain,file:,help,dry-run,quiet,load-path:,env-file:,no-env-file,banner,no-banner,version,debug,directory:,keep-going,ignore-errors,jobs:,no-print-directory,tasks: -- "${option_side[@]}")
+parsed_options=$(getopt -n "maak" -o C:e:ij:klf:hL:nqvt: --longoptions list,list-width:,json,plan,watch,explain,completion:,file:,help,dry-run,quiet,load-path:,env-file:,no-env-file,banner,no-banner,version,debug,directory:,keep-going,ignore-errors,jobs:,no-print-directory,tasks: -- "${option_side[@]}")
 eval set -- "$parsed_options"
 
 
@@ -233,6 +233,17 @@ while [ "$#" -gt 0 ]; do
   --explain)
     guile_cmd_args+=("--explain")
     shift
+    ;;
+  --completion)
+    if [ -z "${2:-}" ]; then
+      log_error "The --completion option needs a shell name: bash, zsh or fish."
+      exit 1
+    fi
+    # The script is the library's, not the Maak file's, so nothing is read from
+    # the checkout for it.
+    needs_maak_file=no
+    guile_cmd_args+=("--completion" "${2}")
+    shift 2
     ;;
   -t | --tasks)
     if [ -z "${2:-}" ]; then
@@ -345,7 +356,10 @@ if [ "${#directories[@]}" -gt 0 ]; then
       if [ -z "${part}" ]; then
         continue
       fi
-      if ! cd -- "${part}" 2>/dev/null; then
+      # CDPATH is cleared for the change: a shell that exports one makes `cd'
+      # print the directory it landed in, and that line would be the first thing
+      # in a listing a machine reads.
+      if ! CDPATH= cd -- "${part}" 2>/dev/null; then
         log_error "no such directory: '${part}'"
         exit 1
       fi
