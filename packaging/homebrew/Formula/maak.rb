@@ -16,7 +16,7 @@ class Maak < Formula
   desc "Command runner à la Make using Guile Scheme"
   homepage "https://github.com/jjba23/maak"
   url "https://github.com/jjba23/maak/archive/refs/tags/v1.2.1.tar.gz"
-  sha256 "ba7e96f12bdddb29dd9ea82c540697f0bf496626977bfa7fbdd4d25d82ffc444"
+  sha256 "d91d88c351955d7b2de97e42ea53910090a343224f6a1d22b6409cc181aa7566"
   license "MIT"
 
   depends_on "coreutils"
