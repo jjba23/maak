@@ -91,6 +91,16 @@ directory of its own is what tells it the same about `-C'."
 " port)))
     (cons directory path)))
 
+(define (project-path relative)
+  "Return the absolute path of RELATIVE under the working directory.
+
+The path is built from the working directory rather than resolved with
+`canonicalize-path', which follows symlinks.  A build job that mounts the
+checkout at one path while the mount's target lives elsewhere gets the path the
+process can actually open this way; the resolved one may not exist on the other
+side of the mount, and a shell handed it would fail to read the file it names."
+  (in-vicinity (getcwd) relative))
+
 (define (maak-shim)
   "Return a directory whose `maak' runs this checkout's launcher.
 
@@ -106,7 +116,7 @@ point it at a tree that holds no sources."
     (call-with-output-file shim
       (lambda (port)
         (format port "#!/bin/sh\nexec ~a \"$@\"\n"
-                (canonicalize-path "scripts/maak"))))
+                (project-path "scripts/maak"))))
     (chmod-file "755" shim)
     directory))
 
@@ -298,8 +308,8 @@ as the list of tasks they describe rather than as text."
 ;; the environment, so nothing here builds a shell command out of data.
 
 (define bash-driver
-  "source \"$MAAK_COMPLETION\" || exit 9
-cd \"$MAAK_COMPLETION_DIR\" || exit 9
+  "source \"$MAAK_COMPLETION\" || { echo \"cannot read $MAAK_COMPLETION\" >&2; exit 9; }
+cd \"$MAAK_COMPLETION_DIR\" || { echo \"cannot enter $MAAK_COMPLETION_DIR\" >&2; exit 9; }
 COMP_WORDS=(\"$@\")
 COMP_CWORD=$(( ${#COMP_WORDS[@]} - 1 ))
 _maak
@@ -328,22 +338,36 @@ _maak_tasks
 ")
 
 (define (drive-shell shell driver . words)
-  "Complete WORDS in SHELL through DRIVER, and return `(STATUS STDOUT STDERR)'."
-  (apply run-program
-         (append
-          (list "env"
-                (format #f "PATH=~a:~a" (maak-shim) (getenv "PATH"))
-                (format #f "MAAK_COMPLETION=~a"
-                        (canonicalize-path (script-file shell)))
-                (format #f "MAAK_COMPLETION_DIR=~a"
-                        (canonicalize-path fixture-directory))
-                (symbol->string shell) "-c" driver)
-          ;; bash and zsh read the first word after the script as the name they
-          ;; were started under, so the driver is given one and the words follow
-          ;; it; fish hands the words over on their own.
-          (if (eq? shell 'fish)
-              words
-              (cons "maak-completion" words)))))
+  "Complete WORDS in SHELL through DRIVER, and return `(STATUS STDOUT STDERR)'.
+
+A driver that exits non-zero raises, carrying what it wrote to standard error:
+a case that only saw an empty candidate list would say nothing about a driver
+that never started, and one build failed here with a bare status that took a
+log hunt to explain."
+  (let ((result (apply run-program
+                       (append
+                        (list "env"
+                              (format #f "PATH=~a:~a"
+                                      (maak-shim) (getenv "PATH"))
+                              (format #f "MAAK_COMPLETION=~a"
+                                      (project-path (script-file shell)))
+                              (format #f "MAAK_COMPLETION_DIR=~a"
+                                      (project-path fixture-directory))
+                              (symbol->string shell) "-c" driver)
+                        ;; bash and zsh read the first word after the script as
+                        ;; the name they were started under, so the driver is
+                        ;; given one and the words follow it; fish hands the
+                        ;; words over on their own.
+                        (if (eq? shell 'fish)
+                            words
+                            (cons "maak-completion" words))))))
+    (if (zero? (status-of result))
+        result
+        (raise-maak-error
+         (format #f "the ~a completion driver failed with status ~a: ~a"
+                 shell (status-of result)
+                 (string-trim-both (stderr-of result)))
+         #:hint "The completion spec drives a real shell; see its driver."))))
 
 (define shell-suite
   (suite "The scripts in a real shell"
@@ -361,11 +385,10 @@ _maak_tasks
                                 #:got "deploy"))
 
          (test "the bash script offers only the tasks that start with the word"
-               (assert-equal #:expect (list 0 "build")
-                             #:got (let ((result (drive-shell 'bash bash-driver
-                                                              "maak" "bu")))
-                                     (list (status-of result)
-                                           (string-trim-both (stdout-of result))))))
+               (assert-equal #:expect "build"
+                             #:got (string-trim-both
+                                    (stdout-of (drive-shell 'bash bash-driver
+                                                            "maak" "bu")))))
 
          (test "the bash script offers the options of the grammar"
                (assert-contains #:expect (stdout-of (drive-shell 'bash bash-driver
@@ -383,11 +406,10 @@ _maak_tasks
                                 #:got "echo,deploy"))
 
          (test "the bash script asks for no number"
-               (assert-equal #:expect (list 0 "")
-                             #:got (let ((result (drive-shell 'bash bash-driver
-                                                              "maak" "-j" "")))
-                                     (list (status-of result)
-                                           (string-trim-both (stdout-of result))))))
+               (assert-equal #:expect ""
+                             #:got (string-trim-both
+                                    (stdout-of (drive-shell 'bash bash-driver
+                                                            "maak" "-j" "")))))
 
          (test "the bash script offers files after --file"
                (assert-contains #:expect (stdout-of (drive-shell 'bash bash-driver
