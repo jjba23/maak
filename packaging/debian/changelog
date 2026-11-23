@@ -1,3 +1,14 @@
+maak (1.2.3-1) unstable; urgency=medium
+
+  * Test and manifest only; no library code, command line or generated script
+    changed.  The Bash completion cases failed in a build with "complete:
+    command not found", because the bash a Guix shell hands you is
+    bash-minimal, built without readline and therefore without programmable
+    completion at all.  The manifest names the full bash now, and the spec
+    asks first and passes those cases unrun where the shell cannot complete.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Mon, 23 Nov 2026 15:40:00 +0100
+
 maak (1.2.2-1) unstable; urgency=medium
 
   * maak --dry-run completions no longer empties scripts/maak-completion.bash,

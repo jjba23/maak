@@ -12,6 +12,26 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 
 *[Released]*
 
+** v1.2.3 (2026-11-23)
+
+The suite runs the completions in a bash that can complete, and passes in a
+build where the bash on PATH cannot.  No library code, command line or
+generated script changed.
+
+*** Fixed
+
+- The bash completion cases failed in a build with `complete: command not
+  found`.  A bash built without readline -- `bash-minimal`, which Guile's own
+  package graph carries -- has no programmable completion at all, so sourcing a
+  completion file fails on its last line; the suite reported that as maak
+  offering nothing.  The Guix manifest now names the full `bash`, so the suite
+  runs the shell a user completes with, and the spec asks first
+  (`type complete') and passes the bash cases unrun where the answer is no, the
+  way the zsh and fish cases already skip themselves when their shell is absent.
+- A shell driver that cannot start now says why: it names the step that failed
+  on standard error, and the spec raises with that text instead of handing back
+  an empty candidate list.
+
 ** v1.2.2 (2026-11-23)
 
 A dry run of `maak completions` no longer empties the three scripts it writes.
