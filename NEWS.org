@@ -12,7 +12,7 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 
 *[Released]*
 
-** v1.2.0 (unreleased)
+** v1.2.0 (2026-11-23)
 
 The shell completions are generated from one description of the interface and
 ask maak which tasks the project has, instead of parsing `maak.scm` themselves.

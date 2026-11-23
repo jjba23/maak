@@ -1,3 +1,25 @@
+maak (1.2.0-1) unstable; urgency=medium
+
+  * The shell completions are generated from one description of the interface,
+    in (maak completion), and ask maak which tasks the project has instead of
+    matching regular expressions against maak.scm.  A task a macro defines, one
+    a module the Maak file uses brings in, one a task file in JSON, TOML or YAML
+    describes and the ones a -f or -C already on the line names are all offered
+    now, and a task that asked to be left out of the listings is left out here
+    too.  Every option completes, with its value: a file for -f and -e, a
+    directory for -C and -L, a layout for --list=, a shell for --completion.
+  * --completion SHELL prints the script for bash, zsh or fish and reads no Maak
+    file; --list=completion is the layout a completion menu reads: name, tab,
+    first line of the docstring.  maak completions regenerates the three
+    checked-in scripts, and the suite fails when a copy and the generator
+    disagree.
+  * -C no longer prints the directory it entered in front of a listing, a plan
+    or an explain, and the launcher no longer lets a CDPATH from the environment
+    put a path in front of one, so a --list=json document is the JSON and only
+    the JSON.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Mon, 23 Nov 2026 14:00:00 +0100
+
 maak (1.1.2-1) unstable; urgency=medium
 
   * frontend-add's @example block is gone: a docstring is Texinfo, so the
