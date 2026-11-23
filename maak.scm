@@ -14,7 +14,6 @@
   #:use-module ((ice-9 ftw) #:select (scandir))
   #:use-module ((srfi srfi-13) #:select (string-drop-right string-suffix?))
   #:use-module (maak maak)
-  #:use-module (maak completion)
   #:use-module ((ice-9 rdelim) #:select (read-line))
   ;; The git and container helpers are imported under prefixes because the
   ;; tasks below are named the way maak exposes them on the command line, and a
@@ -255,12 +254,19 @@ same shape the earlier releases were cut with."
 
 ;; ====== The shell completions ======
 ;;
-;; The three files under scripts/ are copies of what `(maak completion)' renders:
-;; the options are written once, and each shell's script is generated from that
-;; one table.  Editing a copy is the one thing not to do, because `maak test'
-;; compares each file with what this writes and fails on the difference -- which
-;; is the point of generating them at all, since three hand-kept scripts had no
-;; way of noticing that an option had been added above them.
+;; The three files under scripts/ are copies of what `maak --completion SHELL'
+;; renders: the options are written once, and each shell's script is generated
+;; from that one table.  Editing a copy is the one thing not to do, because
+;; `maak test' compares each file with what this writes and fails on the
+;; difference -- which is the point of generating them at all, since three
+;; hand-kept scripts had no way of noticing that an option had been added above
+;; them.
+;;
+;; The generator is asked for through `./scripts/maak' rather than imported as a
+;; module, and that is deliberate: this file is loaded by whatever `maak' is
+;; installed, which may be older than the checkout it is reading, so a task here
+;; may only use the library that release shipped.  The launcher beside the file
+;; runs the checkout's own library, which is the one that knows the table.
 
 (define (completions)
   "Regenerate the Bash, Zsh and fish completions from one description.
@@ -269,13 +275,13 @@ same shape the earlier releases were cut with."
 this task writes files instead of deciding anything: `--completion SHELL'
 prints the same text, and an installed maak answers with the completions of the
 command line it actually has."
-  (for-each
-   (lambda (shell)
-     (let ((path (~ "scripts/maak-completion.~a" shell)))
-       (call-with-output-file path
-         (lambda (port) (display (completion-script shell) port)))
-       (log-info "Wrote ~a." path)))
-   completion-shells))
+  (define (write path command)
+    (call-with-output-file path
+      (lambda (port) (display (capture command) port)))
+    (log-info "Wrote ~a." path))
+  (write "scripts/maak-completion.bash" "./scripts/maak --completion bash")
+  (write "scripts/maak-completion.zsh" "./scripts/maak --completion zsh")
+  (write "scripts/maak-completion.fish" "./scripts/maak --completion fish"))
 
 ;; ====== Git and source archives ======
 ;;

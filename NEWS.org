@@ -12,6 +12,22 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 
 *[Released]*
 
+** v1.2.1 (2026-11-23)
+
+This repository's own Maak file loads again under a maak older than 1.2.0.
+Nothing else changed: 1.2.0 was released with a Maak file that imported the
+module 1.2.0 introduced, and no earlier maak can load that.
+
+*** Fixed
+
+- `maak.scm` no longer imports `(maak completion)`.  That file is loaded by
+  whichever `maak` is installed -- a CI image, a distribution package, a shell
+  that exported `MAAK_LOAD_PATH` -- so a task written in it may only use the
+  library that release shipped; a task that needs a newer one asks the
+  checkout's `./scripts/maak` for it.  `maak completions` does that now, so
+  `maak test` and every other task in this repository run under an older maak
+  again, which is what the 1.2.0 release broke.
+
 ** v1.2.0 (2026-11-23)
 
 The shell completions are generated from one description of the interface and

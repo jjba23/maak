@@ -1,3 +1,15 @@
+maak (1.2.1-1) unstable; urgency=medium
+
+  * maak.scm no longer imports (maak completion).  This repository's Maak file
+    is loaded by whichever maak is installed, so a task in it may only use the
+    library that release shipped, and 1.2.0 shipped a file that needed the
+    module 1.2.0 introduced: `maak test`, and every other task here, failed with
+    "no code for module (maak completion)" under any older maak.  maak
+    completions now asks the checkout's ./scripts/maak for the three scripts,
+    which is the library beside it.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Mon, 23 Nov 2026 14:30:00 +0100
+
 maak (1.2.0-1) unstable; urgency=medium
 
   * The shell completions are generated from one description of the interface,

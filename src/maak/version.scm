@@ -29,7 +29,7 @@
                          print-version))
 
 (define maak-version
-  "1.2.0")
+  "1.2.1")
 
 (define maak-homepage
   "https://github.com/jjba23/maak")
