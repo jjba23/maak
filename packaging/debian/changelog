@@ -1,3 +1,14 @@
+maak (1.2.2-1) unstable; urgency=medium
+
+  * maak --dry-run completions no longer empties scripts/maak-completion.bash,
+    .zsh and .fish.  A dry run prints the commands and writes nothing, which is
+    right, but the task wrote the empty output capture returns in dry-run mode
+    over the three files.  An empty capture writes nothing now, so a dry run
+    leaves the copies on disk alone, and a capture that fails still stops the
+    task before it writes.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Mon, 23 Nov 2026 15:00:00 +0100
+
 maak (1.2.1-1) unstable; urgency=medium
 
   * maak.scm no longer imports (maak completion).  This repository's Maak file

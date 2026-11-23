@@ -12,6 +12,22 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 
 *[Released]*
 
+** v1.2.2 (2026-11-23)
+
+A dry run of `maak completions` no longer empties the three scripts it writes.
+
+*** Fixed
+
+- `maak --dry-run completions` printed the three commands and wrote nothing, as
+  a dry run should, but it then wrote the empty output over
+  `scripts/maak-completion.bash`, `.zsh` and `.fish`: `capture` prints a command
+  instead of running it under `--dry-run` and returns the empty string, and the
+  task wrote that string without looking at it.  An empty capture now writes
+  nothing, so the copy on disk survives a dry run, and a capture that fails
+  still stops the task before it writes anything.
+- The completion spec covers it: a dry run of the task leaves the three files
+  byte for byte as they were.
+
 ** v1.2.1 (2026-11-23)
 
 This repository's own Maak file loads again under a maak older than 1.2.0.

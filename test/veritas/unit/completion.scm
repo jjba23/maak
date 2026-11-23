@@ -481,6 +481,40 @@ _maak_tasks
                                     #:got "--list=json")
                    (assert-true #t)))))
 
+;; ====== The task that regenerates the scripts ======
+
+(define generated-scripts
+  '("scripts/maak-completion.bash"
+    "scripts/maak-completion.zsh"
+    "scripts/maak-completion.fish"))
+
+(define (script-texts)
+  "Return the text of every checked-in completion script, in order."
+  (map (lambda (path) (read-file path #:default "")) generated-scripts))
+
+(define regeneration-suite
+  (suite "The task that regenerates the scripts"
+         #:concurrent? #f
+         #:shuffle? #f
+
+         (test "a dry run of it leaves the scripts alone"
+               ;; `capture' prints the command instead of running it under
+               ;; `--dry-run' and returns nothing, so a task that writes its
+               ;; output without looking would empty the three files.  The
+               ;; scripts are put back if that happens, so the case fails
+               ;; without taking the checkout with it.
+               (let* ((before (script-texts))
+                      (result (run-program "scripts/maak" "--dry-run"
+                                           "completions"))
+                      (after (script-texts)))
+                 (unless (equal? before after)
+                   (for-each (lambda (path text)
+                               (call-with-output-file path
+                                 (lambda (port) (display text port))))
+                             generated-scripts before))
+                 (assert-equal #:expect (list 0 before)
+                               #:got (list (status-of result) after))))))
+
 ;; ====== The command line that prints a script ======
 
 (define command-suite
@@ -528,4 +562,5 @@ _maak_tasks
                agreement-suite
                listing-suite
                shell-suite
+               regeneration-suite
                command-suite))

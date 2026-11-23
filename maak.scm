@@ -276,9 +276,14 @@ this task writes files instead of deciding anything: `--completion SHELL'
 prints the same text, and an installed maak answers with the completions of the
 command line it actually has."
   (define (write path command)
-    (call-with-output-file path
-      (lambda (port) (display (capture command) port)))
-    (log-info "Wrote ~a." path))
+    ;; A run with `--dry-run' prints the command instead of running it and
+    ;; returns nothing, and a file written from nothing is a script emptied; so
+    ;; an empty capture writes nothing and leaves the copy that is there.
+    (let ((text (capture command)))
+      (unless (string=? text "")
+        (call-with-output-file path
+          (lambda (port) (display text port)))
+        (log-info "Wrote ~a." path))))
   (write "scripts/maak-completion.bash" "./scripts/maak --completion bash")
   (write "scripts/maak-completion.zsh" "./scripts/maak --completion zsh")
   (write "scripts/maak-completion.fish" "./scripts/maak --completion fish"))
