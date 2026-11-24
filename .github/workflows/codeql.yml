@@ -3,16 +3,19 @@
 # SPDX-License-Identifier: MIT
 # Copyright © Josep Bigorra <jjbigorra@gmail.com>
 
-# CodeQL in an advanced setup, so that the languages are the ones written here
-# rather than the ones an autodetection pass guesses at from the tree.
+# CodeQL in an advanced setup, so that the languages and the build mode are the
+# ones written here rather than the ones an autodetection pass guesses at from
+# the tree.  Default setup re-detects languages on its own, which is how the
+# `Analyze (java-kotlin)` job came to fail on every push: it found
+# `contrib/intellij/build.gradle.kts` and the checkout has no build it can run.
 #
-# The guess is what broke: default setup found `contrib/intellij/build.gradle.kts'
-# and ran the Java/Kotlin autobuilder, which looks for a build it can run at the
-# top of a checkout and found none -- the plugin has no wrapper and its build
-# downloads the IntelliJ platform -- so the language failed with a configuration
-# error on every push that touched Kotlin files.  `build-mode: none' is the fix
-# the error asked for: the sources are analysed without a build, which is what a
-# code scan of two Kotlin files needs and what a hosted runner can do.
+# Java and Kotlin are not in the matrix, and that is a limit of the plugin's
+# build rather than a choice about coverage.  `build-mode: none` is meant for
+# exactly this case, but the Java extractor still resolves the project's
+# dependencies, so it runs Gradle over `contrib/intellij`, which fails at
+# `settings.gradle.kts:5: Unresolved reference 'intellijPlatform'` -- the
+# IntelliJ platform DSL there is one that only a project script has.  When that
+# script builds again, `java-kotlin` can come back with `build-mode: none`.
 #
 # Every language here is build-free, so no job has a build step.  `contrib/vscode'
 # is the JavaScript and TypeScript, `contrib/sublime/maak.py' the Python, the
@@ -44,10 +47,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [actions, java-kotlin, javascript-typescript, python, ruby]
+        language: [actions, javascript-typescript, python, ruby]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
