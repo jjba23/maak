@@ -77,6 +77,16 @@ Three things are worth knowing when adding a test, because two of them fail quie
 
 The first two fail quietly, and nothing catches them for you: the run exits 0 and a test that asserted nothing passes exactly where one that asserts does. The only sign is in the report, which prints the value of every case under the test it belongs to — a test with no line under it ran no case at all, and a case showing one value where two assertions were written means one of them was never read. Read the report, and prefer a test that can fail to a count of tests that passed.
 
+* Continuous integration
+
+A push to ~trunk~ runs ~.github/workflows/ci.yml~, which hands Byggsteg the tasks ~maak-test~ and ~maak-deploy~ through the reusable workflow of [[https://github.com/jjba23/byggsteg-github][byggsteg-github]], and a run is green when the suite is.
+
+A pull request against ~trunk~ runs ~.github/workflows/pull-request.yml~, which hands Byggsteg ~maak-test~ and nothing else. It is a =pull_request_target= workflow, and that is deliberate: GitHub reads that file from ~trunk~ rather than from the pull request, so a patch that edits ~.github/workflows/~ has those edits ignored -- it cannot add a step, change the task list, or name a secret. The run is given a read-only token, and only the two credentials the bridge signs in to Byggsteg with are passed to it, named one by one instead of with =secrets: inherit=. What a patch still controls is the code under test: the daemon clones the branch named in the workflow, runs ~maak test~ there in a container, and nothing of the patch runs on the runner.
+
+Both workflows pin the reusable bridge to a release rather than to a branch, so a repository that publishes a new release is a change somebody makes here.
+
+CodeQL is ~.github/workflows/codeql.yml~, an advanced setup whose languages are written down: =actions=, =javascript-typescript=, =python= and =ruby=, all scanned without a build, on push, on pull request, and weekly. Java and Kotlin are not scanned: the Java extractor resolves dependencies through Gradle, and ~contrib/intellij~ does not configure yet.
+
 * Documentation
 
 The guide is the pages under ~docs/~: one topic each, linked from the

@@ -1,3 +1,17 @@
+maak (1.4.1-1) unstable; urgency=medium
+
+  * A pull request runs the suite on Byggsteg now, from a pipeline the patch
+    cannot edit: .github/workflows/pull-request.yml runs maak-test for every
+    pull request against trunk, and nothing else.  It is a pull_request_target
+    workflow, so the file is read from trunk rather than from the patch, the
+    run gets a read-only token, and only the two bridge credentials are passed
+    -- named one by one rather than with `secrets: inherit'.  CodeQL becomes an
+    advanced setup with its languages written down, so default setup can no
+    longer re-detect contrib/intellij and fail the java-kotlin job on every
+    push.  No library, command line or file format changed.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Tue, 24 Nov 2026 10:30:00 +0100
+
 maak (1.4.0-1) unstable; urgency=medium
 
   * maak can drive `zig build`: (maak zig) is a new module -- built the way

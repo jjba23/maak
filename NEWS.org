@@ -12,6 +12,36 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 
 *[Released]*
 
+** v1.4.1 (2026-11-24)
+
+A pull request runs the suite now, from a pipeline the patch cannot edit.  No
+library, command line or file format changed.
+
+*** Added
+
+- `.github/workflows/pull-request.yml` runs `maak-test` on Byggsteg for every
+  pull request against `trunk`, and nothing else: no deploy task, and no
+  credential beyond the two the bridge signs in to Byggsteg with.  The event is
+  `pull_request_target`, so the workflow file is read from `trunk` rather than
+  from the patch -- a patch that edits `.github/workflows/` has those edits
+  ignored and cannot add a step, change the task list or name a secret -- and the
+  run is given a read-only token.  `branch-name` and `clone-url` are what make a
+  pull request from a fork testable, since under this event the run is on
+  `trunk`.
+- CodeQL is an advanced setup that names its languages, so default setup can no
+  longer re-detect `contrib/intellij` and fail the `java-kotlin` job on every
+  push.  The languages are scanned build-free, on push, on pull request, and
+  weekly.
+
+*** Changed
+
+- Both callers pin the byggsteg bridge to `v0.1.1` instead of to its trunk, so a
+  branch that moves cannot change what this repository runs.
+- Java and Kotlin leave the CodeQL matrix until the IntelliJ plugin's Gradle
+  build configures: `build-mode: none` still resolves dependencies through
+  Gradle, and `contrib/intellij/settings.gradle.kts` names a DSL only a project
+  script has.  The workflow says so beside the language list.
+
 ** v1.4.0 (2026-11-24)
 
 maak can drive `zig build`.  `(maak zig)` is the thirteenth ecosystem module,
