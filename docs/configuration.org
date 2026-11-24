@@ -23,6 +23,7 @@ maak is configured three ways, in increasing order of precision: command-line fl
 | ~MAAK_PKG_CONFIG~ | The pkg-config program; ~pkg-config~ by default.                    |
 | ~MAAK_CARGO~      | The cargo program for ~(maak cargo)~; falls back to ~CARGO~, then ~cargo~. |
 | ~MAAK_RUSTUP~     | The rustup program; falls back to ~RUSTUP~, then ~rustup~.          |
+| ~MAAK_ZIG~        | The zig program for ~(maak zig)~; falls back to ~ZIG~, then ~zig~.  |
 | ~MAAK_UV~         | The uv program for ~(maak python)~; falls back to ~UV~, then ~uv~.  |
 | ~MAAK_UVX~        | The uvx program; falls back to ~UVX~, then ~uvx~.                   |
 | ~MAAK_PYTHON~     | The interpreter ~(maak python)~ runs; falls back to ~PYTHON~, then ~python3~. |
@@ -51,6 +52,9 @@ that belongs to a link are not the same decision.  See
 ~MAAK_CARGO~ and ~MAAK_RUSTUP~ are read the same way, and their values may carry
 a wrapper or a toolchain -- ~"cargo +nightly"~ is the usual one.  See
 [[file:rust-and-cargo.org][Rust and Cargo]].
+
+~MAAK_ZIG~ is read the same way, so a value may carry a compiler cache
+(~"sccache zig"~).  See [[file:zig.org][Zig and zig build]].
 
 ~MAAK_MAVEN~, ~MAAK_GRADLE~ and ~MAAK_EMACS~ are read the same way too, and a
 value may carry flags.  A checkout's ~mvnw~ or ~gradlew~ is not chosen through

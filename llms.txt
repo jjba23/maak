@@ -30,7 +30,7 @@ arguments) and `maak --plan --json TASK` (what a task would execute: `kind`,
 
 ## The rest of the guide
 
-- [Guide index](https://raw.githubusercontent.com/jjba23/maak/trunk/docs/index.org): one page per topic — Guix and Nix, containers, Rust, Python, frontend, Maven and Gradle, Emacs Lisp, git and archives, downloads, editors.
+- [Guide index](https://raw.githubusercontent.com/jjba23/maak/trunk/docs/index.org): one page per topic — Guix and Nix, containers, Rust, Zig, Python, frontend, Maven and Gradle, Emacs Lisp, git and archives, downloads, editors.
 - [This repository's own automation](https://raw.githubusercontent.com/jjba23/maak/trunk/docs/project.org): the tasks of the checkout that writes maak.
 - [Hacking on maak](https://raw.githubusercontent.com/jjba23/maak/trunk/docs/development.org): the Veritas suite, the API documentation, the man page.
 

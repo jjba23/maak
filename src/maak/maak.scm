@@ -2,6 +2,7 @@
 ;;
 ;; SPDX-License-Identifier: MIT
 ;; Copyright © Josep Bigorra <jjbigorra@gmail.com>
+;; Copyright © FuncProgLinux <softwarelibre@urutau-ltd.org>
 
 (define-module (maak maak)
   #:declarative? #t
@@ -26,6 +27,7 @@
   #:use-module (maak watch)
   #:use-module (maak cc)
   #:use-module (maak cargo)
+  #:use-module (maak zig)
   #:use-module (maak python)
   #:use-module (maak frontend)
   #:use-module (maak maven)
@@ -174,6 +176,26 @@
                            rustup-install
                            rustup-target-add
                            rustup-component-add
+                           ;; ====== Zig ======
+                           zig-command
+                           zig-argv
+                           zig
+                           zig-output
+                           zig-build-argv
+                           zig-build
+                           zig-build-install
+                           zig-build-test
+                           zig-build-run
+                           zig-build-uninstall
+                           zig-build-clean
+                           zig-build-steps
+                           zig-build-exe
+                           zig-build-lib
+                           zig-build-obj
+                           zig-test
+                           zig-fmt
+                           zig-fetch
+                           zig-version
                            ;; ====== Python ======
                            uv-command
                            uvx-command
