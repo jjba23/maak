@@ -12,6 +12,47 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 
 *[Released]*
 
+** v1.4.0 (2026-11-24)
+
+maak can drive `zig build`.  `(maak zig)` is the thirteenth ecosystem module,
+built the way `(maak cargo)` is: Zig stays the build engine and keeps the
+dependency graph, and maak owns the command line around it, so a Zig project's
+automation is a Maak file and the steps are still `build.zig`'s.
+
+*** Added
+
+- `(maak zig)` provides `zig-argv` and `zig`, `zig-output`, `zig-build-argv`
+  and `zig-build`, the usual steps (`zig-build-install`, `zig-build-test`,
+  `zig-build-run`, `zig-build-steps`), the direct compiler commands
+  (`zig-build-exe`, `zig-build-lib`, `zig-build-obj`, `zig-test`), `zig-fmt`,
+  `zig-fetch` and `zig-version`.  Every one of them is re-exported by
+  `(maak maak)`, so a Maak file needs no extra import.
+- `zig-build-argv` is pure: the steps and the named options -- `#:optimize`,
+  `#:target`, `#:cpu`, `#:prefix`, `#:summary`, `#:options`, `#:fetch`, and the
+  cache and prefix directories Zig documents in 0.16.0 -- become an argv list,
+  which a test can assert and `--dry-run` and `--plan` can show without Zig
+  installed.
+- `zig-build-clean` removes a local prefix, and `zig-build-uninstall` is
+  deliberately absent from it: Zig 0.16.0's own `uninstall` step panics
+  (ziglang/zig#14943), so the helper raises a maak error that names the missing
+  implementation instead of aborting the build runner.  The prefix may not leave
+  the project, because `zig-out` is the project's and `/usr/local` is not.
+- `zig-command` is a parameter, taken from `MAAK_ZIG`, then `ZIG`, then `zig`,
+  so a task can pin a compiler cache for one call with `parameterize`.
+- `docs/zig.org` is the guide page: the helpers, a project's tasks, the
+  structured command line, the two ways to run tests, cleaning, and what the
+  module deliberately does not do.  `docs/configuration.org` and `man/maak.1`
+  record `MAAK_ZIG`, and `test/veritas/unit/zig.scm` covers the argv builder,
+  the validation errors, the wrappers, the output query and the clean guards.
+
+*** Changed
+
+- The README's diagram of how a task description is built is redrawn, and it is
+  readable in a dark colour scheme as well as a light one: the SVG carries both
+  palettes and picks one by `prefers-color-scheme`.  `maak diagrams` paints it
+  with `resources/diagrams/diagram.css` and leaves the type to the reader's
+  machine, so the committed artefact is a third of its former size.
+
 ** v1.3.0 (2026-11-23)
 
 maak is packaged for Void Linux.  Nothing in the library or the command line

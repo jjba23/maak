@@ -1,3 +1,18 @@
+maak (1.4.0-1) unstable; urgency=medium
+
+  * maak can drive `zig build`: (maak zig) is a new module -- built the way
+    (maak cargo) is -- providing zig-argv and zig-build-argv, the usual steps,
+    the direct compiler commands, zig-fmt, zig-fetch and zig-version, all
+    re-exported by (maak maak).  Zig keeps the dependency graph and maak builds
+    the command line, so the argv is pure and --dry-run and --plan show it
+    without Zig installed.  zig-build-clean removes a local prefix and refuses
+    to leave the project; zig-build-uninstall names the step Zig has not
+    implemented rather than running a build that panics.  MAAK_ZIG selects the
+    program.  The README's diagram is redrawn and answers to a dark colour
+    scheme as well as a light one.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Tue, 24 Nov 2026 09:00:00 +0100
+
 maak (1.3.0-1) unstable; urgency=medium
 
   * maak is packaged for Void Linux: packaging/voidlinux/template is an
