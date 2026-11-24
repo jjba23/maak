@@ -445,6 +445,15 @@ beside the page that points at them."
 ;; rendering is a task of its own because the renderer is a JavaScript tool the
 ;; development shell does not carry; it is found on $PATH, which is where
 ;; `npm install --global @mermaid-js/mermaid-cli' puts it.
+;;
+;; Two of the flags are not the renderer's defaults.  `--no-font-embed' leaves
+;; the type to the reader's machine, which is also what the labels were measured
+;; with, so a diagram is not laid out for a font the reader does not have;
+;; `--cssFile' paints it with the stylesheet beside the sources, which carries a
+;; light palette and a dark one.
+
+(define diagram-stylesheet
+  "resources/diagrams/diagram.css")
 
 (define (diagrams)
   "Render every mermaid source under resources/diagrams to the SVG beside it."
@@ -453,7 +462,9 @@ beside the page that points at them."
      (let* ((source (in-vicinity "resources/diagrams" name))
             (image (string-append (string-drop-right source 4) ".svg")))
        (run (list "mmdc" "-i" source "-o" image
-                  "--backgroundColor" "transparent")
+                  "--backgroundColor" "transparent"
+                  "--no-font-embed"
+                  "--cssFile" diagram-stylesheet)
             #:verbose? #t)))
    (scandir "resources/diagrams"
             (lambda (name)

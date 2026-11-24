@@ -1,0 +1,77 @@
+/* The style `maak diagrams' renders the diagrams with.
+ *
+ * A rendered diagram is one static SVG, so it cannot ask the page what colour
+ * it is on; it carries both answers instead.  What is above the media query is
+ * the light palette, and the block below it re-inks the same shapes for a
+ * reader who prefers dark.  Neither sets a background: the diagram is drawn on
+ * whatever is behind it, which is why a node is a soft tint rather than white,
+ * and why the dark palette is a tint dark enough for light ink.
+ *
+ * The selectors are written the way the stylesheet beside them writes them, and
+ * mermaid prefixes each one with the diagram's id, so rewriting the shapes the
+ * theme already coloured is a matter of saying the same thing again, later.
+ */
+
+/* Light: a light card of ink on a light page. */
+.arrowheadPath {
+  fill: #64748b;
+}
+
+.cluster-label text,
+.cluster text {
+  fill: #334155;
+}
+
+.cluster-label span {
+  color: #334155;
+}
+
+/* Dark: the same shapes, inverted, so the arrows are visible on a dark page
+ * instead of disappearing into it. */
+@media (prefers-color-scheme: dark) {
+  .node rect,
+  .node circle,
+  .node ellipse,
+  .node polygon,
+  .node path {
+    fill: #1e1b4b;
+    stroke: #818cf8;
+  }
+
+  .label text,
+  span {
+    fill: #e0e7ff;
+    color: #e0e7ff;
+  }
+
+  .cluster rect {
+    fill: #111827;
+    stroke: #334155;
+  }
+
+  .cluster-label text,
+  .cluster text {
+    fill: #cbd5e1;
+  }
+
+  .cluster-label span {
+    color: #cbd5e1;
+  }
+
+  .edgePaths .path,
+  .flowchart-link {
+    stroke: #94a3b8;
+  }
+
+  .arrowheadPath {
+    fill: #94a3b8;
+  }
+
+  .edgeLabel,
+  .edgeLabel p,
+  .edgeLabel rect,
+  .labelBkg {
+    background-color: #1e1b4b;
+    fill: #1e1b4b;
+  }
+}

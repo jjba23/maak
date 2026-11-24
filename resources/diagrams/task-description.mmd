@@ -1,12 +1,48 @@
+---
+config:
+  theme: base
+  look: neo
+  fontFamily: "Inter, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    primaryColor: "#eef2ff"
+    primaryTextColor: "#1e1b4b"
+    primaryBorderColor: "#a5b4fc"
+    lineColor: "#94a3b8"
+    textColor: "#1e1b4b"
+    edgeLabelBackground: "#eef2ff"
+    clusterBkg: "#f8fafc"
+    clusterBorder: "#cbd5e1"
+  flowchart:
+    curve: basis
+    nodeSpacing: 34
+    rankSpacing: 46
+    padding: 12
+---
 flowchart LR
-  file["maak.scm"] --> forms["read-forms<br/>the file as data, never evaluated"]
-  forms --> defs["a top-level define, define*,<br/>or a name bound to a lambda"]
-  defs --> exports{"does the module<br/>declare #:export?"}
-  exports -- "yes, and the name is in it" --> task
-  exports -- "yes, and the name is not" --> helper["a helper, not a task"]
-  exports -- "no" --> task
-  forms --> metadata["metadata-plist<br/>the task-metadata! calls"]
-  metadata --> task["static-tasks<br/>name, docstring, lambda list,<br/>dependencies, hidden flag"]
-  task --> listing["maak: the task listing"]
-  task --> plan["maak --dry-run: the plan"]
-  task --> callgraph["static-call-graph<br/>which task calls which"]
+  file["maak.scm"]
+
+  subgraph reading["read, never evaluated"]
+    forms["read-forms"]
+    defs["a define, define*<br/>or a lambda"]
+    exports{"in #:export?"}
+    metadata["metadata-plist"]
+  end
+
+  subgraph description["the task description"]
+    task["static-tasks<br/>name, docstring,<br/>arguments, hidden"]
+  end
+
+  subgraph views["built from it"]
+    listing["maak --list"]
+    plan["maak --dry-run"]
+    callgraph["static-call-graph"]
+  end
+
+  file --> forms --> defs --> exports
+  exports -- "named" --> task
+  exports -- "not named" --> helper["a helper,<br/>not a task"]
+  exports -- "no list" --> task
+  file --> metadata --> task
+  task --> listing
+  task --> plan
+  task --> callgraph
