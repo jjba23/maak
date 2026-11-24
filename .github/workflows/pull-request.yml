@@ -51,10 +51,11 @@ jobs:
     name: 🧱 Byggsteg
     uses: jjba23/byggsteg-github/.github/workflows/byggsteg.yml@v0.1.1
     with:
-      tasks: maak-test
+      tasks: maak-deploy
       branch-name: ${{ github.event.pull_request.head.ref }}
       clone-url: ${{ github.event.pull_request.head.repo.clone_url }}
       timeout-minutes: 60
     secrets:
       BYGGSTEG_EMAIL: ${{ secrets.BYGGSTEG_EMAIL }}
+      DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
       BYGGSTEG_PASSWORD: ${{ secrets.BYGGSTEG_PASSWORD }}
