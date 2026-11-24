@@ -15,7 +15,9 @@ permissions:
 jobs:
   byggsteg:
     name: 🧱 Byggsteg
-    uses: jjba23/byggsteg-github/.github/workflows/byggsteg.yml@trunk
+    # The released bridge rather than its trunk: what maak runs is a version
+    # somebody chose, not whatever that repository's main branch says today.
+    uses: jjba23/byggsteg-github/.github/workflows/byggsteg.yml@v0.1.1
     with:
       tasks: maak-test maak-deploy
       timeout-minutes: 60

@@ -1,0 +1,60 @@
+# maak - the infinitely extensible command runner
+#
+# SPDX-License-Identifier: MIT
+# Copyright © Josep Bigorra <jjbigorra@gmail.com>
+
+# The pipeline a pull request runs: the suite, on Byggsteg, and nothing else.
+#
+# `pull_request_target' rather than `pull_request', and that is the whole answer
+# to "a patch must not choose what runs".  A `pull_request' workflow is read
+# from the pull request itself, so a patch that edited `.github/workflows/' would
+# be run as its author wrote it, with the credentials this repository holds.
+# `pull_request_target' reads the file from `trunk', the base of the pull
+# request: the patch cannot add a step, cannot change the task list, cannot ask
+# for a secret, because nothing it wrote is read here.  `permissions' below hands
+# the run a read-only token as well, so there is nothing to write with even if a
+# step it did not write could be added.
+#
+# What a patch can still be is the code under test.  `maak-test' runs on the
+# Byggsteg daemon, in the container that deployment gives a job, over the branch
+# named below; nothing of the patch runs on this runner.  The credentials handed
+# over are the two the bridge signs in to Byggsteg with, named one by one rather
+# than `secrets: inherit', so a secret added to this repository tomorrow is not
+# handed to a stranger's patch today.
+#
+# `branch-name' and `clone-url' are what make a pull request from a fork testable
+# at all: a run under this event is on `trunk', so the branch to check out is the
+# one the patch came from, and the repository to clone it from is the fork's
+# rather than this one.  The bridge pinned here is the released one, so the
+# script that submits the job is the script of that release and not of a branch
+# that can move under it.
+
+name: Pull request
+
+on:
+  pull_request_target:
+    branches: [trunk]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  # A new push to the same patch replaces the run of the one before it: a
+  # daemon builds one container per job, and a superseded run is a container
+  # nobody is waiting for.
+  group: pull-request-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  byggsteg:
+    name: 🧱 Byggsteg
+    uses: jjba23/byggsteg-github/.github/workflows/byggsteg.yml@v0.1.1
+    with:
+      tasks: maak-test
+      branch-name: ${{ github.event.pull_request.head.ref }}
+      clone-url: ${{ github.event.pull_request.head.repo.clone_url }}
+      timeout-minutes: 60
+    secrets:
+      BYGGSTEG_EMAIL: ${{ secrets.BYGGSTEG_EMAIL }}
+      BYGGSTEG_PASSWORD: ${{ secrets.BYGGSTEG_PASSWORD }}
