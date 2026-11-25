@@ -87,6 +87,10 @@
          (test "no step builds the default install step"
                (parameterize ((zig-command "zig"))
                  (assert-equal #:expect '("zig" "build")
+                               #:got (zig-build-argv))))
+         (test "an empty step list builds the default install step"
+               (parameterize ((zig-command "zig"))
+                 (assert-equal #:expect '("zig" "build")
                                #:got (zig-build-argv '()))))
          (test "a step may be one string or a list of them"
                (parameterize ((zig-command "zig"))

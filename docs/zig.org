@@ -94,10 +94,15 @@ Zig installed:
 ;;            -Dfoo=bar --prefix build/out --summary all
 #+end_src
 
-The first argument is one step name or a list of them; an empty list builds
-Zig's default install step.  The steps come first, then the build options, then
-~#:arguments~ as they are, so an option this builder does not name still
-reaches the build.
+The first argument is optional: omit it, or pass an empty list, to build Zig's
+default install step.  A step name is a string, and several steps are a list of
+them.  The steps come first, then the build options, then ~#:arguments~ as they
+are, so an option this builder does not name still reaches the build.
+
+#+begin_src scheme
+(run (zig-build-argv #:optimize "ReleaseSafe"))
+;; => zig build -Doptimize=ReleaseSafe
+#+end_src
 
 ~#:optimize~ takes ~Debug~, ~ReleaseSafe~, ~ReleaseFast~ or ~ReleaseSmall~.
 ~#:target~ and ~#:cpu~ become ~-Dtarget~ and ~-Dcpu~.  ~#:options~ carries the
