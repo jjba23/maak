@@ -7,7 +7,7 @@
 # both, plus the userland the launcher calls: `getopt' from util-linux and the
 # coreutils programs `dirname', `readlink' and `date'.
 pkgname=maak
-version=1.5.0
+version=1.5.1
 revision=1
 depends="bash coreutils guile util-linux"
 # `guild' byte-compiles the modules at build time, and it ships with Guile.

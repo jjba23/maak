@@ -1,3 +1,15 @@
+maak (1.5.1-1) unstable; urgency=medium
+
+  * The suite runs on guile-veritas 1.6.0, whose source moves to
+    https://github.com/jjba23/veritas.git: the Codeberg copy stops at v1.1.1.
+    That release adds end-to-end tests -- a suite starts and stops the services
+    it talks to, readiness is wait-for-port, wait-for-http and wait-for-log, and
+    http-get, http-post and http-request reach the running system.  The suite is
+    green on the new pin: 37 files, 132 suites, 991 tests, 1089 assertions.  No
+    library, command line or file format changed.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Wed, 25 Nov 2026 20:45:00 +0100
+
 maak (1.5.0-1) unstable; urgency=medium
 
   * zig-build-argv takes its steps as an optional first argument, so the common

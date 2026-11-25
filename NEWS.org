@@ -12,6 +12,21 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 
 *[Released]*
 
+** v1.5.1 (2026-11-25)
+
+The suite runs on veritas 1.6.0.  No library, command line or file format
+changed.
+
+*** Changed
+
+- `manifest.scm` pins `guile-veritas` at 1.6.0, the release that adds
+  end-to-end tests: a suite starts the services it talks to before its first
+  test and stops them after its last, `wait-for-port`, `wait-for-http` and
+  `wait-for-log` report why readiness failed instead of sleeping for a time the
+  author guessed, and `http-get`, `http-post` and `http-request` reach the
+  running system.  The source moves to GitHub with the pin, because the Codeberg
+  copy of veritas stops at v1.1.1 and carries nothing newer.
+
 ** v1.5.0 (2026-11-25)
 
 `zig-build-argv` no longer makes a caller write an empty list in front of the
