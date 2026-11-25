@@ -12,6 +12,30 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 
 *[Released]*
 
+** v1.5.0 (2026-11-25)
+
+`zig-build-argv` no longer makes a caller write an empty list in front of the
+options.  The first argument is optional, so the common call is one form that
+names the build options and nothing else.  The argv it builds is unchanged, and
+so is the rest of the library, the command line and the file formats.
+
+*** Added
+
+- `zig-build-argv` takes its steps as an optional first argument: omitting them,
+  or passing `'()`, builds Zig's default install step.
+  `(zig-build-argv #:optimize "ReleaseSafe")` is
+  `("zig" "build" "-Doptimize=ReleaseSafe")`, which used to need
+  `(zig-build-argv '() #:optimize "ReleaseSafe")`.  The docstring says which
+  shape a step has, and `docs/zig.org` shows the short form beside the long one.
+- `test/veritas/unit/zig.scm` covers the call that names no steps at all,
+  beside the one that passes an empty list.
+
+*** Changed
+
+- A call that names its steps builds the same argv as before, whether it passes
+  one step name as a string or a list of them, so a Maak file written against
+  v1.4.0 needs no edit.
+
 ** v1.4.1 (2026-11-24)
 
 A pull request runs the suite now, from a pipeline the patch cannot edit.  No

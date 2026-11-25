@@ -1,3 +1,15 @@
+maak (1.5.0-1) unstable; urgency=medium
+
+  * zig-build-argv takes its steps as an optional first argument, so the common
+    call is (zig-build-argv #:optimize "ReleaseSafe") instead of
+    (zig-build-argv '() #:optimize "ReleaseSafe").  Omitting the steps, or
+    passing an empty list, builds Zig's default install step; a call that names
+    steps builds the same argv as before, so a Maak file needs no edit.
+    docs/zig.org shows the short form and a case in test/veritas/unit/zig.scm
+    covers it.  No other library, command line or file format changed.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Wed, 25 Nov 2026 20:15:00 +0100
+
 maak (1.4.1-1) unstable; urgency=medium
 
   * A pull request runs the suite on Byggsteg now, from a pipeline the patch
