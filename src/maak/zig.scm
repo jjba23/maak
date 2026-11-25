@@ -180,7 +180,7 @@ An entry is a string such as `\"foo=bar\"', or a pair such as
   "Run zig SUBCOMMAND with ARGUMENTS."
   (run (zig-argv subcommand #:arguments arguments)))
 
-(define* (zig-build-argv steps
+(define* (zig-build-argv #:optional (steps '())
                          #:key
                          (arguments '())
                          (optimize #f)
@@ -204,9 +204,10 @@ An entry is a string such as `\"foo=bar\"', or a pair such as
                          (verbose? #f))
   "Return the argv that runs `zig build' with STEPS, without running it.
 
-STEPS is one step name or a list of them; an empty list builds Zig's default
-install step.  The steps come first, then the build options, then ARGUMENTS as
-they are, so an option this builder does not name still reaches the build.
+STEPS is optional: omit it, or pass an empty list, to build Zig's default
+install step.  A step name is a string, and several steps are a list of them.
+The steps come first, then the build options, then ARGUMENTS as they are, so an
+option this builder does not name still reaches the build.
 
 OPTIMIZE is one of `Debug', `ReleaseSafe', `ReleaseFast' or `ReleaseSmall'.
 TARGET and CPU become `-Dtarget' and `-Dcpu'; OPTIONS carries the project
@@ -219,6 +220,9 @@ are tested against.  A flag a newer Zig spells differently still reaches the
 build through ARGUMENTS.
 
 @example
+(zig-build-argv #:optimize \"ReleaseSafe\")
+@result{} (\"zig\" \"build\" \"-Doptimize=ReleaseSafe\")
+
 (zig-build-argv '(\"test\")
                 #:optimize \"ReleaseSafe\"
                 #:target \"aarch64-linux-gnu\"
