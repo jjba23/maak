@@ -33,6 +33,7 @@
   #:use-module (maak maven)
   #:use-module (maak gradle)
   #:use-module (maak elisp)
+  #:use-module (maak elixir)
   #:use-module (maak i18n)
   #:use-module (maak version)
   #:use-module (maak git)
@@ -319,6 +320,35 @@
                            elisp-footer?
                            elisp-practices
                            elisp-practices-ok?
+                           ;; ====== Elixir ======
+                           mix-command
+                           elixir-command
+                           mix-argv
+                           mix
+                           mix-output
+                           mix-cmd-argv
+                           mix-test-argv
+                           mix-test
+                           mix-format-argv
+                           mix-format
+                           mix-release-argv
+                           mix-release
+                           mix-deps
+                           mix-deps-get
+                           mix-compile
+                           mix-run
+                           mix-clean
+                           mix-version
+                           elixir-version
+                           mix-project-file
+                           mix-lock-file
+                           mix-project
+                           mix-project-name
+                           mix-project-version
+                           mix-project-elixir
+                           mix-project-umbrella?
+                           mix-lock-versions
+                           mix-lock-version
                            ;; ====== Guix values ======
                            guix-available?
                            guix-channels
