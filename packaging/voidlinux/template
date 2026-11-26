@@ -24,7 +24,7 @@ archs="x86_64* i686* aarch64* armv7l*"
 # afterwards from the published archive, which is the one thing no release task
 # can know.
 distfiles="${homepage}/archive/refs/tags/v${version}.tar.gz"
-checksum=51137f5dc46dffd58359dc2777654aaf4e77efcc6a131c89fddacea7834f6b6b
+checksum=52a9c09d03ef3814a8d2733b08a7925b13fcae3c91c60da7c5d45b15a7f0ed47
 # GitHub drops the tag's leading `v' from the directory it packs, which is what
 # this name is; saying so keeps a future `v' handling change from moving the
 # sources out from under the recipe.
