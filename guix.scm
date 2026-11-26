@@ -57,11 +57,16 @@
                                       (search-input-file inputs
                                                          (string-append "bin/"
                                                           program)))))))
-                        '(("readlink -f " "readlink" "~s -f ")
+                        ;; The launcher looks for the interpreter under the
+                        ;; name the system installs it by -- `guile' first,
+                        ;; `guile-3.0' second -- and the assignment rewritten
+                        ;; here is the first of the two, so the store's own
+                        ;; program is the one it finds.
+                        '(("guile_program=guile" "guile" "guile_program=~s")
+                          ("readlink -f " "readlink" "~s -f ")
                           ("realpath " "realpath" "~s ")
                           ("dirname " "dirname" "~s ")
-                          ("getopt " "getopt" "~s ")
-                          ("exec guile " "guile" "exec ~s ")))))
+                          ("getopt " "getopt" "~s ")))))
           (add-after 'build 'install-completions
             (lambda _
               (for-each (match-lambda

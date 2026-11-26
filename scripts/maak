@@ -465,5 +465,17 @@ if [ -n "${listing_style}" ]; then
   guile_cmd_args+=("--list=${listing_style}")
 fi
 
+# The interpreter's name is not the same on every system.  Guix, Nix and the
+# RPM, Arch, Void and Homebrew packages install a program called `guile', while
+# Debian's guile-3.0 package installs `guile-3.0' and no plain `guile' at all,
+# so a launcher that assumed the first name answered a Debian install with
+# "guile: command not found".  Both names are looked for rather than assumed,
+# and a packager whose interpreter sits at a path of its own rewrites the first
+# assignment -- which is what guix.scm does with the guile-3.0 beside it.
+guile_program=guile
+if ! command -v "${guile_program}" >/dev/null 2>&1; then
+  guile_program="guile-3.0"
+fi
+
 # Run Guile application
-exec guile "${guile_cmd_args[@]}"
+exec "${guile_program}" "${guile_cmd_args[@]}"

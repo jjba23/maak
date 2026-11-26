@@ -162,6 +162,43 @@ The answer is `#t' or `#f' rather than the offset `string-contains' finds, so
 that a case can ask about it alongside the status of the run."
   (and (string-contains (stream-of result stream) text) #t))
 
+;; ---- A PATH built the way Debian builds one -------------------------------
+;;
+;; Debian installs the interpreter as `guile-3.0' and no plain `guile', so a
+;; launcher that knows only the second name has to be given a PATH that looks
+;; like that system's to be caught here rather than on somebody's machine.  The
+;; programs the launcher runs before Guile starts are linked in from wherever
+;; they are now; the interpreter is a script of this run's own, because the
+;; question is which program was started rather than what one would have said.
+
+(define interpreter-programs
+  '("bash" "cat" "date" "dirname" "getopt" "readlink" "realpath"))
+
+(define* (debian-interpreter-path #:optional (interpreter "guile-3.0"))
+  "Return `(DIRECTORY . MARKER)', a PATH for a Debian-like system.
+
+DIRECTORY holds a link to every program INTERPRETER-PROGRAMS names and a
+stand-in INTERPRETER that touches MARKER and exits 0."
+  (let ((directory (unique-path "path"))
+        (marker (unique-path "started")))
+    (mkdir directory)
+    (for-each
+     (lambda (program)
+       (let ((found (which program)))
+         (unless found
+           (error "the suite needs ~a on PATH to build a test one" program))
+         (symlink (canonicalize-path found) (in-vicinity directory program))))
+     interpreter-programs)
+    (call-with-output-file (in-vicinity directory interpreter)
+      (lambda (port)
+        ;; The marker is written by the shell's own redirection, because this
+        ;; PATH has no `touch' on it: the programs the launcher needs are the
+        ;; ones linked here, and that is all a Debian system is being stood in
+        ;; for.
+        (format port "#!/bin/sh\n: > '~a'\nexit 0\n" marker)))
+    (chmod (in-vicinity directory interpreter) #o755)
+    (cons directory marker)))
+
 ;; ====== The suite ======
 ;;
 ;; The launcher runs the whole CLI in a process of its own, so these cases are
@@ -199,6 +236,35 @@ that a case can ask about it alongside the status of the run."
                                #:got (list (status-of result)
                                            (said? result "stdout"
                                                   (maak-version-string))))))
+
+         ;; ---- Which interpreter the launcher starts -----------------------
+         ;;
+         ;; The interpreter is asked for under two names.  Guix, Nix and the
+         ;; RPM, Arch, Void and Homebrew packages install a program called
+         ;; `guile'; Debian's guile-3.0 package installs `guile-3.0' and no
+         ;; plain `guile' at all, so a launcher that knew only the first name
+         ;; answered a Debian install with "guile: command not found".  The
+         ;; case below hands the launcher a PATH built the way that system
+         ;; builds one -- the programs it runs before Guile starts, and a
+         ;; stand-in interpreter under the second name only -- because which
+         ;; program it started is all that is being asked.
+
+         (test "the interpreter Debian names alone still starts maak"
+               (let* ((path (debian-interpreter-path))
+                      (directory (car path))
+                      (marker (cdr path))
+                      (saved (getenv "PATH")))
+                 (dynamic-wind
+                   (lambda () (setenv "PATH" directory))
+                   (lambda ()
+                     (let ((result (launcher-run "--version")))
+                       (assert-equal #:expect (list 0 #t)
+                                     #:got (list (status-of result)
+                                                 (file-exists? marker)))))
+                   (lambda ()
+                     (setenv "PATH" saved)
+                     (when (file-exists? marker) (delete-file marker))
+                     (delete-file-recursively directory)))))
 
          ;; ---- What works without a Maak file -----------------------------
          ;;
