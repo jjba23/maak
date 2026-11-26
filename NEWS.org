@@ -12,6 +12,19 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 
 *[Released]*
 
+** v1.6.1 (2026-11-26)
+
+The pinned Guix channel carries guile-dokgen 0.12.0: the published API
+reference folds the source behind each definition into a panel a reader opens,
+and reads on a quieter page with translucent surfaces.  No library, command
+line or file format changed.
+
+*** Changed
+
+- `channels.scm` pins `jointhefreeworld` at `59d58ac`, the commit that carries
+  guile-dokgen 0.12.0, so `maak docs` writes the API reference with the source
+  behind each definition folded into a panel the reader opens.
+
 ** v1.6.0 (2026-11-26)
 
 `(maak elixir)` brings Mix into the same shape as the other toolchains: the

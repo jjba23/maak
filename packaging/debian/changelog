@@ -1,3 +1,13 @@
+maak (1.6.1-1) unstable; urgency=medium
+
+  * channels.scm pins the jointhefreeworld channel at 59d58ac, the commit
+    that carries guile-dokgen 0.12.0: the published API reference folds the
+    source behind each definition into a panel a reader opens, and reads on a
+    quieter page with translucent surfaces.  No library, command line or file
+    format changed.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Thu, 26 Nov 2026 15:12:28 +0100
+
 maak (1.6.0-1) unstable; urgency=medium
 
   * (maak elixir) drives Mix, re-exported by (maak maak): mix-argv and mix for
