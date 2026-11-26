@@ -32,6 +32,8 @@ maak is configured three ways, in increasing order of precision: command-line fl
 | ~MAAK_SIFT~       | The sift program for ~(maak sift)~; falls back to ~SIFT~, then ~sift~. |
 | ~MAAK_GRADLE~     | The Gradle program for ~(maak gradle)~; falls back to ~GRADLE~, then ~gradle~. |
 | ~MAAK_EMACS~      | The Emacs program for ~(maak elisp)~; falls back to ~EMACS~, then ~emacs~. |
+| ~MAAK_MIX~        | The Mix program for ~(maak elixir)~; falls back to ~MIX~, then ~mix~. |
+| ~MAAK_ELIXIR~     | The Elixir program the version query runs; falls back to ~ELIXIR~, then ~elixir~. |
 | ~MAAK_ELEVATE~    | The program that answers ~#:sudo?~: ~doas~, ~sudo~, or one with options. |
 | ~MAAK_CONTAINER_ENGINE~ | The container engine: ~podman~ or ~docker~.                  |
 | ~MAAK_COMPOSE~    | The Compose program, for example ~podman-compose~ or ~docker compose~. |

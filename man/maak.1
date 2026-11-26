@@ -502,6 +502,24 @@ helpers run, falling back to
 and then
 .BR emacs .
 .TP
+.B MAAK_MIX
+The Mix program the
+.B (maak elixir)
+helpers run, falling back to
+.B MIX
+and then
+.BR mix .
+The value may carry a wrapper, as in
+.BR "asdf exec mix" .
+.TP
+.B MAAK_ELIXIR
+The Elixir program
+.B (maak elixir)
+reads its version from, falling back to
+.B ELIXIR
+and then
+.BR elixir .
+.TP
 .B MAAK_UV
 The uv program the
 .B (maak python)

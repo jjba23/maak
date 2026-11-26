@@ -1,0 +1,272 @@
+#+title: Elixir and mix
+#+author: Josep Bigorra
+#+email: jjbigorra@gmail.com
+#+options: toc:nil
+#+language: en
+
+[[file:index.org][Documentation index]]
+
+Mix is the build tool of an Elixir project and stays the build tool: it owns the
+compiler, the dependency graph, the environment and the release.  What
+~(maak elixir)~ adds is the task layer around it -- the three command lines a
+project's automation actually writes, `mix test`, `mix format` and `mix release`,
+as argv a task can inspect, one way to run something in another directory or for
+each application of an umbrella, and the two files a release reads.
+
+* The helpers
+
+| Helper                                       | What it does                                                      |
+|----------------------------------------------+-------------------------------------------------------------------|
+| ~mix-command~                                 | The parameter for the program, honoured from ~MAAK_MIX~, then ~MIX~. |
+| ~elixir-command~                              | The parameter for the interpreter, from ~MAAK_ELIXIR~, then ~ELIXIR~. |
+| ~mix-argv~                                    | The words of a mix task, with the switches Mix documents.          |
+| ~mix~                                         | Run a task with arguments, through ~run~.                          |
+| ~mix-output~                                  | Run an argv and return its standard output.                        |
+| ~mix-test-argv~, ~mix-format-argv~, ~mix-release-argv~ | The three command lines, built without running them.     |
+| ~mix-test~, ~mix-format~, ~mix-release~       | Run those command lines from words.                                |
+| ~mix-cmd-argv~                                | A command through ~mix cmd~, in a directory or for each app.       |
+| ~mix-deps~, ~mix-deps-get~, ~mix-compile~, ~mix-run~, ~mix-clean~ | The common tasks, one line each.        |
+| ~mix-version~, ~elixir-version~               | The version numbers the installed programs report.                 |
+| ~mix-project~, ~mix-project-name~, ~mix-project-version~, ~mix-project-elixir~, ~mix-project-umbrella?~ | What ~mix.exs~ declares. |
+| ~mix-lock-versions~, ~mix-lock-version~       | What ~mix.lock~ pins, dependency by dependency.                    |
+
+All of them are re-exported by ~(maak maak)~, so a normal Maak file needs only
+its usual import.
+
+* A project's tasks
+
+#+begin_src scheme
+(define-module (maak)
+  #:use-module (maak maak))
+
+(define (setup)
+  "Fetch the dependencies the lock file names."
+  (mix-deps-get "--check-locked"))
+
+(define (build)
+  "Compile, turning a warning into a failure."
+  (mix-compile "--warnings-as-errors"))
+
+(define (test)
+  "Run the suite, with coverage."
+  (mix-test "--cover"))
+
+(define (format-check)
+  "Fail when a file is not formatted."
+  (mix-format "--check-formatted"))
+
+(define (ci)
+  "What CI runs, in order."
+  (setup)
+  (format-check)
+  (test)
+  (build))
+
+(define (release)
+  "Assemble the release from the production environment."
+  (run (mix-release-argv "--overwrite") #:env '(("MIX_ENV" . "prod"))))
+#+end_src
+
+* The generic command line
+
+~mix-argv~ builds the words of any task, and it is where the grammar matters:
+Mix recognizes only ~--help~ and ~--version~ *before* the task name, so
+~mix --no-compile test~ is an error while ~mix test --no-compile~ runs.  The
+switches therefore come between the task and its arguments, and the five ~no-~
+checks plus ~--force~ are the ones the tasks a project's automation runs accept.
+
+#+begin_src scheme
+(mix-argv "compile" #:force? #t)
+;; => mix compile --force
+
+(mix-argv "ecto.migrate" #:arguments '("-r" "Repo"))
+;; => mix ecto.migrate -r Repo
+
+(mix-argv "test" #:no-start? #t #:arguments '("test/a_test.exs"))
+;; => mix test --no-start test/a_test.exs
+#+end_src
+
+An option this builder does not name travels in ~#:arguments~, as the words Mix
+reads for that task.
+
+* The three task lines
+** mix test
+
+~mix-test-argv~ takes the filters and switches ~mix help test~ documents.  The
+three filters Mix lets a caller repeat -- ~--only~, ~--include~ and ~--exclude~ --
+take a string or a list, and a list becomes one flag per filter, which is how Mix
+applies several of them at once.
+
+#+begin_src scheme
+(mix-test-argv #:warnings-as-errors? #t #:cover? #t)
+;; => mix test --cover --warnings-as-errors
+
+(mix-test-argv #:only '("slow" "integration") #:seed 0)
+;; => mix test --seed 0 --only slow --only integration
+
+(mix-test-argv #:trace? #t #:arguments '("test/a_test.exs:12"))
+;; => mix test --trace test/a_test.exs:12
+#+end_src
+
+| Keyword                                         | The flag                                                          |
+|-------------------------------------------------+-------------------------------------------------------------------|
+| ~#:only~, ~#:include~, ~#:exclude~               | ~--only~, ~--include~, ~--exclude~, repeated for a list.           |
+| ~#:seed~                                         | ~--seed~; ~0~ turns the random order off.                          |
+| ~#:max-failures~, ~#:slowest~, ~#:partitions~, ~#:repeat-until-failure~ | The same flag with a positive number.     |
+| ~#:trace?~, ~#:cover?~, ~#:failed?~, ~#:stale?~, ~#:force?~, ~#:warnings-as-errors?~ | The switches that only say yes. |
+| ~#:arguments~                                    | The files and lines to run, appended last.                         |
+
+~--stale~ is asked for rather than assumed: it runs only the tests that
+reference a module which changed, and a suite that quietly ran a subset is not
+what a task in a release asks for.
+
+A single seed, a filename and an option are also just words, which is what
+~mix-test~ takes:
+
+#+begin_src scheme
+(mix-test "--failed")
+(mix-test "test/a_test.exs:12")
+#+end_src
+
+** mix format
+
+#+begin_src scheme
+(mix-format-argv #:check-formatted? #t)
+;; => mix format --check-formatted
+
+(mix-format-argv #:dot-formatter ".formatter.exs" #:arguments '("lib" "test"))
+;; => mix format --dot-formatter .formatter.exs lib test
+#+end_src
+
+~#:check-formatted?~ is the gate a CI runs: it fails when a file is not
+formatted.  ~#:dry-run?~ reports what would change without writing it, and
+~#:stdin-filename~ is the path an editor passes for a buffer it has not saved.
+
+** mix release
+
+#+begin_src scheme
+(mix-release-argv "example" #:overwrite? #t)
+;; => mix release example --overwrite
+
+(mix-release-argv #:path "dist" #:quiet? #t #:version "1.2.3")
+;; => mix release --path dist --quiet --version 1.2.3
+#+end_src
+
+The release is normally assembled from the production environment, which is the
+task's environment to set:
+
+#+begin_src scheme
+(run (mix-release-argv "--overwrite") #:env '(("MIX_ENV" . "prod")))
+#+end_src
+
+The name is the one the project declares under ~releases:~ in ~mix.exs~; without
+one, Mix assembles the release the project names.
+
+* A command in a directory, or for each umbrella application
+
+Mix has no global ~--cd~, so a command that has to run somewhere else goes
+through ~mix cmd~, and an umbrella application is named on ~mix do~ -- ~mix cmd
+--app~ is deprecated in favour of it.  ~mix-cmd-argv~ answers with both, so a
+task does not have to remember which is which:
+
+#+begin_src scheme
+(mix-cmd-argv '("make" "test") #:cd "third-party")
+;; => mix cmd --cd third-party make test
+
+(mix-cmd-argv '("mix" "test") #:apps '("web" "api"))
+;; => mix do --app web --app api cmd mix test
+
+(mix-cmd-argv '("echo" "$HOME") #:shell? #t)
+;; => mix cmd --shell echo $HOME
+#+end_src
+
+The words are not read by a shell unless ~#:shell?~ asks for it, so a path with a
+space in it stays one argument.
+
+* What the files say
+** mix.exs
+
+The project file is read, never run: ~app: :example~ answers as ~"example"~,
+~version: "0.3.1"~ as ~"0.3.1"~, and a field whose value is computed --
+~deps: deps()~, ~start_permanent: Mix.env() == :prod~ -- is left out of
+~mix-project~ and refused by name from the readers that ask for it.  A release
+that tagged a version nobody wrote would be worse than a task that stopped.
+
+#+begin_src scheme
+(mix-project)
+;; => (("app" . "example") ("version" . "0.3.1") ("elixir" . "~> 1.15"))
+
+(mix-project-version)
+;; => "0.3.1"
+
+(string-append "v" (mix-project-version))
+;; => "v0.3.1"
+#+end_src
+
+Comments are dropped before anything is matched, because the file ~mix new~
+writes leaves a commented out dependency carrying a ~tag:~ and a ~git:~ that
+would otherwise read as fields of the project.  The first occurrence of a key
+wins, which is the project list in a file ~mix new~ wrote.
+
+An umbrella is a project that names its applications directory:
+
+#+begin_src scheme
+(mix-project-umbrella?)
+;; => #t, for a mix.exs with apps_path: "apps"
+
+(mix-project-elixir)
+;; => "~> 1.15"
+#+end_src
+
+** mix.lock
+
+The lock is an Elixir map literal, and the reader answers for hex
+dependencies: the third element of an entry is their version.  A dependency
+fetched from git carries a revision there instead, so it is left out of
+~mix-lock-versions~ and named as such by ~mix-lock-version~.
+
+#+begin_src scheme
+(mix-lock-versions)
+;; => (("decimal" . "2.1.1") ("phoenix" . "1.7.10"))
+
+(mix-lock-version "phoenix")
+;; => "1.7.10"
+#+end_src
+
+* The programs
+
+~MAAK_MIX~ names the program, falling back to ~MIX~ and then ~mix~, and
+~MAAK_ELIXIR~ names the interpreter the version query runs.  A value may carry a
+wrapper, which is how a project pinned to one version manager says so:
+
+#+begin_src scheme
+(parameterize ((mix-command "asdf exec mix"))
+  (mix-compile))
+;; => asdf exec mix compile
+#+end_src
+
+~mix-version~ and ~elixir-version~ report the number the program prints, taken
+from the line that names it rather than from the whole output, which carries the
+Erlang/OTP banner above it:
+
+#+begin_src scheme
+(mix-version)
+;; => "1.19.3"
+
+(elixir-version)
+;; => "1.19.3"
+#+end_src
+
+* What this does not do
+
+It does not read a value the project computes, compile Elixir, or take the place
+of Mix: every builder is a command line, every wrapper runs it, and the answers
+about ~mix.exs~ and ~mix.lock~ are the files' own words.  A task that needs what
+only Elixir can answer -- the routes of a Phoenix application, say -- runs
+~mix~ and reads the result:
+
+#+begin_src scheme
+(define (routes)
+  "Print every route the application defines."
+  (mix-run "-e" "ExampleWeb.Router.__routes__() |> Enum.each(&IO.inspect/1)"))
+#+end_src

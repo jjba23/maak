@@ -29,6 +29,7 @@ continues.
 | [[file:task-files.org][Task files in JSON, TOML and YAML]] | A task list without the language: the schema, the three formats, the supported subset of each, and what a data file cannot do. |
 | [[file:maven-and-gradle.org][Maven, Gradle and the JVM]] | The Maven lifecycle and Gradle tasks as argv, the wrapper a checkout pins, and the reports a JVM task reaches for. |
 | [[file:emacs-lisp.org][Emacs Lisp packages]] | Byte-compiling, ERT and checkdoc in batch, and the headers, provides and footer a package is expected to keep. |
+| [[file:elixir.org][Elixir and mix]] | `mix test`, `mix format` and `mix release` as argv, a command in a directory or for each umbrella app, and what `mix.exs` and `mix.lock` say. |
 | [[file:sift.org][Formatting and linting with sift]] | sift's format, lint, check and ci jobs as procedures, the status each one answers with, and the files they read. |
 | [[file:veritas.org][Running a Veritas suite]] | The suite invocation as one line, the four variables the runner reads, and the same words inside a manifest shell. |
 | [[file:guix-and-nix.org][Guix, Nix and reproducibility]] | The Guix and Nix helpers, and why a pin is a value a task can ask for. |
