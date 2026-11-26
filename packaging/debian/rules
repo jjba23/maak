@@ -1,96 +1,90 @@
 #!/usr/bin/make -f
 
-export DH_VERBOSE = 1
+# maak's Debian build: copy the modules where Guile reads them, byte-compile
+# each of them, and install the launcher with the files it looks for beside
+# itself.  Nothing is configured and nothing is compiled from C, so there is no
+# configure step and no shared library to link.
 
-GUILE_VER = 3.0
-SITE_DIR = debian/maak/usr/share/guile/site/$(GUILE_VER)
-CCACHE_DIR = debian/maak/usr/lib/guile/$(GUILE_VER)/site-ccache
+export DH_VERBOSE = 1
+export LC_ALL = C.UTF-8
+
+PKG_CONFIG ?= pkg-config
+GUILE_PC := guile-3.0
+
+# Guile answers where a module and its compiled form are read from, and Debian
+# does not use one directory for both: the modules belong under
+# /usr/share/guile/site, while the site-ccache is under the multiarch libdir.
+# Asking guile-3.0.pc rather than hard-coding the pair is what puts the compiled
+# files where the Guile this package depends on looks for them; a hard-coded
+# /usr/lib/guile/3.0/site-ccache is not a directory Debian's Guile reads.
+#
+# Both are absolute, and both are installed under the package root, because that
+# is what they are: the site directory the *system* has, not a path relative to
+# anything.
+SITE_DIR := $(shell $(PKG_CONFIG) --variable=sitedir $(GUILE_PC) 2>/dev/null)
+CCACHE_DIR := $(shell $(PKG_CONFIG) --variable=siteccachedir $(GUILE_PC) 2>/dev/null)
+
+# `guild' byte-compiles the modules.  Debian ships it in guile-3.0-dev under the
+# versioned name and no plain `guild', so the program is found rather than
+# assumed -- the recipe used to call `guild' and swallow its failure.
+GUILD := $(or $(shell command -v guild-3.0 2>/dev/null),$(shell command -v guild 2>/dev/null))
+
+BUILD_SITE := build/site
+BUILD_CCACHE := build/ccache
 
 %:
 	dh $@
 
+# No suite is run at build time.  The tests need the test framework this project
+# pins, which Debian does not carry; what can be asked of the installed package
+# without it is asked in debian/tests/ instead.
+override_dh_auto_test:
+
 override_dh_auto_build:
-	mkdir -p build/site/maak build/ccache/maak
-
-	# Locate Scheme sources
-	if [ -d "src/maak" ]; then \
-		cp -r src/maak/* build/site/maak/ ; \
-	elif [ -d "src" ]; then \
-		cp -r src/* build/site/maak/ ; \
-	elif [ -d "maak" ]; then \
-		cp -r maak/* build/site/maak/ ; \
-	else \
-		find . -maxdepth 1 -name "*.scm" -exec cp {} build/site/maak/ \; ; \
-	fi
-
-	# Byte-compile Scheme modules using guild
-	find build/site/maak -name "*.scm" | while read -r scm_file; do \
-		rel_path="$${scm_file#build/site/}"; \
-		go_file="build/ccache/$${rel_path%.scm}.go"; \
-		mkdir -p "$$(dirname "$$go_file")"; \
-		guild compile -L build/site -o "$$go_file" "$$scm_file" || true; \
+	@test -n "$(GUILD)" && test -n "$(SITE_DIR)" && test -n "$(CCACHE_DIR)" || \
+	  { echo "debian/rules: guile-3.0-dev and pkg-config are needed to find guild and guile's directories" >&2; exit 1; }
+	# The modules are installed as they are written, and byte-compiled one by
+	# one into the site-ccache, so the first run of the program does not compile
+	# the library.  A module that does not compile fails the build: a package
+	# that shipped the sources without their compiled form runs slower and hides
+	# the reason, which is what the `|| true' this replaces did.
+	mkdir -p $(BUILD_SITE)
+	cp -r src/maak $(BUILD_SITE)/maak
+	for scm in $$(find src/maak -name '*.scm' | sort); do \
+	  go="$(BUILD_CCACHE)/$${scm#src/}"; \
+	  go="$${go%.scm}.go"; \
+	  mkdir -p "$$(dirname "$$go")"; \
+	  $(GUILD) compile -L src -o "$$go" "$$scm"; \
 	done
 
 override_dh_auto_install:
-	# Executable wrapper
-	mkdir -p debian/maak/usr/bin
-	if [ -f "scripts/maak" ]; then \
-		install -m 0755 scripts/maak debian/maak/usr/bin/maak; \
-	elif [ -f "maak" ]; then \
-		install -m 0755 maak debian/maak/usr/bin/maak; \
-	fi
+	install -Dm755 scripts/maak debian/maak/usr/bin/maak
+	install -d debian/maak$(SITE_DIR)/maak debian/maak$(CCACHE_DIR)/maak
+	cp -r $(BUILD_SITE)/maak/. debian/maak$(SITE_DIR)/maak/
+	cp -r $(BUILD_CCACHE)/maak/. debian/maak$(CCACHE_DIR)/maak/
+	# The help screen, which the launcher reads from the share directory beside
+	# its own prefix rather than from the module directory.
+	install -Dm644 resources/help.txt debian/maak/usr/share/resources/help.txt
+	# One completion per shell, under the name that shell loads it by.
+	install -Dm644 scripts/maak-completion.bash \
+	  debian/maak/usr/share/bash-completion/completions/maak
+	install -Dm644 scripts/maak-completion.fish \
+	  debian/maak/usr/share/fish/vendor_completions.d/maak.fish
+	install -Dm644 scripts/maak-completion.zsh \
+	  debian/maak/usr/share/zsh/vendor-completions/_maak
+	# What was just installed is asked the question an installer asks it.  The
+	# launcher looks for its library under share/guile/site, so a directory this
+	# recipe computed wrongly is a failure here rather than a package that
+	# installs and then cannot start.  The Guile paths are cleared for the run:
+	# what is being asked is what this tree holds, not what a profile elsewhere
+	# on the build machine carries.
+	env -u GUILE_LOAD_PATH -u GUILE_LOAD_COMPILED_PATH \
+	  ./debian/maak/usr/bin/maak --version
+	env -u GUILE_LOAD_PATH -u GUILE_LOAD_COMPILED_PATH \
+	  ./debian/maak/usr/bin/maak --completion bash > /dev/null
 
-	# Guile site files & compiled cache
-	mkdir -p $(SITE_DIR) $(CCACHE_DIR)
-	cp -r build/site/maak $(SITE_DIR)/
-	cp -r build/ccache/maak $(CCACHE_DIR)/
-
-	# Help resources
-	mkdir -p debian/maak/usr/share/resources
-	if [ -f "resources/help.txt" ]; then \
-		install -m 0644 resources/help.txt debian/maak/usr/share/resources/help.txt; \
-	fi
-
-	# Documentation
-	mkdir -p debian/maak/usr/share/doc/maak
-	if [ -f "README.org" ]; then \
-		install -m 0644 README.org debian/maak/usr/share/doc/maak/README.org; \
-	fi
-	if [ -f "NEWS.org" ]; then \
-		install -m 0644 NEWS.org debian/maak/usr/share/doc/maak/NEWS.org; \
-	fi
-	if [ -d "docs" ]; then \
-		cp -r docs debian/maak/usr/share/doc/maak/docs; \
-	fi
-
-	# Shell completions
-	mkdir -p debian/maak/usr/share/bash-completion/completions
-	mkdir -p debian/maak/usr/share/fish/vendor_completions.d
-	mkdir -p debian/maak/usr/share/zsh/vendor-completions
-
-	if [ -f "scripts/maak-completion.bash" ]; then \
-		install -m 0644 scripts/maak-completion.bash debian/maak/usr/share/bash-completion/completions/maak; \
-	elif [ -f "maak-completion.bash" ]; then \
-		install -m 0644 maak-completion.bash debian/maak/usr/share/bash-completion/completions/maak; \
-	fi
-
-	if [ -f "scripts/maak-completion.fish" ]; then \
-		install -m 0644 scripts/maak-completion.fish debian/maak/usr/share/fish/vendor_completions.d/maak.fish; \
-	elif [ -f "maak-completion.fish" ]; then \
-		install -m 0644 maak-completion.fish debian/maak/usr/share/fish/vendor_completions.d/maak.fish; \
-	fi
-
-	if [ -f "scripts/maak-completion.zsh" ]; then \
-		install -m 0644 scripts/maak-completion.zsh debian/maak/usr/share/zsh/vendor-completions/_maak; \
-	elif [ -f "maak-completion.zsh" ]; then \
-		install -m 0644 maak-completion.zsh debian/maak/usr/share/zsh/vendor-completions/_maak; \
-	fi
-
-	# Manual page
-	mkdir -p debian/maak/usr/share/man/man1
-	if [ -f "man/maak.1" ]; then \
-		install -m 0644 man/maak.1 debian/maak/usr/share/man/man1/maak.1; \
-	fi
+override_dh_missing:
+	dh_missing --fail-missing
 
 override_dh_auto_clean:
 	rm -rf build

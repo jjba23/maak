@@ -1,14 +1,16 @@
 Source: maak
-Section: utils
+Section: devel
 Priority: optional
 Maintainer: Josep Bigorra <jjbigorra@gmail.com>
 Build-Depends:
  debhelper-compat (= 13),
+ guile-3.0,
  guile-3.0-dev,
- guile-3.0
-Standards-Version: 4.6.2
+ pkg-config,
+Standards-Version: 4.7.0
 Homepage: https://github.com/jjba23/maak
-Vcs-Git: https://github.com/jjba23/maak.git
+Vcs-Git: https://github.com/jjba23/maak.git -b trunk
+Vcs-Browser: https://github.com/jjba23/maak
 Rules-Requires-Root: no
 
 Package: maak
@@ -16,11 +18,23 @@ Architecture: any
 Depends:
  ${misc:Depends},
  ${shlibs:Depends},
- bash,
- coreutils,
  guile-3.0,
- util-linux
-Description: Command runner à la Make using Guile Scheme
- Maak is an extensible command runner and control plane for your projects.
- It allows you to use Guile Scheme to define tasks, build steps, and
- automation, integrating easily with external shell commands.
+Suggests:
+ curl,
+ git,
+ tar,
+ unzip,
+ zip,
+Description: command runner whose task list is a Guile Scheme file
+ Maak runs a project's automation from a Maak file: an ordinary Guile Scheme
+ module in which every procedure is a task.  The docstring is the task's
+ documentation, the lambda list is its argument grammar, and the command a
+ task runs is an argv list rather than a shell string, so a path with a space
+ in it stays one argument.
+ .
+ The same file is read, rather than run, to answer a question about it, so a
+ listing, a dry run, a plan of the commands and the call graph work on a file
+ somebody is halfway through writing.  Tasks compose like any other
+ procedure, run in parallel with -j, and may be pinned to a Guix or Nix store
+ path.  Like make in spirit, it takes a real programming language instead of
+ a domain specific one.

@@ -1,0 +1,9 @@
+# The installed package is asked what an installer asks a command runner: does
+# it start, can it read a Maak file that is not this project's, does --list name
+# the tasks, does --plan show the commands without running them, and does
+# --completion print a script.  Every answer is read from the installed program;
+# nothing here reaches the source tree.
+
+Tests: smoke
+Depends: maak
+Restrictions: allow-stderr

@@ -525,8 +525,8 @@ Args:
 
 (define deb-packages
   (make-parameter (map symbol->string
-                       '(build-essential debhelper devscripts cme lintian
-                                         guile-3.0-dev))))
+                       '(build-essential debhelper devscripts lintian
+                                         pkg-config guile-3.0-dev))))
 
 (define (deb-build)
   "Build .deb package (unsigned)"

@@ -1,0 +1,58 @@
+#!/bin/sh
+
+# maak's autopkgtest: the questions an installer asks the installed package.
+#
+# The version is not compared with the source tree here -- that is what
+# test/veritas/unit/version.scm does -- because the Debian revision (`-1', `-2')
+# is not part of what the program prints.
+
+set -eu
+
+fail() {
+	echo "smoke: $*" >&2
+	exit 1
+}
+
+# 1. The launcher starts the interpreter this package depends on, under the name
+#    Debian installs it by, and answers with a version.
+maak --version | head -n 1 | grep -qE '^maak [0-9]+\.[0-9]+\.[0-9]+$' ||
+	fail "maak --version printed no version line"
+maak --version | grep -q '^License: MIT$' || fail "maak --version printed no licence"
+
+# 2. It reads a Maak file of its own, in a directory of its own.
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+cat >"${work}/maak.scm" <<'EOF'
+(define-module (maak)
+  #:declarative? #t
+  #:use-module (maak maak))
+
+(define (greet name)
+  "Greet NAME."
+  (run (list "echo" "hello" name)))
+EOF
+cd "${work}"
+
+# 3. The listing names the task and the docstring beside it.
+maak --list | grep -q 'greet' || fail "--list did not name the task"
+maak --list | grep -q 'Greet NAME' || fail "--list did not print the docstring"
+
+# 4. The plan shows the argv the task would run, and runs nothing.
+maak --plan greet world | grep -q 'echo hello world' ||
+	fail "--plan did not show the command"
+
+# 5. A dry run shows the same command and leaves nothing behind.
+maak --dry-run greet world | grep -q 'echo hello world' ||
+	fail "the dry run showed no command"
+[ ! -e hello ] || fail "the dry run wrote a file"
+
+# 6. The completion is generated from the installed library.
+maak --completion bash | grep -q 'complete' ||
+	fail "--completion printed no completion"
+
+# 7. A task that is not there is refused, with the exit status a caller reads.
+if maak nope >/dev/null 2>&1; then
+	fail "an unknown task was accepted"
+fi
+
+echo "smoke: ok"
