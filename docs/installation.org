@@ -140,17 +140,59 @@ sudo zypper install ~/rpmbuild/RPMS/x86_64/maak-1.5.1-0.x86_64.rpm
 maak --help
 #+end_src
 
-* Debian and Ubuntu (experimental) 🧪
+* Debian and Ubuntu 🧪
 
-Install the build tools and compile the package (see also the ~deb-build~ task):
+maak is not in Debian yet, so the archive is built from ~packaging/debian~,
+which is a complete source package: a ~control~ file whose build depends on
+~guile-3.0-dev~ and ~pkg-config~, a ~rules~ file that byte-compiles every module
+into the site-ccache Guile reports, an autopkgtest, a ~watch~ file for ~uscan~
+and a DEP-5 copyright.
+
+The package installs the launcher in ~/usr/bin~, the modules under
+~/usr/share/guile/site/3.0~ and their compiled form in the site-ccache that
+~guile-3.0.pc~ names, which on Debian is the multiarch directory under
+~/usr/lib~ rather than ~/usr/lib/guile~. It also installs the manual page, the
+three completions, the help screen and the guide.
+
+Install the build tools, which ~maak deb-build~ also does for you:
 
 #+begin_src shell
-sudo apt update
-sudo apt install build-essential debhelper devscripts cme lintian guile-3.0-dev
-
-# Unsigned binary build; copy packaging/debian/* to the root of the repo first
-debuild -b -uc -us
+sudo apt install build-essential debhelper devscripts lintian pkg-config \
+     guile-3.0-dev
 #+end_src
+
+Then build. ~maak deb-build~ stages ~packaging/debian~ as ~./debian~ for the
+length of the build and removes the link afterwards, so nothing is copied by
+hand:
+
+#+begin_src shell
+./scripts/maak deb-build        # or `maak deb-build' with maak installed
+#+end_src
+
+The recipe byte-compiles each module and fails if one does not compile, then
+starts the tree it has just installed, because a launcher that cannot find its
+library is a build failure rather than a package that installs and then cannot
+start.  ~debuild~ leaves the archive, and lintian's report on it, one directory
+above the checkout:
+
+#+begin_src shell
+sudo dpkg -i ../maak_*.deb
+maak --version
+#+end_src
+
+The two checks a Debian developer runs, both of which work here without a
+change to the packaging:
+
+#+begin_src shell
+lintian ../maak_*.changes                        # policy and packaging
+autopkgtest ../maak_*.changes -- null            # the installed program
+uscan --download-current-version                 # debian/watch finds the release
+#+end_src
+
+The autopkgtest is ~packaging/debian/tests/smoke~: it asks the installed program
+for its version, reads a Maak file of its own in a directory of its own, lists
+and plans without running, and prints a completion.  A release therefore does not
+need a Debian build to know that the package starts.
 
 * Arch Linux
 

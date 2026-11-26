@@ -84,10 +84,10 @@ Two copies are left to a person, because neither is a number in a file:
   maintainer line. ~test/veritas/unit/version.scm~ compares the newest entry
   with the program, so a release whose changelog was forgotten fails the suite
   instead of shipping a package named after an older version.
-- ~packaging/arch/PKGBUILD~ and ~packaging/homebrew/Formula/maak.rb~ carry a
-  checksum of the release's archive, which cannot be known until the tag is
-  published. Both download the same archive, so one value fills both. Write it
-  after the push:
+- ~packaging/arch/PKGBUILD~, ~packaging/voidlinux/template~ and
+  ~packaging/homebrew/Formula/maak.rb~ carry a checksum of the release's
+  archive, which cannot be known until the tag is published. All three download
+  the same archive, so one value fills all three. Write it after the push:
 
 #+begin_src shell
 curl -sL https://github.com/jjba23/maak/archive/refs/tags/vX.Y.Z.tar.gz \
