@@ -1,3 +1,22 @@
+maak (1.6.0-1) unstable; urgency=medium
+
+  * (maak elixir) drives Mix, re-exported by (maak maak): mix-argv and mix for
+    a task, mix-test-argv, mix-format-argv and mix-release-argv with the
+    filters, switches and numbers `mix help TASK' documents, mix-cmd-argv for a
+    command in another directory or for each application of an umbrella, and
+    the one-line wrappers mix-deps, mix-deps-get, mix-compile, mix-run and
+    mix-clean.
+  * The readers answer what mix.exs and mix.lock say -- the application name,
+    the version, the Elixir requirement, whether the project is an umbrella,
+    and the version each hex dependency is pinned at -- by reading the files,
+    so a release task tags a version somebody wrote.  A field the project
+    computes is refused by name instead of guessed at.
+  * MAAK_MIX and MAAK_ELIXIR name the programs; the manual page and the
+    configuration page name both, and a value may carry a wrapper.
+  * docs/elixir.org is the page for it, linked from the guide's index.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Thu, 26 Nov 2026 09:45:40 +0100
+
 maak (1.5.2-1) unstable; urgency=medium
 
   * The launcher finds the Guile 3 interpreter under the name the system

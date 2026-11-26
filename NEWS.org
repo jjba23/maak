@@ -12,6 +12,48 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 
 *[Released]*
 
+** v1.6.0 (2026-11-26)
+
+`(maak elixir)` brings Mix into the same shape as the other toolchains: the
+three command lines an Elixir project's automation writes are argv a task can
+inspect, a command runs in a directory or for each application of an umbrella,
+and the name, version and requirement a release reads come from `mix.exs` and
+`mix.lock` rather than from a guess.
+
+*** Added
+
+- `(maak elixir)`, re-exported by `(maak maak)`:
+  - `mix-argv` and `mix` build and run a task, with the switches Mix documents
+    placed after the task name, which is where Mix accepts them: it recognizes
+    only `--help` and `--version` in front of the task.
+  - `mix-test-argv`, `mix-format-argv` and `mix-release-argv`, with the filters,
+    switches and numbers `mix help TASK` documents -- `--only`, `--include` and
+    `--exclude` take a string or a list, and a list is one flag each.  `mix-test`,
+    `mix-format` and `mix-release` run them from words, and `mix-deps`,
+    `mix-deps-get`, `mix-compile`, `mix-run` and `mix-clean` are the one-line
+    wrappers.
+  - `mix-cmd-argv` runs a command in another directory (`mix cmd --cd`) or for
+    each application of an umbrella (`mix do --app ... cmd ...`, which is what
+    Mix documents in place of the deprecated `mix cmd --app`).  Mix has no global
+    `--cd`, so this is the only way to say "there".
+  - `mix-version` and `elixir-version` answer with the number the program prints,
+    read from the line that names it rather than from the Erlang/OTP banner
+    above it.
+  - `mix-project`, `mix-project-name`, `mix-project-version`,
+    `mix-project-elixir` and `mix-project-umbrella?` read `mix.exs` as text:
+    literal fields are answered for, comments are dropped first -- the file
+    `mix new` writes leaves a commented out dependency carrying a `tag:` -- and a
+    field the project computes is refused by name rather than guessed at.
+  - `mix-lock-versions` and `mix-lock-version` answer with what `mix.lock` pins,
+    and say which entry carries a revision rather than a version.
+- `MAAK_MIX` and `MAAK_ELIXIR` name the programs, falling back to `MIX` and
+  `ELIXIR`; a value may carry a wrapper, as in `MAAK_MIX="asdf exec mix"`.  The
+  manual page and the configuration page name both.
+- `docs/elixir.org`, with the three task lines, the umbrella and directory
+  forms, and the two readers; `test/veritas/unit/elixir.scm` covers 51 cases,
+  and every option name it asserts was checked against `mix help TASK` from
+  Elixir 1.19.3.
+
 ** v1.5.2 (2026-11-26)
 
 A Debian install works: the launcher starts the Guile the system installs, and
