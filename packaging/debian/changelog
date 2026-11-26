@@ -1,3 +1,31 @@
+maak (1.5.2-1) unstable; urgency=medium
+
+  * The launcher finds the Guile 3 interpreter under the name the system
+    installs it by: `guile' where a distribution provides it, and `guile-3.0'
+    where that is the only name there is, which is the case on Debian.  An
+    installed maak answered a Debian system with "guile: command not found"
+    before this.
+  * The package builds the way a Debian package should.  A module that fails
+    to byte-compile fails the build instead of being skipped: the recipe called
+    `guild compile' with `|| true', and Debian's guild is `guild-3.0', so every
+    compiled file was missing and the error went into the log.  The compiled
+    files are installed into the site-ccache guile-3.0.pc reports, which on
+    Debian is the multiarch directory rather than /usr/lib/guile/3.0, and the
+    installed tree is started once during the build.  Build-Depends name
+    pkg-config and guile-3.0-dev, the package no longer depends on Essential
+    packages, the synopsis is ASCII and the section is devel, and
+    Standards-Version is 4.7.0.
+  * New packaging files: debian/watch, so that `uscan' finds a release;
+    debian/tests, an autopkgtest that asks the installed program for its
+    version, a listing, a plan, a dry run and a completion; debian/upstream/
+    metadata; and debian/maak.docs and debian/maak.manpages instead of copies
+    made by hand in debian/rules.
+  * debian/copyright names the two skills AGENTS.md is generated from, both
+    MIT licensed.  The oldest changelog entry no longer claims to close a bug
+    number it never closed.
+
+ -- Josep Bigorra <jjbigorra@gmail.com>  Thu, 26 Nov 2026 09:08:35 +0100
+
 maak (1.5.1-1) unstable; urgency=medium
 
   * The suite runs on guile-veritas 1.6.0, whose source moves to
@@ -387,6 +415,6 @@ maak (0.14.1-1) unstable; urgency=medium
 
 maak (0.8.3-1) unstable; urgency=medium
 
-  * Initial Debian release (Closes: #1000000).
+  * Initial Debian release.
 
  -- Josep Bigorra <jjbigorra@gmail.com>  Tue, 25 Aug 2026 12:00:00 +0000

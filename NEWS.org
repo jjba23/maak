@@ -12,6 +12,48 @@ This project adheres loosely to [[https://semver.org/spec/v2.0.0.html][Semantic 
 
 *[Released]*
 
+** v1.5.2 (2026-11-26)
+
+A Debian install works: the launcher starts the Guile the system installs, and
+the Debian package builds the way a Debian package should.  No library, command
+line or file format changed.
+
+*** Fixed
+
+- `scripts/maak` finds the interpreter under the name the system installs it
+  by: `guile` where a distribution provides it, and `guile-3.0` where that is
+  the only name there is, which is the case on Debian.  An installed maak
+  answered a Debian system with `guile: command not found`, because Debian's
+  `guile-3.0` package ships `/usr/bin/guile-3.0` and no plain `guile`.
+  `test/veritas/unit/integration.scm` runs the launcher on a PATH built the way
+  that system builds one, so the second name stays tested.
+
+*** Changed
+
+- `packaging/debian` is a package a Debian developer would expect to find:
+  - `rules` byte-compiles each module with `guild-3.0`, which is the name
+    Debian ships, and a module that does not compile fails the build.  The
+    recipe called `guild compile` with `|| true`, so every compiled file was
+    missing and the error said nothing.
+  - The compiled files are installed into the site-ccache `guile-3.0.pc`
+    reports -- the multiarch directory under `/usr/lib` on Debian, not
+    `/usr/lib/guile` -- and the installed tree is started once during the
+    build, so a launcher that cannot find its library is a build failure.
+  - `control` names `pkg-config` and `guile-3.0-dev`, no longer depends on
+    Essential packages, has an ASCII synopsis, is in `devel` where `make` is,
+    and is at `Standards-Version: 4.7.0`.
+  - `debian/watch` lets `uscan` find a release; `debian/tests` is an
+    autopkgtest that asks the installed program for its version, a listing, a
+    plan, a dry run and a completion; `debian/upstream/metadata` is DEP-12;
+    `debian/maak.docs` and `debian/maak.manpages` replace the copies the recipe
+    made by hand.
+  - `debian/copyright` names the two skills `AGENTS.md` is generated from, and
+    the oldest changelog entry no longer claims to close a bug number it never
+    closed.
+- `maak deb-build` installs `pkg-config` with the rest of the Debian build
+  tools, and `docs/installation.org` describes the Debian build as it is
+  instead of calling it experimental.
+
 ** v1.5.1 (2026-11-25)
 
 The suite runs on veritas 1.6.0.  No library, command line or file format
